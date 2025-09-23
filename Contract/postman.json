@@ -1,0 +1,156 @@
+{
+  "info": {
+    "name": "Orders API",
+    "_postman_id": "orders-api-collection",
+    "description": "Collection for Orders API — GET list, GET by id, POST create. Edit {{baseUrl}} if needed.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0"
+  },
+  "item": [
+    {
+      "name": "Get Orders",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/orders",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "orders"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Response is JSON\", function () {",
+              "    pm.response.to.be.json();",
+              "});",
+              "",
+              "pm.test(\"Envelope has ok property\", function () {",
+              "    const json = pm.response.json();",
+              "    pm.expect(json).to.have.property('ok');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get Order by Id",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/orders/{{orderId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "orders",
+            "{{orderId}}"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Response is JSON\", function () {",
+              "    pm.response.to.be.json();",
+              "});",
+              "",
+              "pm.test(\"Envelope has ok property\", function () {",
+              "    const json = pm.response.json();",
+              "    pm.expect(json).to.have.property('ok');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create Order (POST)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"session_id\": \"cs_test_b1IUDa2CTVkK8XKrQcntt3daZKb7vA9hGXXWf8Vlh74F6fhKavPagaUFpp\",\n  \"name\": \"Alvaro Ferranti\",\n  \"email\": \"customer@example.com\",\n  \"amount_total\": 3999,\n  \"currency\": \"eur\",\n  \"items\": [\n    {\n      \"id\": \"price_1\",\n      \"name\": \"IBOTINCTURE™ TOTAL EXTRACT (60 ML)\",\n      \"quantity\": 1,\n      \"unit_amount\": 3999\n    }\n  ],\n  \"metadata\": {\n    \"addr_city\": \"Sintra\",\n    \"addr_ctry\": \"PT\",\n    \"addr_line1\": \"Rua Engenheiro Sampaio Baptista,12\",\n    \"addr_zip\": \"2710-691\",\n    \"full_name\": \"Alvaro Ferranti\",\n    \"phone\": \"965751649\"\n  },\n  \"track_url\": \"\",\n  \"metadata_raw\": {}\n}\n",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/orders",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "orders"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Response is JSON\", function () {",
+              "    pm.response.to.be.json();",
+              "});",
+              "",
+              "pm.test(\"Envelope has ok property and order\", function () {",
+              "    const json = pm.response.json();",
+              "    pm.expect(json).to.have.property('ok');",
+              "    pm.expect(json.ok).to.be.true;",
+              "    pm.expect(json).to.have.property('order');",
+              "});",
+              "",
+              "// if creation returned an order with an event_id, save it to collection variable for next requests",
+              "try {",
+              "    const json = pm.response.json();",
+              "    if (json && json.order && json.order.event_id) {",
+              "        pm.collectionVariables.set('orderId', json.order.event_id);",
+              "    }",
+              "} catch (e) { /* ignore parse errors */ }"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "orderId",
+      "value": "evt_1SALZLPjytaoBek7ZzrMhi15",
+      "type": "string"
+    }
+  ]
+}

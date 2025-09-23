@@ -92,34 +92,41 @@ export async function getOrderById(idStr) {
   return { id: doc.id, ...data };
 }
 
-export async function createOrderDB(obj) {
-  ensureInit()
+// database/firebaseDB.mjs
+// Required helpers (adjust path if your module uses a different name / location):
+// import { initFirebase, getRealtimeDB, getFirestore, useRealtimeDB } from './firebase/firebaseInit.mjs';
+// import 'dotenv/config';
 
-   // Attach a deterministic createdAt timestamp (ISO string).
-  // If you prefer server timestamps, see note below.
+export async function createOrderDB(orderData = {}, { id = undefined } = {}) {
+  // ensure Firebase admin is initialized (this will throw if creds are missing)
+  initFirebase(); // or ensureInit(); depending on your module
+
+  // attach createdAt right away so we can return it without another read
   const createdAt = new Date().toISOString();
   const payload = { ...orderData, createdAt };
 
   if (useRealtimeDB()) {
     const db = getRealtimeDB();
 
-    if (id) {
-      // write to a known key (overwrite or create)
-      await db.ref(`/orders/${id}`).set(payload);
-      return { id: String(id), ...payload };
+    if (typeof id !== 'undefined' && id !== null) {
+      const key = String(id);
+      await db.ref(`/orders/${key}`).set(payload);
+      return { id: key, ...payload };
     } else {
-      // push() creates a new unique key
       const newRef = db.ref('/orders').push();
       await newRef.set(payload);
       return { id: newRef.key, ...payload };
     }
   }
 
+  // Firestore branch
   const fs = getFirestore();
-  if (id) {
-    const docRef = fs.collection('orders').doc(String(id));
+
+  if (typeof id !== 'undefined' && id !== null) {
+    const key = String(id);
+    const docRef = fs.collection('orders').doc(key);
     await docRef.set(payload);
-    return { id: String(id), ...payload };
+    return { id: key, ...payload };
   } else {
     const docRef = await fs.collection('orders').add(payload);
     return { id: docRef.id, ...payload };

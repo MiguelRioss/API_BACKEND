@@ -222,5 +222,33 @@
     "event_id": "8305b0d4-4e14-4153-beed-3a534577b813",
     "written_at": "2025-09-23T20:29:21.441Z",
     "status": false
+  },
+  "0bf4f25e-b2bf-4f3a-ad2f-0b73c969b2b0": {
+    "session_id": "hello",
+    "name": "Alvaro Ferranti",
+    "email": "customer@example.com",
+    "amount_total": 3999,
+    "currency": "eur",
+    "items": [
+      {
+        "id": "price_1",
+        "name": "IBOTINCTURE™ TOTAL EXTRACT (60 ML)",
+        "quantity": 1,
+        "unit_amount": 3999
+      }
+    ],
+    "metadata": {
+      "addr_city": "Sintra",
+      "addr_ctry": "PT",
+      "addr_line1": "Rua Engenheiro Sampaio Baptista,12",
+      "addr_zip": "2710-691",
+      "full_name": "Alvaro Ferranti",
+      "phone": "965751649"
+    },
+    "track_url": "",
+    "metadata_raw": {},
+    "event_id": "0bf4f25e-b2bf-4f3a-ad2f-0b73c969b2b0",
+    "written_at": "2025-09-23T22:36:58.763Z",
+    "status": false
   }
 }

@@ -2,7 +2,7 @@
 import fs from 'fs';
 import path from 'path';
 import admin from 'firebase-admin';
-import 'dotenv/config'; // load .env from project root in dev
+import 'dotenv/config'; // loads .env in dev
 
 const isTruthy = v => (typeof v === 'string' ? v.toLowerCase() === 'true' : !!v);
 
@@ -11,44 +11,46 @@ function resolveServiceAccountPath() {
   return path.resolve(process.cwd(), process.env.FIREBASE_SERVICE_ACCOUNT_PATH);
 }
 
-/**
- * Initialize firebase-admin (idempotent).
- * Accepts optional overrides, but by default reads process.env.* variables:
- * - FIREBASE_SERVICE_ACCOUNT_PATH  (./secrets/...)
- * - FIREBASE_SERVICE_ACCOUNT_JSON  (full JSON string, less ideal)
- * - FIREBASE_DATABASE_URL
- * - FIREBASE_PROJECT_ID
- *
- * Returns the admin namespace.
- */
-export function initFirebase({ force = false } = {}) {
-  if (admin.apps && admin.apps.length && !force) {
-    // already initialized -> return admin instance
-    return admin;
+function parseServiceAccountFromEnv() {
+  // 1) raw JSON env
+  if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+    return JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
   }
+  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    return JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+  }
+  // 2) base64-encoded JSON env
+  if (process.env.FIREBASE_SERVICE_ACCOUNT_B64) {
+    const decoded = Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_B64, 'base64').toString('utf8');
+    return JSON.parse(decoded);
+  }
+  return null;
+}
+
+export function initFirebase({ force = false } = {}) {
+  if (admin.apps && admin.apps.length && !force) return admin;
 
   let credential = null;
   const saPath = resolveServiceAccountPath();
 
   try {
-    if (saPath) {
-      if (!fs.existsSync(saPath)) {
-        throw new Error(`Service account file not found at ${saPath}`);
-      }
+    // Prefer: env JSON/B64
+    const parsedFromEnv = parseServiceAccountFromEnv();
+    if (parsedFromEnv) {
+      credential = admin.credential.cert(parsedFromEnv);
+    }
+    // If no env credential but a path is provided and exists -> use file
+    else if (saPath && fs.existsSync(saPath)) {
       const raw = fs.readFileSync(saPath, 'utf8');
       const parsed = JSON.parse(raw);
       credential = admin.credential.cert(parsed);
-    } else if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
-      const parsed = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
-      credential = admin.credential.cert(parsed);
-    } else {
-      // fallback to application default credentials (GCP)
+    }
+    // else fallback to ADC (GCP)
+    else {
       credential = admin.credential.applicationDefault();
     }
   } catch (err) {
-    // surface parse/file errors immediately
     const msg = `Failed to load Firebase credentials: ${err.message}`;
-    // keep detailed stack in console for debugging
     console.error(msg);
     console.error(err && err.stack);
     throw new Error(msg);
@@ -61,7 +63,6 @@ export function initFirebase({ force = false } = {}) {
 
   try {
     admin.initializeApp(initOptions);
-    // optional: enable debug logging in dev
     if (process.env.NODE_ENV !== 'production') {
       console.info('Firebase Admin initialized (projectId=%s, useRTDB=%s)',
         process.env.FIREBASE_PROJECT_ID || '<unset>',
@@ -74,34 +75,11 @@ export function initFirebase({ force = false } = {}) {
   }
 }
 
-/** return the initialized admin namespace (or throw if not init) */
 export function getAdmin() {
-  if (!admin.apps || !admin.apps.length) {
-    throw new Error('Firebase not initialized. Call initFirebase() first.');
-  }
+  if (!admin.apps || !admin.apps.length) throw new Error('Firebase not initialized. Call initFirebase() first.');
   return admin;
 }
-
-/** utility: get Firestore instance (after init) */
-export function getFirestore() {
-  return getAdmin().firestore();
-}
-
-/** utility: get RTDB instance (after init) */
-export function getRealtimeDB() {
-  const a = getAdmin();
-  if (!a.database) {
-    throw new Error('Realtime Database not available in this admin build.');
-  }
-  return a.database();
-}
-
-/** boolean helper */
-export function isInitialized() {
-  return !!(admin.apps && admin.apps.length);
-}
-
-/** convenience: should we use RTDB? */
-export function useRealtimeDB() {
-  return isTruthy(process.env.FIREBASE_USE_RTDB);
-}
+export function getFirestore(){ return getAdmin().firestore(); }
+export function getRealtimeDB(){ const a=getAdmin(); if(!a.database) throw new Error('RTDB not available'); return a.database(); }
+export function isInitialized(){ return !!(admin.apps && admin.apps.length); }
+export function useRealtimeDB(){ return isTruthy(process.env.FIREBASE_USE_RTDB); }

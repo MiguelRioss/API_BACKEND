@@ -52,7 +52,6 @@ export default function createOrdersService(db) {
 
       // Compose the pure helpers
       orders = filterByStatus(orders, status);
-      console.log(orders)
 
       orders = filterByQuery(orders, q);
       orders = sortByWrittenAtDesc(orders);
@@ -70,31 +69,39 @@ export default function createOrdersService(db) {
   // -------------------------
   // getOrderByIdServices: flexible lookup (uses servicesUtils)
   // -------------------------
-  async function getOrderByIdServices(id) {
-    try {
-      // validate id (throws ValidationError on bad input)
-      validateIdOrThrow(id);
+ async function getOrderByIdServices(id) {
+  try {
+    // 1) validate input (throws ValidationError -> DomainError if invalid)
+    validateIdOrThrow(id);
 
-      // fast-path: prefer adapter direct lookup when available
-      if (typeof db.getOrderById === "function") {
-        const direct = await db.getOrderById(id);
-        if (direct) return direct;
-        // otherwise continue to fallback search
-      }
+    // 2) normalise to a trimmed string for the DB layer
+    //    - this prevents numeric/string mismatch and removes accidental spaces
+    const idStr = String(id).trim();
 
-      // fallback: scan all orders and use validator matching
-      const all = await db.getAllOrders();
-      const found = findOrderById(all, id);
-      if (found) return found;
-
-      // Not found -> domain error
-      throw new NotFoundError(`Order ${String(id).trim()} not found`);
-    } catch (err) {
-      if (err instanceof DomainError) throw err;
-      throw new ExternalServiceError("Failed looking up order", { original: err?.message ?? String(err) });
+    // Optional: ensure idStr not empty after trim
+    if (idStr.length === 0) {
+      throw new Error('getOrderByIdServices: normalized id is empty');
     }
-  }
 
+    // 3) prefer adapter direct lookup (adapter should expect a string)
+    if (typeof db.getOrderById === 'function') {
+      const direct = await db.getOrderById(idStr);
+      if (direct) return direct;
+      // if adapter returns falsy, fallthrough to explicit NotFound
+    }
+
+    // 4) if no adapter or not found, explicit NotFoundError
+    throw new NotFoundError(`Order ${idStr} not found`);
+  } catch (err) {
+    // preserve domain errors by code or instanceof
+    if (err && (err instanceof NotFoundError || err.code === 'NOT_FOUND')) throw err;
+    if (err && (err instanceof DomainError || err.code === 'VALIDATION_ERROR')) throw err;
+
+    // wrap unexpected errors for the upstream layer
+    const origDetail = err && (err.message || err.stack || String(err));
+    throw new ExternalServiceError('Failed looking up order', { original: origDetail });
+  }
+}
 
   // -------------------------
   // createOrderServices: validate, prepare and persist an order
@@ -104,6 +111,7 @@ export default function createOrdersService(db) {
       // 1) validate & prepare (throws ValidationError on bad input)
       const prepared = validateAndPrepareOrder(orderObject);
 
+      console.log(prepared)
       // 2) ensure DB supports create
       if (typeof db.createOrderDB !== "function") {
         throw new ExternalServiceError("DB adapter does not support createOrderDB");

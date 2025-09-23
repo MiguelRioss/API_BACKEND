@@ -1,16 +1,127 @@
-// database/firebaseDB.mjs (example stub — implement with firebase-admin in real use)
-import admin from 'firebase-admin';
+// database/firebaseDB.mjs
+import 'dotenv/config'; // safe to import again; dotenv is idempotent
+import { initFirebase, getFirestore, getRealtimeDB, useRealtimeDB } from './firebase/firebaseInit.mjs';
+import { NotFoundError, ExternalServiceError } from '../domain/domainErrors.mjs';
 
-if (!admin.apps.length) {
-  // init code here using service account JSON or env-based credentials
-  // admin.initializeApp({ credential: admin.credential.cert(...), databaseURL: process.env.FIREBASE_DATABASE_URL });
+/**
+ * Ensure Firebase is initialized before any db operation.
+ * You may call initFirebase() at app startup (recommended).
+ */
+function ensureInit() {
+  try {
+    initFirebase();
+  } catch (err) {
+    // Wrap init errors as ExternalServiceError so API layer can handle consistently
+    throw new ExternalServiceError(`Firebase initialization failed: ${err && err.message}`, err);
+  }
 }
 
-export async function getAllOrders() {
-  // implement reading from Firebase RTDB or Firestore
-  throw new Error('firebaseDB.getAllOrders not implemented. Implement using firebase-admin.');
+/**
+ * Get all orders (RTDB or Firestore depending on env).
+ * Returns an array of { id, ...data }.
+ */
+export async function getAllOrders(options = {}) {
+  ensureInit();
+  try {
+    if (useRealtimeDB()) {
+      const db = getRealtimeDB();
+      const snap = await db.ref('/orders').once('value');
+      const val = snap.val() || {};
+      return Object.entries(val).map(([id, data]) => ({ id, ...data }));
+    }
+
+    const fsdb = getFirestore();
+    let q = fsdb.collection('orders');
+
+    if (options.where) {
+      const clauses = Array.isArray(options.where) ? options.where : [options.where];
+      for (const c of clauses) {
+        q = q.where(c.field, c.op, c.value);
+      }
+    }
+
+    if (options.orderBy) q = q.orderBy(options.orderBy.field, options.orderBy.direction || 'desc');
+    else q = q.orderBy('createdAt', 'desc');
+
+    if (options.limit) q = q.limit(options.limit);
+
+    const snap = await q.get();
+    return snap.docs.map(doc => {
+      const data = doc.data();
+      if (data && data.createdAt && typeof data.createdAt.toDate === 'function') {
+        data.createdAt = data.createdAt.toISOString();
+      }
+      return { id: doc.id, ...data };
+    });
+  } catch (err) {
+    // Log for server-side debugging. Wrap as ExternalServiceError for callers.
+    console.error('getAllOrders error:', err && err.stack);
+    throw new ExternalServiceError('Failed to read orders from DB', err);
+  }
+}
+// Assumes these are imported at the top of the module:
+// import { NotFoundError } from '../api/errors/domainErrors.mjs';
+// import { initFirebase, getFirestore, getRealtimeDB, useRealtimeDB } from './firebase/firebaseInit.mjs';
+// and ensureInit() calls initFirebase() or throws.
+
+export async function getOrderById(idStr) {
+  // DO NOT validate idStr here. The service layer must supply a valid, normalised idStr.
+  ensureInit(); // will throw ExternalServiceError if init fails
+
+  // RTDB path
+  if (useRealtimeDB()) {
+    const db = getRealtimeDB();
+    const snap = await db.ref(`/orders/${idStr}`).once('value');
+    const val = snap.val();
+    if (val === null || typeof val === 'undefined') {
+      throw new NotFoundError(`Order ${idStr} not found`);
+    }
+    return { id: idStr, ...val };
+  }
+
+  // Firestore path
+  const fsdb = getFirestore();
+  const doc = await fsdb.collection('orders').doc(idStr).get();
+  if (!doc.exists) {
+    throw new NotFoundError(`Order ${idStr} not found`);
+  }
+  const data = doc.data();
+  if (data && data.createdAt && typeof data.createdAt.toDate === 'function') {
+    data.createdAt = data.createdAt.toISOString();
+  }
+  return { id: doc.id, ...data };
 }
 
-export async function getOrderById(id) {
-  throw new Error('firebaseDB.getOrderById not implemented.');
+export async function createOrderDB(obj) {
+  ensureInit()
+
+   // Attach a deterministic createdAt timestamp (ISO string).
+  // If you prefer server timestamps, see note below.
+  const createdAt = new Date().toISOString();
+  const payload = { ...orderData, createdAt };
+
+  if (useRealtimeDB()) {
+    const db = getRealtimeDB();
+
+    if (id) {
+      // write to a known key (overwrite or create)
+      await db.ref(`/orders/${id}`).set(payload);
+      return { id: String(id), ...payload };
+    } else {
+      // push() creates a new unique key
+      const newRef = db.ref('/orders').push();
+      await newRef.set(payload);
+      return { id: newRef.key, ...payload };
+    }
+  }
+
+  const fs = getFirestore();
+  if (id) {
+    const docRef = fs.collection('orders').doc(String(id));
+    await docRef.set(payload);
+    return { id: String(id), ...payload };
+  } else {
+    const docRef = await fs.collection('orders').add(payload);
+    return { id: docRef.id, ...payload };
+  }
 }

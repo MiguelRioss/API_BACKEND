@@ -1,9 +1,9 @@
-// server.mjs
+﻿// server.mjs
 import { EventEmitter } from "events";
 EventEmitter.defaultMaxListeners = 20;
 
 import express from "express";
-import { createHandler } from "./utils/handleFactory.mjs";
+import handleFactory from './utils/handleFactory.mjs';
 import errorHandler from "./middleware/errorHandler.mjs";
 import { health } from "./api/health.mjs";
 import { testErrorHandler } from "./api/testErros/testErros.mjs";
@@ -28,16 +28,16 @@ app.use(corsMiddleware);
 // });
 
 // Initialize DB/services
-const db = await createDb({ type: process.env.DB_TYPE });
+const db = await createDb();
 const ordersService = createOrdersService(db);
 const ordersApi = createOrdersAPI(ordersService);
 
 // Routes
-app.get("/health", createHandler(health));
-app.get("/api/test-error", createHandler(testErrorHandler));
-app.get("/api/orders", createHandler(ordersApi.getOrdersAPI));
-app.get("/api/orders/:id", createHandler(ordersApi.getOrderByIdAPI));
-app.post("/api/orders",createHandler(ordersApi.createOrderAPI))
+app.get("/health", handleFactory(health));
+app.get("/api/test-error", handleFactory(testErrorHandler));
+app.get("/api/orders", handleFactory(ordersApi.getOrdersAPI));
+app.get("/api/orders/:id", handleFactory(ordersApi.getOrderByIdAPI));
+app.post("/api/orders",handleFactory(ordersApi.createOrderAPI))
 // Error handler
 app.use(errorHandler);
 

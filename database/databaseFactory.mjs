@@ -1,4 +1,6 @@
 // database/databaseFactory.mjs
+import 'dotenv/config'; // loads project-root .env into process.env
+
 const DEFAULT = "local";
 
 /**

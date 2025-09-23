@@ -8,7 +8,7 @@ servers:
     description: Local development server
 tags:
   - name: orders
-    description: Operations to list and fetch orders
+    description: Operations to list, fetch and create orders
 
 paths:
   /api/orders:
@@ -71,6 +71,84 @@ paths:
                         track_url: ""
                         status: false
                         metadata_raw: {}
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '502':
+          $ref: '#/components/responses/ExternalServiceError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    post:
+      tags:
+        - orders
+      summary: Create a new order
+      description: >
+        Create a new order. The service layer injects `event_id`, `written_at`, and `status` (default `false`) if missing.
+        The request body should include required business fields; the response returns the stored order in `{ ok: true, order }`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewOrder'
+            examples:
+              newOrderExample:
+                summary: Example new order payload
+                value:
+                  session_id: "cs_test_b1IUDa2CTVkK8XKrQcntt3daZKb7vA9hGXXWf8Vlh74F6fhKavPagaUFpp"
+                  name: "Alvaro Ferranti"
+                  email: "customer@example.com"
+                  amount_total: 3999
+                  currency: "eur"
+                  items:
+                    - id: "price_1"
+                      name: "IBOTINCTURE™ TOTAL EXTRACT (60 ML)"
+                      quantity: 1
+                      unit_amount: 3999
+                  metadata:
+                    addr_city: "Sintra"
+                    addr_ctry: "PT"
+                    addr_line1: "Rua Engenheiro Sampaio Baptista,12"
+                    addr_zip: "2710-691"
+                    full_name: "Alvaro Ferranti"
+                    phone: "965751649"
+                  track_url: ""
+                  metadata_raw: {}
+      responses:
+        '200':
+          description: Order created (returns stored order)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+              examples:
+                created:
+                  summary: Example created order response
+                  value:
+                    ok: true
+                    order:
+                      event_id: "evt_1SALZLPjytaoBek7ZzrMhi15"
+                      session_id: "cs_test_b1IUDa2CTVkK8XKrQcntt3daZKb7vA9hGXXWf8Vlh74F6fhKavPagaUFpp"
+                      written_at: "2025-09-23T02:03:03.792Z"
+                      name: "Alvaro Ferranti"
+                      email: "customer@example.com"
+                      amount_total: 3999
+                      currency: "eur"
+                      items:
+                        - id: "price_1"
+                          name: "IBOTINCTURE™ TOTAL EXTRACT (60 ML)"
+                          quantity: 1
+                          unit_amount: 3999
+                      metadata:
+                        addr_city: "Sintra"
+                        addr_ctry: "PT"
+                        addr_line1: "Rua Engenheiro Sampaio Baptista,12"
+                        addr_zip: "2710-691"
+                        full_name: "Alvaro Ferranti"
+                        phone: "965751649"
+                      track_url: ""
+                      status: false
+                      metadata_raw: {}
         '400':
           $ref: '#/components/responses/BadRequest'
         '502':
@@ -159,6 +237,39 @@ components:
         unit_amount:
           type: integer
           description: Unit amount in minor units (cents)
+      additionalProperties: true
+
+    NewOrder:
+      type: object
+      required:
+        - name
+        - items
+        - amount_total
+        - currency
+      properties:
+        session_id:
+          type: string
+          description: Optional checkout session id
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        amount_total:
+          type: integer
+          description: Total amount in minor units (cents)
+        currency:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Item'
+        metadata:
+          type: object
+        track_url:
+          type: string
+        metadata_raw:
+          type: object
       additionalProperties: true
 
     Order:

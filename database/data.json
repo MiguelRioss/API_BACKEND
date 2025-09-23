@@ -110,5 +110,117 @@
     "event_id": "9be5f80a-b16b-488f-8389-3b024527131d",
     "written_at": "2025-09-23T17:09:46.991Z",
     "status": false
+  },
+  "9abb40b2-6784-4c56-b97b-924abedb3bd5": {
+    "session_id": "cs_test_b1IUDa2CTVkK8XKrQcntt3daZKb7vA9hGXXWf8Vlh74F6fhKavPagaUFpp",
+    "name": "Alvaro Ferranti",
+    "email": "customer@example.com",
+    "amount_total": 3999,
+    "currency": "eur",
+    "items": [
+      {
+        "id": "price_1",
+        "name": "IBOTINCTURE™ TOTAL EXTRACT (60 ML)",
+        "quantity": 1,
+        "unit_amount": 3999
+      }
+    ],
+    "metadata": {
+      "addr_city": "Sintra",
+      "addr_ctry": "PT",
+      "addr_line1": "Rua Engenheiro Sampaio Baptista,12",
+      "addr_zip": "2710-691",
+      "full_name": "Alvaro Ferranti",
+      "phone": "965751649"
+    },
+    "track_url": "",
+    "metadata_raw": {},
+    "event_id": "9abb40b2-6784-4c56-b97b-924abedb3bd5",
+    "written_at": "2025-09-23T17:16:01.780Z",
+    "status": false
+  },
+  "3003fffc-8595-4af8-8d7c-158769914572": {
+    "session_id": "cs_test_b1IUDa2CTVkK8XKrQcntt3daZKb7vA9hGXXWf8Vlh74F6fhKavPagaUFpp",
+    "name": "Alvaro Ferranti",
+    "email": "customer@example.com",
+    "amount_total": 3999,
+    "currency": "eur",
+    "items": [
+      {
+        "id": "price_1",
+        "name": "IBOTINCTURE™ TOTAL EXTRACT (60 ML)",
+        "quantity": 1,
+        "unit_amount": 3999
+      }
+    ],
+    "metadata": {
+      "addr_city": "Sintra",
+      "addr_ctry": "PT",
+      "addr_line1": "Rua Engenheiro Sampaio Baptista,12",
+      "addr_zip": "2710-691",
+      "full_name": "Alvaro Ferranti",
+      "phone": "965751649"
+    },
+    "track_url": "",
+    "metadata_raw": {},
+    "event_id": "3003fffc-8595-4af8-8d7c-158769914572",
+    "written_at": "2025-09-23T17:16:08.332Z",
+    "status": false
+  },
+  "af2b0426-600c-4f29-96a4-50405712abd1": {
+    "session_id": "cs_test_b1IUDa2CTVkK8XKrQcntt3daZKb7vA9hGXXWf8Vlh74F6fhKavPagaUFpp",
+    "name": "Alvaro Ferranti",
+    "email": "customer@example.com",
+    "amount_total": 3999,
+    "currency": "eur",
+    "items": [
+      {
+        "id": "price_1",
+        "name": "IBOTINCTURE™ TOTAL EXTRACT (60 ML)",
+        "quantity": 1,
+        "unit_amount": 3999
+      }
+    ],
+    "metadata": {
+      "addr_city": "Sintra",
+      "addr_ctry": "PT",
+      "addr_line1": "Rua Engenheiro Sampaio Baptista,12",
+      "addr_zip": "2710-691",
+      "full_name": "Alvaro Ferranti",
+      "phone": "965751649"
+    },
+    "track_url": "",
+    "metadata_raw": {},
+    "event_id": "af2b0426-600c-4f29-96a4-50405712abd1",
+    "written_at": "2025-09-23T20:28:54.387Z",
+    "status": false
+  },
+  "8305b0d4-4e14-4153-beed-3a534577b813": {
+    "session_id": "hello",
+    "name": "Alvaro Ferranti",
+    "email": "customer@example.com",
+    "amount_total": 3999,
+    "currency": "eur",
+    "items": [
+      {
+        "id": "price_1",
+        "name": "IBOTINCTURE™ TOTAL EXTRACT (60 ML)",
+        "quantity": 1,
+        "unit_amount": 3999
+      }
+    ],
+    "metadata": {
+      "addr_city": "Sintra",
+      "addr_ctry": "PT",
+      "addr_line1": "Rua Engenheiro Sampaio Baptista,12",
+      "addr_zip": "2710-691",
+      "full_name": "Alvaro Ferranti",
+      "phone": "965751649"
+    },
+    "track_url": "",
+    "metadata_raw": {},
+    "event_id": "8305b0d4-4e14-4153-beed-3a534577b813",
+    "written_at": "2025-09-23T20:29:21.441Z",
+    "status": false
   }
 }

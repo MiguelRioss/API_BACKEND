@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node server.mjs",
     "dev": "nodemon server.mjs",
+    "postinstall": "npx puppeteer browsers install chrome",
     "test": "echo \"no tests\""
   },
   "engines": {

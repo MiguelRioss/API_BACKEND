@@ -40,7 +40,7 @@ app.get("/api/test-error", handleFactory(testErrorHandler));
 app.get("/api/orders", handleFactory(ordersApi.getOrdersAPI));
 app.get("/api/orders/:id", handleFactory(ordersApi.getOrderByIdAPI));
 // add to your express app routes (ONLY temporarily for debugging)
-app.post('/api/orders', ordersApi.createOrderAPI);
+app.post('/api/orders', handleFactory(ordersApi.createOrderAPI));
 
 // Error handler
 app.use(errorHandler);

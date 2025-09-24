@@ -1,5 +1,7 @@
 ﻿// server.mjs
 import { EventEmitter } from "events";
+import { closeBrowser } from "./ctt/browserPool.mjs";
+
 EventEmitter.defaultMaxListeners = 20;
 
 import express from "express";
@@ -44,8 +46,12 @@ app.get("/api/orders/:id", handleFactory(ordersApi.getOrderByIdAPI));
 app.post('/api/orders', ordersApi.createOrderAPI);
 // NEW: CTT
 app.get("/api/ctt", cttApi.getStatusAPI); // paired events
-app.get("/api/ctt/timeline", handleFactory(cttApi.getTimelineAPI)); // 
+//app.get("/api/ctt/timeline", handleFactory(cttApi.getTimelineAPI)); // 
 
+// …
+
+process.on("SIGINT",  async () => { await closeBrowser(); process.exit(0); });
+process.on("SIGTERM", async () => { await closeBrowser(); process.exit(0); });
 
 // Error handler
 app.use(errorHandler);

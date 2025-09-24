@@ -1,5 +1,7 @@
 // api/services/servicesUtils.mjs
 import { ValidationError } from "../errors/domainErros.mjs";
+import { randomUUID } from "node:crypto";
+
 
 /**
  * Utility validators and matching helpers used by services.
@@ -128,46 +130,206 @@ export function applyLimit(orders = [], limit) {
 }
 
 
+// servicesUtils.mjs
+
+/**
+ * Validates and normalizes an order payload.
+ * - Ensures required fields exist and have the right types
+ * - Validates each item (id, name, quantity, unit_amount)
+ * - Checks that amount_total === sum(items.quantity * unit_amount)
+ * - Normalizes strings (trim, lower-casing currency/email)
+ * - Injects event_id, written_at, default status, metadata / metadata_raw
+ */
 export function validateAndPrepareOrder(order) {
-  if (!order || typeof order !== "object") {
-    throw new ValidationError("Order object is required");
+  if (!order || typeof order !== "object" || Array.isArray(order)) {
+    throw new ValidationError("Order object is required.");
   }
 
-  const name = order.name;
-  const items = order.items;
-  const amount_total = order.amount_total;
-  const currency = order.currency;
+  // ——— Basic required fields ———
+  const { name, email, amount_total, currency, items, metadata } = order;
 
-  if (!name || typeof name !== "string") {
-    throw new ValidationError("Order.name is required and must be a string");
+  if (typeof name !== "string" || name.trim() === "") {
+    throw new ValidationError("Order.name is required and must be a non-empty string.");
   }
+
+  if (typeof email !== "string" || email.trim() === "") {
+    throw new ValidationError("Order.email is required and must be a non-empty string.");
+  }
+  const emailTrimmed = email.trim().toLowerCase();
+  // light email sanity check (not overzealous)
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrimmed)) {
+    throw new ValidationError("Order.email must be a valid email address.");
+  }
+
   if (!Array.isArray(items) || items.length === 0) {
-    throw new ValidationError("Order.items is required and must be a non-empty array");
-  }
-  if (typeof amount_total !== "number" || Number.isNaN(amount_total)) {
-    throw new ValidationError("Order.amount_total is required and must be a number");
-  }
-  if (!currency || typeof currency !== "string") {
-    throw new ValidationError("Order.currency is required and must be a string");
+    throw new ValidationError("Order.items is required and must be a non-empty array.");
   }
 
-  // Shallow clone to avoid mutating caller object
-  const prepared = { ...order };
+  if (!Number.isInteger(amount_total) || amount_total < 0) {
+    throw new ValidationError("Order.amount_total must be a non-negative integer (e.g., cents).");
+  }
 
-  // Inject event_id if missing (service responsibility to provide a stable id)
-  if (!prepared.event_id || typeof prepared.event_id !== "string" || prepared.event_id.trim() === "") {
-    prepared.event_id = crypto.randomUUID();
+  if (typeof currency !== "string" || currency.trim() === "") {
+    throw new ValidationError("Order.currency is required and must be a non-empty string.");
+  }
+  const currencyNorm = currency.trim().toLowerCase();
+  // optional: restrict to a known set if your system only supports a few
+  const allowedCurrencies = new Set(["eur", "usd", "gbp"]);
+  if (!allowedCurrencies.has(currencyNorm)) {
+    throw new ValidationError(`Unsupported currency: ${currencyNorm}`);
+  }
+
+  // ——— Validate items ———
+  let computedTotal = 0;
+  const normItems = items.map((it, idx) => {
+    if (!it || typeof it !== "object") {
+      throw new ValidationError(`Order.items[${idx}] must be an object.`);
+    }
+    const { id, name, quantity, unit_amount } = it;
+
+    if (typeof id !== "string" || id.trim() === "") {
+      throw new ValidationError(`Order.items[${idx}].id must be a non-empty string.`);
+    }
+    if (typeof name !== "string" || name.trim() === "") {
+      throw new ValidationError(`Order.items[${idx}].name must be a non-empty string.`);
+    }
+    if (!Number.isInteger(quantity) || quantity <= 0) {
+      throw new ValidationError(`Order.items[${idx}].quantity must be a positive integer.`);
+    }
+    if (!Number.isInteger(unit_amount) || unit_amount < 0) {
+      throw new ValidationError(`Order.items[${idx}].unit_amount must be a non-negative integer (e.g., cents).`);
+    }
+
+    computedTotal += quantity * unit_amount;
+
+    return {
+      id: String(id).trim(),
+      name: String(name).trim(),
+      quantity,
+      unit_amount,
+    };
+  });
+
+  if (computedTotal !== amount_total) {
+    throw new ValidationError(
+      `Order.amount_total (${amount_total}) does not match items total (${computedTotal}).`
+    );
+  }
+
+  // ——— Validate metadata (optional but typed) ———
+  let normMetadata = {};
+  if (typeof metadata !== "undefined") {
+    if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+      throw new ValidationError("Order.metadata, if provided, must be an object.");
+    }
+    const coerceStr = v => (typeof v === "string" ? v.trim() : v == null ? "" : String(v));
+    normMetadata = {
+      addr_city: coerceStr(metadata.addr_city ?? ""),
+      addr_ctry: coerceStr(metadata.addr_ctry ?? ""),
+      addr_line1: coerceStr(metadata.addr_line1 ?? ""),
+      addr_zip: coerceStr(metadata.addr_zip ?? ""),
+      full_name: coerceStr(metadata.full_name ?? ""),
+      phone: coerceStr(metadata.phone ?? ""),
+      // keep any extra keys but as strings where sensible
+      ...Object.fromEntries(
+        Object.entries(metadata).filter(([k]) =>
+          !["addr_city", "addr_ctry", "addr_line1", "addr_zip", "full_name", "phone"].includes(k)
+        )
+      ),
+    };
+  }
+
+  const STATUS_KEYS = [
+    "delivered",
+    "acceptedInCtt",
+    "accepted",
+    "in_transit",                 // ← canonical
+    "wating_to_Be_Delivered",
+  ];
+
+  const STATUS_ALIASES = {
+    accepted_in_ctt: "acceptedInCtt",
+    acceptedinctt: "acceptedInCtt",
+    inTraffic: "in_transit",
+    in_traffic: "in_transit",     // ← legacy → canonical
+    waiting_to_be_delivered: "wating_to_Be_Delivered",
+  };
+
+  function makeDefaultStatus() {
+    return {
+      delivered: { status: false, date: null, time: null },
+      acceptedInCtt: { status: false, date: null, time: null },
+      accepted: { status: false, date: null, time: null },
+      in_transit: { status: false, date: null, time: null }, // ← canonical
+      wating_to_Be_Delivered: { status: false, date: null, time: null },
+    };
+  }
+
+  // If you ever wish to *merge* an incoming status later (NOT on creation),
+  // this shows how you’d normalize keys and coerce types safely.
+  // For creation we will still *ignore* and overwrite with defaults.
+  function normalizeIncomingStatus(raw) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return makeDefaultStatus();
+
+    const norm = makeDefaultStatus();
+    for (const [k, v] of Object.entries(raw)) {
+      const keyLower = k.replace(/\s+/g, "").toLowerCase();
+      const canonical = STATUS_KEYS.includes(k) ? k : (STATUS_ALIASES[keyLower] ?? null);
+      if (!canonical) continue;
+
+      const s = v && typeof v === "object" ? v : {};
+      norm[canonical] = {
+        status: Boolean(s.status),
+        date: s.date ?? null,
+        time: s.time ?? null,
+      };
+    }
+    return norm;
+  }
+
+
+  // ——— Build prepared (normalized) object ———
+  const prepared = {
+    ...order,
+    name: name.trim(),
+    email: emailTrimmed,
+    currency: currencyNorm,
+    items: normItems,
+    amount_total, // already validated
+    metadata: normMetadata,
+
+    // IMPORTANT: on creation, enforce all-false status regardless of input
+    status: makeDefaultStatus(),
+  };
+
+  // Inject event_id if missing/empty
+  if (typeof prepared.event_id !== "string" || prepared.event_id.trim() === "") {
+    prepared.event_id = randomUUID();
   }
 
   // Inject written_at if missing
   if (!prepared.written_at) prepared.written_at = new Date().toISOString();
 
-  // Ensure status injected and default to false
+  // Normalize / default status
   if (typeof prepared.status === "undefined") prepared.status = false;
 
-  // Ensure metadata and metadata_raw exist (optional but convenient)
-  if (typeof prepared.metadata === "undefined") prepared.metadata = {};
-  if (typeof prepared.metadata_raw === "undefined") prepared.metadata_raw = {};
+  // Ensure metadata_raw exists (optional: snapshot raw input)
+  if (typeof prepared.metadata_raw === "undefined") prepared.metadata_raw = { ...order.metadata };
 
   return prepared;
+}
+
+
+//Update orderStatus
+export function updateOrderStatus(currentStatus, key, { status, date = null, time = null }) {
+  if (!STATUS_KEYS.includes(key)) {
+    throw new ValidationError(`Unknown status step "${key}". Allowed: ${STATUS_KEYS.join(", ")}`);
+  }
+  if (typeof status !== "boolean") {
+    throw new ValidationError("status must be boolean");
+  }
+  return {
+    ...currentStatus,
+    [key]: { status, date, time },
+  };
 }

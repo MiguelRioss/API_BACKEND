@@ -103,14 +103,15 @@ export default function createOrdersService(db) {
     }
   }
 
-  // -------------------------
-  // createOrderServices: validate, prepare and persist an order
-  // -------------------------
+  // inside createOrderServices
   async function createOrderServices(order) {
-      // call same function your API uses:
-      const result = await db.createOrderDB(order, order.id ?? undefined);
-
-      // return the stored order (service-level contract)
-      return result
+    try {
+      const prepared = validateAndPrepareOrder(order);
+      return await db.createOrderDB(prepared, prepared.id ?? undefined);
+    } catch (err) {
+      if (err instanceof ValidationError || err?.code === "VALIDATION_ERROR") throw err;
+      throw new ExternalServiceError("Failed to create order", { original: err?.message ?? String(err) });
+    }
   }
+
 }

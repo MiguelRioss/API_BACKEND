@@ -11,7 +11,6 @@ import createOrdersService from "./services/orderServices.mjs";
 import { createDb } from "./database/databaseFactory.mjs";
 import createOrdersAPI from "./api/ordersAPI.mjs";
 import createCorsMiddleware from "./middleware/cors.mjs";
-import debugOrders from './api/debugOrders.mjs'; // path to file you created
 
 
 const app = express();
@@ -22,7 +21,6 @@ app.use(express.json());
 // CORS: configured middleware
 const corsMiddleware = createCorsMiddleware();
 app.use(corsMiddleware);
-app.use(debugOrders);
 
 
 // OPTIONAL explicit preflight handler (uncomment if you want it):

@@ -24,14 +24,24 @@ export default function createOrdersAPI(ordersService) {
     }
 
     async function createOrderAPI(req, res) {
-        const orderPayload = req.body;
-          // accepts full order object in request body
-        const order = req.body;
-        console.info('[DEBUG CREATE ORDER] incoming body:', JSON.stringify(order));
-        // The handler does not catch errors; createHandler wrapper sends errors to central error handler.
-        const created = await ordersService.createOrderServices(orderPayload);
-        // created is the exact saved order object
-        return { ok: true, order: created };
+        try {   // accepts full order object in request body
+            const order = req.body;
+            console.info('[DEBUG CREATE ORDER] incoming body:', JSON.stringify(order));
+            // The handler does not catch errors; createHandler wrapper sends errors to central error handler.
+            const created = await ordersService.createOrderServices(order);
+            // created is the exact saved order object
+            return { ok: true, order: created };
+        } catch (err) {
+            console.error('[DEBUG CREATE ORDER] ERROR ->', err && err.stack ? err.stack : err);
+            const details = {
+                message: err && err.message,
+                name: err && err.name,
+                code: err && err.code,
+                status: err && err.status,
+                // include any vendor error fields (e.g. firebase code)
+                firebase: err && err.details ? err.details : undefined,
+            };
+            return res.status(500).json({ ok: false, debug_error: details });
+        }
     }
-
 }

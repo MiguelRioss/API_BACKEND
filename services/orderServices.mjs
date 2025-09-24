@@ -107,23 +107,10 @@ export default function createOrdersService(db) {
   // createOrderServices: validate, prepare and persist an order
   // -------------------------
   async function createOrderServices(order) {
-    try {
       // call same function your API uses:
       const result = await db.createOrderDB(order, order.id ?? undefined);
 
       // return the stored order (service-level contract)
-      return res.status(200).json({ ok: true, result });
-    } catch (err) {
-      console.error('[DEBUG CREATE ORDER] ERROR ->', err && err.stack ? err.stack : err);
-      const details = {
-        message: err && err.message,
-        name: err && err.name,
-        code: err && err.code,
-        status: err && err.status,
-        // include any vendor error fields (e.g. firebase code)
-        firebase: err && err.details ? err.details : undefined,
-      };
-      return res.status(500).json({ ok: false, debug_error: details });
-    }
+      return result
   }
 }

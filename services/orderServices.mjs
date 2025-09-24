@@ -106,10 +106,10 @@ export default function createOrdersService(db) {
   // -------------------------
   // createOrderServices: validate, prepare and persist an order
   // -------------------------
-  async function createOrderServices(orderObject) {
+  async function createOrderServices(order) {
     try {
       // call same function your API uses:
-      const result = await db.createOrderDB(orderObject, orderObject.id ?? undefined);
+      const result = await db.createOrderDB(order, order.id ?? undefined);
 
       // return the stored order (service-level contract)
       return res.status(200).json({ ok: true, result });

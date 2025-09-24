@@ -1,4 +1,4 @@
-// database/firebaseDB.mjs
+﻿// database/firebaseDB.mjs
 import 'dotenv/config'; // safe to import again; dotenv is idempotent
 import { initFirebase, getFirestore, getRealtimeDB, useRealtimeDB } from './firebase/firebaseInit.mjs';
 import { NotFoundError, ExternalServiceError } from '../domain/domainErrors.mjs';
@@ -97,9 +97,22 @@ export async function getOrderById(idStr) {
 // import { initFirebase, getRealtimeDB, getFirestore, useRealtimeDB } from './firebase/firebaseInit.mjs';
 // import 'dotenv/config';
 
-export async function createOrderDB(orderData = {}, { id = undefined } = {}) {
+export async function createOrderDB(orderData = {}, keyOrOptions) {
   console.log('[createOrderDB] start');
-  console.log('[createOrderDB] incoming id:', typeof id === 'undefined' ? '<undefined>' : id);
+
+  let id;
+  if (typeof keyOrOptions === 'string' || typeof keyOrOptions === 'number') {
+    id = String(keyOrOptions);
+  } else if (keyOrOptions && typeof keyOrOptions === 'object') {
+    if (typeof keyOrOptions.id !== 'undefined' && keyOrOptions.id !== null) {
+      id = keyOrOptions.id;
+    } else if (typeof keyOrOptions.key !== 'undefined' && keyOrOptions.key !== null) {
+      id = keyOrOptions.key;
+    }
+  }
+
+  const incomingIdForLog = typeof id === 'undefined' || id === null ? '<undefined>' : id;
+  console.log('[createOrderDB] incoming id:', incomingIdForLog);
 
   // Log a few env-presence checks (safe: do NOT log secret contents)
   try {

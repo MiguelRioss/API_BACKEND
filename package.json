@@ -5,8 +5,7 @@
   "main": "server.mjs",
   "scripts": {
     "start": "node server.mjs",
-     "postinstall": "npx playwright install chromium --with-deps",
-
+    "postinstall": "npx playwright install chromium",   
     "dev": "nodemon server.mjs",
     "test": "echo \"no tests\""
   },

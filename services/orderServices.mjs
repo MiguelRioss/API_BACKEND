@@ -111,6 +111,6 @@ export default function createOrdersService(db) {
       const result = await db.createOrderDB(order, order.id ?? undefined);
 
       // return the stored order (service-level contract)
-      return result
+      return { ok: true, order: created };
   }
 }

@@ -49,7 +49,7 @@ app.post('/__debug/create-order', async (req, res) => {
     const order = req.body;
     console.info('[DEBUG CREATE ORDER] incoming body:', JSON.stringify(order));
     // call same function your API uses:
-    const result = await createOrderDB(order, order.id ?? undefined);
+    const result = await db.createOrderDB(order, order.id ?? undefined);
     // return success response with DB result
     return res.status(200).json({ ok: true, result });
   } catch (err) {

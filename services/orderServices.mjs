@@ -1,4 +1,4 @@
-// api/services/ordersServiceFactory.mjs
+﻿// api/services/ordersServiceFactory.mjs
 import {
   DomainError,
   ValidationError,
@@ -119,7 +119,7 @@ export default function createOrdersService(db) {
 
       // 3) persist (pass key explicitly to keep adapter dumb)
       // The DB adapter is expected to just store whatever it receives.
-      const result = await db.createOrderDB(prepared, prepared.event_id);
+      const result = await db.createOrderDB(prepared, { id: prepared.event_id });
 
       // return the stored order (service-level contract)
       return result;

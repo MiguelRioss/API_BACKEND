@@ -11,7 +11,6 @@ import createOrdersService from "./services/orderServices.mjs";
 import { createDb } from "./database/databaseFactory.mjs";
 import createOrdersAPI from "./api/ordersAPI.mjs";
 import createCorsMiddleware from "./middleware/cors.mjs";
-import createCttAPI from "./api/cttAPI.mjs";
 
 
 const app = express();
@@ -34,14 +33,12 @@ app.use(corsMiddleware);
 const db = await createDb();
 const ordersService = createOrdersService(db);
 const ordersApi = createOrdersAPI(ordersService);
-const cttApi = createCttAPI();
 
 // Routes
 app.get("/health", handleFactory(health));
 app.get("/api/test-error", handleFactory(testErrorHandler));
 app.get("/api/orders", handleFactory(ordersApi.getOrdersAPI));
 app.get("/api/orders/:id", handleFactory(ordersApi.getOrderByIdAPI));
-app.get("/api/ctt", cttApi.getStatusAPI);
 // add to your express app routes (ONLY temporarily for debugging)
 app.post('/api/orders', handleFactory(ordersApi.createOrderAPI));
 

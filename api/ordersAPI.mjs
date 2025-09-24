@@ -25,6 +25,7 @@ export default function createOrdersAPI(ordersService) {
 
     async function createOrderAPI(req, res) {
         const orderPayload = req.body;
+
         // The handler does not catch errors; createHandler wrapper sends errors to central error handler.
         const created = await ordersService.createOrderServices(orderPayload);
         // created is the exact saved order object

@@ -98,37 +98,73 @@ export async function getOrderById(idStr) {
 // import 'dotenv/config';
 
 export async function createOrderDB(orderData = {}, { id = undefined } = {}) {
-  // ensure Firebase admin is initialized (this will throw if creds are missing)
-  initFirebase(); // or ensureInit(); depending on your module
+  console.log('[createOrderDB] start');
+  console.log('[createOrderDB] incoming id:', typeof id === 'undefined' ? '<undefined>' : id);
 
-  // attach createdAt right away so we can return it without another read
+  // Log a few env-presence checks (safe: do NOT log secret contents)
+  try {
+    console.log('[createOrderDB] FIREBASE_SERVICE_ACCOUNT_PATH present?', !!process.env.FIREBASE_SERVICE_ACCOUNT_PATH);
+    console.log('[createOrderDB] FIREBASE_SERVICE_ACCOUNT_B64 present?', !!process.env.FIREBASE_SERVICE_ACCOUNT_B64);
+    console.log('[createOrderDB] FIREBASE_USE_RTDB:', process.env.FIREBASE_USE_RTDB);
+  } catch (e) {
+    console.warn('[createOrderDB] env check failed', e && e.message);
+  }
+
+  try {
+    console.log('[createOrderDB] initializing firebase...');
+    initFirebase(); // ensure firebase initialized (will throw if creds missing)
+    console.log('[createOrderDB] firebase init ok');
+  } catch (err) {
+    console.error('[createOrderDB] initFirebase() FAILED ->', err && err.message);
+    throw err;
+  }
+
   const createdAt = new Date().toISOString();
   const payload = { ...orderData, createdAt };
+  console.log('[createOrderDB] prepared payload (createdAt set)');
 
-  if (useRealtimeDB()) {
-    const db = getRealtimeDB();
+  try {
+    if (useRealtimeDB()) {
+      console.log('[createOrderDB] using Realtime Database branch (RTDB)');
+      const db = getRealtimeDB();
+      console.log('[createOrderDB] got RTDB instance');
+
+      if (typeof id !== 'undefined' && id !== null) {
+        const key = String(id);
+        console.log(`[createOrderDB] writing to RTDB at /orders/${key} (overwrite/create)`);
+        await db.ref(`/orders/${key}`).set(payload);
+        console.log(`[createOrderDB] RTDB write OK -> id=${key}`);
+        return { id: key, ...payload };
+      } else {
+        console.log('[createOrderDB] pushing new child to /orders (RTDB)');
+        const newRef = db.ref('/orders').push();
+        console.log('[createOrderDB] RTDB newRef.key ->', newRef.key);
+        await newRef.set(payload);
+        console.log('[createOrderDB] RTDB push+set OK -> id=', newRef.key);
+        return { id: newRef.key, ...payload };
+      }
+    }
+
+    // Firestore branch
+    console.log('[createOrderDB] using Firestore branch');
+    const fs = getFirestore();
+    console.log('[createOrderDB] got Firestore instance');
 
     if (typeof id !== 'undefined' && id !== null) {
       const key = String(id);
-      await db.ref(`/orders/${key}`).set(payload);
+      console.log(`[createOrderDB] setting doc orders/${key} (set overwrite/create)`);
+      const docRef = fs.collection('orders').doc(key);
+      await docRef.set(payload);
+      console.log(`[createOrderDB] Firestore set OK -> id=${key}`);
       return { id: key, ...payload };
     } else {
-      const newRef = db.ref('/orders').push();
-      await newRef.set(payload);
-      return { id: newRef.key, ...payload };
+      console.log('[createOrderDB] adding new doc to orders collection (add)');
+      const docRef = await fs.collection('orders').add(payload);
+      console.log('[createOrderDB] Firestore add OK -> id=', docRef.id);
+      return { id: docRef.id, ...payload };
     }
-  }
-
-  // Firestore branch
-  const fs = getFirestore();
-
-  if (typeof id !== 'undefined' && id !== null) {
-    const key = String(id);
-    const docRef = fs.collection('orders').doc(key);
-    await docRef.set(payload);
-    return { id: key, ...payload };
-  } else {
-    const docRef = await fs.collection('orders').add(payload);
-    return { id: docRef.id, ...payload };
+  } catch (err) {
+    console.error('[createOrderDB] WRITE ERROR ->', err && err.stack ? err.stack : err && err.message ? err.message : err);
+    throw err;
   }
 }

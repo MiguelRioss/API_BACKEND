@@ -1,48 +1,11 @@
-﻿// server.mjs
-import { EventEmitter } from "events";
-EventEmitter.defaultMaxListeners = 20;
-
-import express from "express";
-import handleFactory from './utils/handleFactory.mjs';
-import errorHandler from "./middleware/errorHandler.mjs";
-import { health } from "./api/health.mjs";
-import { testErrorHandler } from "./api/testErros/testErros.mjs";
-import createOrdersService from "./services/orderServices.mjs";
-import { createDb } from "./database/databaseFactory.mjs";
-import createOrdersAPI from "./api/ordersAPI.mjs";
-import createCorsMiddleware from "./middleware/cors.mjs";
+﻿import express from 'express';
+import debugOrders from './api/debugOrders.mjs'; // path relative to main file
 
 const app = express();
-const PORT = process.env.PORT || 3000;
-
 app.use(express.json());
 
-// CORS: configured middleware
-const corsMiddleware = createCorsMiddleware();
-app.use(corsMiddleware);
+// other routers...
+app.use(debugOrders);
 
-// OPTIONAL explicit preflight handler (uncomment if you want it):
-// app.use((req, res, next) => {
-//   if (req.method === "OPTIONS") return corsMiddleware(req, res, () => (!res.headersSent ? res.sendStatus(204) : undefined));
-//   next();
-// });
-
-// Initialize DB/services
-const db = await createDb();
-const ordersService = createOrdersService(db);
-const ordersApi = createOrdersAPI(ordersService);
-
-// Routes
-app.get("/health", handleFactory(health));
-app.get("/api/test-error", handleFactory(testErrorHandler));
-app.get("/api/orders", handleFactory(ordersApi.getOrdersAPI));
-app.get("/api/orders/:id", handleFactory(ordersApi.getOrderByIdAPI));
-app.post("/api/orders",handleFactory(ordersApi.createOrderAPI))
-// Error handler
-app.use(errorHandler);
-
-app.listen(PORT, () => {
-  console.log(`Server listening on http://localhost:${PORT}`);
-});
-
-export default app;
+// (optional) small ping to check server is redeployed
+app.get('/_ping', (req, res) => res.send('pong'));

@@ -30,7 +30,7 @@ export default function createOrdersAPI(ordersService) {
             // The handler does not catch errors; createHandler wrapper sends errors to central error handler.
             const created = await ordersService.createOrderServices(order);
             // created is the exact saved order object
-            return res.status(200).json({ok :true, order : created})
+            return res.status(201).json({ok :true, order : created})
         } catch (err) {
             console.error('[DEBUG CREATE ORDER] ERROR ->', err && err.stack ? err.stack : err);
             const details = {

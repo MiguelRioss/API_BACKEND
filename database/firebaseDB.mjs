@@ -2,7 +2,7 @@
 import 'dotenv/config'; // safe to import again; dotenv is idempotent
 import { initFirebase, getFirestore, getRealtimeDB, useRealtimeDB } from './firebase/firebaseInit.mjs';
 import { NotFoundError, ExternalServiceError } from '../domain/domainErrors.mjs';
-
+import { isObj , canonStatusKey ,STATUS_KEYS} from './firebase/utilsDB.mjs';
 /**
  * Ensure Firebase is initialized before any db operation.
  * You may call initFirebase() at app startup (recommended).
@@ -76,4 +76,95 @@ export async function createOrderDB(orderData = {}) {
     console.error('[createOrderDB] WRITE ERROR ->', err && err.stack ? err.stack : err && err.message ? err.message : err);
     throw err;
   }
+  
+}
+export async function updateOrderDB(id, rawChanges = {}) {
+  ensureInitDb();
+  const idStr = String(id);
+
+  // unwrap { changes: {...} } if present
+  const changes = (rawChanges && rawChanges.changes && isObj(rawChanges.changes))
+    ? rawChanges.changes
+    : rawChanges;
+
+  if (!useRealtimeDB()) {
+    // Firestore fallback below
+    return updateOrderFirestore(idStr, changes);
+  }
+
+  const db = getRealtimeDB();
+  const ref = db.ref(`/orders/${idStr}`);
+  const snap = await ref.once('value');
+  if (!snap.exists()) throw new NotFoundError(`Order "${idStr}" not found`);
+  const existing = snap.val() || {};
+
+  // Build a multi-path update so we only touch the provided fields.
+  // NOTE: RTDB .update() merges at the first level; using full paths lets us do deep merges safely.
+  const updates = {};
+  const add = (path, val) => { updates[`/orders/${idStr}/${path}`] = val; };
+
+  // 1) Top-level simple fields you allow (extend as needed)
+  const ALLOWED_TOP = new Set(["name", "email", "metadata", "status", "currency", "amount_total", "items"]);
+  for (const [k, v] of Object.entries(changes)) {
+    if (!ALLOWED_TOP.has(k)) continue;
+    if (!(k in existing)) continue; // keep schema tight
+
+    // metadata/object shallow merge
+    if (k === "metadata" && isObj(v) && isObj(existing.metadata)) {
+      for (const [mk, mv] of Object.entries(v)) add(`metadata/${mk}`, mv);
+      continue;
+    }
+
+    // items full replace (you can make this smarter if needed)
+    if (k === "items") {
+      add("items", v);
+      continue;
+    }
+
+    // status handled below
+    if (k !== "status") {
+      add(k, v);
+    }
+  }
+
+  // 2) Status bucket – accept either:
+  //    - changes.status = { acceptedInCtt: {...}, in_traffic: {...}, ... }
+  //    - flat status-like keys in changes (acceptedInCtt, in_traffic, ...)
+  const statusBag = {};
+  if (isObj(changes.status)) {
+    for (const [sk, sv] of Object.entries(changes.status)) {
+      const canon = canonStatusKey(sk);
+      if (STATUS_KEYS.has(canon) && isObj(sv)) statusBag[canon] = sv;
+    }
+  }
+  for (const [k, v] of Object.entries(changes)) {
+    const canon = canonStatusKey(k);
+    if (STATUS_KEYS.has(canon) && isObj(v)) statusBag[canon] = v;
+  }
+
+  if (Object.keys(statusBag).length) {
+    // ensure status exists in DB
+    if (!isObj(existing.status)) existing.status = {};
+
+    for (const [sk, sv] of Object.entries(statusBag)) {
+      // shallow merge per field to avoid wiping sibling props
+      if (isObj(sv)) {
+        for (const [field, val] of Object.entries(sv)) {
+          add(`status/${sk}/${field}`, val);
+        }
+      } else {
+        add(`status/${sk}`, sv);
+      }
+    }
+  }
+
+  // 3) updatedAt always
+  add(`updatedAt`, new Date().toISOString());
+
+  // Perform atomic fan-out update
+  await db.ref().update(updates);
+
+  // Return the fresh object
+  const fresh = (await ref.once('value')).val();
+  return { id: idStr, ...fresh };
 }

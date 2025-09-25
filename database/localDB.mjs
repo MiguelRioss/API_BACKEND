@@ -127,7 +127,7 @@ export async function updateOrderDB(id, orderChanges = {}) {
   if (bucket !== map) map.orders = bucket;
 
   // 3) Await the write so it actually persists before returning
-  await writeFileAtomic(DB_FILE, map);
+   writeFileAtomic(DB_FILE, map);
 
   return { id: key, ...updated };
 }

@@ -23,6 +23,11 @@ app.use(express.json());
 const corsMiddleware = createCorsMiddleware();
 app.use(corsMiddleware);
 
+// Optional: explicit preflight catch-all (harmless duplicate safety)
+app.options('*', corsMiddleware);
+
+
+
 const db = await createDb();
 const ordersService = createOrdersService(db);
 const ordersApi = createOrdersAPI(ordersService);

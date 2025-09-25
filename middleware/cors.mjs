@@ -1,42 +1,29 @@
-// api/middleware/cors.mjs
-import cors from "cors";
-
-/**
- * createCorsMiddleware()
- * env vars:
- *  - CORS_ORIGINS: comma separated origins, or "*" for any
- *  - CORS_ALLOW_CREDENTIALS: "true" / "false"
- */
+// middleware/cors.mjs
 export default function createCorsMiddleware() {
-  const rawOrigins = process.env.CORS_ORIGINS ?? "*";
-  const allowAll = rawOrigins.trim() === "*";
-  const origins = allowAll ? [] : rawOrigins.split(",").map(s => s.trim()).filter(Boolean);
+  const allowList = (process.env.CORS_ORIGINS || '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
 
-  const methods = (process.env.CORS_METHODS || "GET,POST,PUT,PATCH,DELETE,OPTIONS")
-    .split(",").map(s => s.trim());
+  return function cors(req, res, next) {
+    const origin = req.headers.origin;
 
-  const allowHeaders = (process.env.CORS_ALLOW_HEADERS || "Content-Type,Authorization")
-    .split(",").map(s => s.trim());
+    // If you define CORS_ORIGINS, allow only those; otherwise allow all (no creds).
+    let allowOrigin = '*';
+    if (allowList.length > 0 && origin && allowList.includes(origin)) {
+      allowOrigin = origin;            // echo the matched origin
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+    }
 
-  const exposeHeaders = (process.env.CORS_EXPOSE_HEADERS || "")
-    .split(",").map(s => s.trim()).filter(Boolean);
+    res.setHeader('Access-Control-Allow-Origin', allowOrigin);
+    res.setHeader('Vary', 'Origin');    // important for caches/CDNs
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,PUT,DELETE,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
 
-  const credentials = String(process.env.CORS_ALLOW_CREDENTIALS ?? "true").toLowerCase() === "true";
+    if (req.method === 'OPTIONS') {
+      return res.status(204).end();
+    }
 
-  const options = {
-    origin: (origin, callback) => {
-      // allow non-browser clients (no origin)
-      if (!origin) return callback(null, true);
-      if (allowAll) return callback(null, true);
-      if (origins.includes(origin)) return callback(null, true);
-      return callback(new Error("CORS not allowed for this origin"), false);
-    },
-    methods,
-    allowedHeaders: allowHeaders,
-    exposedHeaders: exposeHeaders.length ? exposeHeaders : undefined,
-    credentials,
-    optionsSuccessStatus: 204
+    next();
   };
-
-  return cors(options);
 }

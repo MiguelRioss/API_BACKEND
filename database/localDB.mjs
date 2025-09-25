@@ -62,31 +62,21 @@ export async function getOrderById(id) {
 }
 
 // database/localDB.mjs (excerpt)
-export async function createOrderDB(orderObject, key) {
+export async function createOrderDB(orderObject) {
   if (typeof orderObject !== "object" || orderObject === null) {
     throw new TypeError("createOrderDB expects an object as orderObject");
   }
-
-  // REQUIRE key to be provided explicitly or via orderObject.event_id
-  let storageKey = undefined;
-  if (typeof key === "string" && key.trim() !== "") {
-    storageKey = key.trim();
-  } else if (typeof orderObject.event_id === "string" && orderObject.event_id.trim() !== "") {
-    storageKey = orderObject.event_id.trim();
-  } else {
-    // Force caller (service) to provide an id — do not invent one silently
-    throw new Error("createOrderDB requires a storage key. Services must provide an event_id.");
-  }
-
   const map = readFileSafe(DB_FILE);
-  map[storageKey] = orderObject;
+  map[orderObject.id] = orderObject;
   writeFileAtomic(DB_FILE, map);
-
   // Return the exact object stored (no mutation)
   return orderObject;
 }
 
-
+// export async function updateOrderStatus(id,status){
+//   const map = readFileSafe(DB_FILE)
+//   map[storageKey] = 
+// }
 
 // Optional export: helper to read raw map
 export async function getRawMap() {

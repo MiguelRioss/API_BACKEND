@@ -23,14 +23,6 @@ app.use(express.json());
 const corsMiddleware = createCorsMiddleware();
 app.use(corsMiddleware);
 
-
-// OPTIONAL explicit preflight handler (uncomment if you want it):
-// app.use((req, res, next) => {
-//   if (req.method === "OPTIONS") return corsMiddleware(req, res, () => (!res.headersSent ? res.sendStatus(204) : undefined));
-//   next();
-// });
-
-// Initialize DB/services
 const db = await createDb();
 const ordersService = createOrdersService(db);
 const ordersApi = createOrdersAPI(ordersService);
@@ -44,6 +36,7 @@ app.get("/api/orders", handleFactory(ordersApi.getOrdersAPI));
 app.get("/api/orders/:id", handleFactory(ordersApi.getOrderByIdAPI));
 // add to your express app routes (ONLY temporarily for debugging)
 app.post('/api/orders', ordersApi.createOrderAPI);
+// app.post('/api/orders/:id',ordersApi.updateApp)
 // NEW: CTT
 app.get("/api/ctt", cttApi.getStatusAPI); // paired events
 //app.get("/api/ctt/timeline", handleFactory(cttApi.getTimelineAPI)); // 

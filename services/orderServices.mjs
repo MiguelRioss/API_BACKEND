@@ -107,7 +107,7 @@ export default function createOrdersService(db) {
   async function createOrderServices(order) {
     try {
       const prepared = validateAndPrepareOrder(order);
-      return await db.createOrderDB(prepared, prepared.id ?? undefined);
+      return await db.createOrderDB(prepared, prepared.id);
     } catch (err) {
       if (err instanceof ValidationError || err?.code === "VALIDATION_ERROR") throw err;
       throw new ExternalServiceError("Failed to create order", { original: err?.message ?? String(err) });

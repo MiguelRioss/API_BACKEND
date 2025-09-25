@@ -37,7 +37,8 @@ export default function createOrdersService(db) {
   return {
     getOrdersServices,
     getOrderByIdServices,
-    createOrderServices
+    createOrderServices,
+    updateOrderServices
   };
 
   // -------------------------
@@ -107,7 +108,20 @@ export default function createOrdersService(db) {
   async function createOrderServices(order) {
     try {
       const prepared = validateAndPrepareOrder(order);
+      // Assign if missing
       return await db.createOrderDB(prepared, prepared.id);
+    } catch (err) {
+      if (err instanceof ValidationError || err?.code === "VALIDATION_ERROR") throw err;
+      throw new ExternalServiceError("Failed to create order", { original: err?.message ?? String(err) });
+    }
+  }
+
+  // inside createOrderServices
+  async function updateOrderServices(orderID,orderChanges) {
+    try {
+     // const prepared = validateAndPrepareOrder(order);
+     console.log(orderChanges)
+      return await db.updateOrderDB(orderID, orderChanges);
     } catch (err) {
       if (err instanceof ValidationError || err?.code === "VALIDATION_ERROR") throw err;
       throw new ExternalServiceError("Failed to create order", { original: err?.message ?? String(err) });

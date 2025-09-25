@@ -264,30 +264,6 @@ export function validateAndPrepareOrder(order) {
       wating_to_Be_Delivered: { status: false, date: null, time: null },
     };
   }
-
-  // If you ever wish to *merge* an incoming status later (NOT on creation),
-  // this shows how you’d normalize keys and coerce types safely.
-  // For creation we will still *ignore* and overwrite with defaults.
-  function normalizeIncomingStatus(raw) {
-    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return makeDefaultStatus();
-
-    const norm = makeDefaultStatus();
-    for (const [k, v] of Object.entries(raw)) {
-      const keyLower = k.replace(/\s+/g, "").toLowerCase();
-      const canonical = STATUS_KEYS.includes(k) ? k : (STATUS_ALIASES[keyLower] ?? null);
-      if (!canonical) continue;
-
-      const s = v && typeof v === "object" ? v : {};
-      norm[canonical] = {
-        status: Boolean(s.status),
-        date: s.date ?? null,
-        time: s.time ?? null,
-      };
-    }
-    return norm;
-  }
-
-
   // ——— Build prepared (normalized) object ———
   const prepared = {
     ...order,
@@ -315,6 +291,8 @@ export function validateAndPrepareOrder(order) {
 
   // Ensure metadata_raw exists (optional: snapshot raw input)
   if (typeof prepared.metadata_raw === "undefined") prepared.metadata_raw = { ...order.metadata };
+  
+  if (!prepared.id) prepared.id = randomUUID();
 
   return prepared;
 }

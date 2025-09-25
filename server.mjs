@@ -23,7 +23,7 @@ app.use(express.json());
 const corsMiddleware = createCorsMiddleware();
 app.use(corsMiddleware);
 
-const db = await createDb();
+const db = await createDb({type : "local"});
 const ordersService = createOrdersService(db);
 const ordersApi = createOrdersAPI(ordersService);
 
@@ -36,7 +36,7 @@ app.get("/api/orders", handleFactory(ordersApi.getOrdersAPI));
 app.get("/api/orders/:id", handleFactory(ordersApi.getOrderByIdAPI));
 // add to your express app routes (ONLY temporarily for debugging)
 app.post('/api/orders', ordersApi.createOrderAPI);
-// app.post('/api/orders/:id',ordersApi.updateApp)
+app.patch('/api/orders/:id',ordersApi.updateOrderAPI)
 // NEW: CTT
 app.get("/api/ctt", cttApi.getStatusAPI); // paired events
 //app.get("/api/ctt/timeline", handleFactory(cttApi.getTimelineAPI)); // 

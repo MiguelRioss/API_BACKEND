@@ -73,10 +73,65 @@ export async function createOrderDB(orderObject) {
   return orderObject;
 }
 
-// export async function updateOrderStatus(id,status){
-//   const map = readFileSafe(DB_FILE)
-//   map[storageKey] = 
-// }
+const isPlainObject = (v) => v && typeof v === 'object' && !Array.isArray(v);
+/**
+ * Update an order by id, changing only keys that ALREADY exist on the order.
+ * Nested objects are merged shallowly (one level).
+ *
+ * @param {string|number} id
+ * @param {object} orderChanges - validated keys (already checked by services)
+ * @returns {Promise<object>} updated order (including id)
+ */
+export async function updateOrderDB(id, orderChanges = {}) {
+  const map = readFileSafe(DB_FILE) || {};
+  const bucket = isPlainObject(map.orders) ? map.orders : map;
+  const key = String(id);
+  const existing = bucket[key];
+  if (!existing) throw new Error(`Order "${key}" not found`);
+
+  // 1) Unwrap { changes: {...} } if present
+  const changes = (orderChanges && orderChanges.changes && isPlainObject(orderChanges.changes))
+    ? orderChanges.changes
+    : orderChanges;
+
+  // 2) Merge only existing keys; handle status specially
+  const updated = { ...existing };
+
+  for (const [k, v] of Object.entries(changes)) {
+    if (!Object.prototype.hasOwnProperty.call(existing, k)) {
+      // ignore unknown top-level keys
+      continue;
+    }
+
+    // Special case: status (shallow merge fields like {status,date,time} per subkey)
+    if (k === "status" && isPlainObject(v) && isPlainObject(existing.status)) {
+      updated.status = { ...existing.status };
+      for (const [sk, sv] of Object.entries(v)) {
+        const prev = isPlainObject(updated.status[sk]) ? updated.status[sk] : {};
+        updated.status[sk] = isPlainObject(sv) ? { ...prev, ...sv } : sv;
+      }
+      continue;
+    }
+
+    // Generic shallow merge for objects; replace for primitives/arrays
+    if (isPlainObject(v) && isPlainObject(existing[k])) {
+      updated[k] = { ...existing[k], ...v };
+    } else {
+      updated[k] = v;
+    }
+  }
+
+  updated.updatedAt = new Date().toISOString();
+  bucket[key] = updated;
+
+  if (bucket !== map) map.orders = bucket;
+
+  // 3) Await the write so it actually persists before returning
+  await writeFileAtomic(DB_FILE, map);
+
+  return { id: key, ...updated };
+}
+
 
 // Optional export: helper to read raw map
 export async function getRawMap() {

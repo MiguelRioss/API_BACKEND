@@ -7,7 +7,8 @@ export default function createOrdersAPI(ordersService) {
     return {
         getOrdersAPI,
         getOrderByIdAPI,
-        createOrderAPI
+        createOrderAPI,
+        updateOrderAPI
     };
 
     async function getOrdersAPI(req, res) {
@@ -39,6 +40,26 @@ export default function createOrdersAPI(ordersService) {
                 code: err && err.code,
                 status: err && err.status,
                 // include any vendor error fields (e.g. firebase code)
+                firebase: err && err.details ? err.details : undefined,
+            };
+            return res.status(500).json({ ok: false, debug_error: details });
+        }
+    }
+
+     async function updateOrderAPI(req, res) {
+        try {   // accepts full order object in request body
+            const orderID = req.params.id;
+            const orderChanges = req.body.changes
+            // The handler does not catch errors; createHandler wrapper sends errors to central error handler.
+            const updated = await ordersService.updateOrderServices(orderID,orderChanges)
+            // created is the exact saved order object
+            return res.status(200).json({ok :true, order : updated})
+        } catch (err) {
+            const details = {
+                message: err && err.message,
+                name: err && err.name,
+                code: err && err.code,
+                status: err && err.status,
                 firebase: err && err.details ? err.details : undefined,
             };
             return res.status(500).json({ ok: false, debug_error: details });

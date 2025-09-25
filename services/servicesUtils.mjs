@@ -239,21 +239,6 @@ export function validateAndPrepareOrder(order) {
     };
   }
 
-  const STATUS_KEYS = [
-    "delivered",
-    "acceptedInCtt",
-    "accepted",
-    "in_transit",                 // ← canonical
-    "wating_to_Be_Delivered",
-  ];
-
-  const STATUS_ALIASES = {
-    accepted_in_ctt: "acceptedInCtt",
-    acceptedinctt: "acceptedInCtt",
-    inTraffic: "in_transit",
-    in_traffic: "in_transit",     // ← legacy → canonical
-    waiting_to_be_delivered: "wating_to_Be_Delivered",
-  };
 
   function makeDefaultStatus() {
     return {
@@ -293,7 +278,8 @@ export function validateAndPrepareOrder(order) {
   if (typeof prepared.metadata_raw === "undefined") prepared.metadata_raw = { ...order.metadata };
   
   if (!prepared.id) prepared.id = randomUUID();
-
+  
+  if (!prepared.track_url) prepared.track_url = ""
   return prepared;
 }
 

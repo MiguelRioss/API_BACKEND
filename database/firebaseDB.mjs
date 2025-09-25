@@ -104,7 +104,7 @@ export async function updateOrderDB(id, rawChanges = {}) {
   const add = (path, val) => { updates[`/orders/${idStr}/${path}`] = val; };
 
   // 1) Top-level simple fields you allow (extend as needed)
-  const ALLOWED_TOP = new Set(["name", "email", "metadata", "status", "currency", "amount_total", "items"]);
+  const ALLOWED_TOP = new Set(["name", "email", "metadata", "status", "currency", "amount_total", "items", "track_url"]);
   for (const [k, v] of Object.entries(changes)) {
     if (!ALLOWED_TOP.has(k)) continue;
     if (!(k in existing)) continue; // keep schema tight

@@ -6,7 +6,7 @@ function DatabaseError(code, message, details = {}) {
   this.details = details;
 }
 
-export const DB_ERROR_CODES = {
+export const ERROR_CODES = {
   ExternalService: 100,
   NotFound: 101,
   PermissionDenied: 102,
@@ -15,11 +15,11 @@ export const DB_ERROR_CODES = {
 
 export default {
   EXTERNAL_SERVICE_ERROR: (message, details) =>
-    DatabaseError(DB_ERROR_CODES.ExternalService, message, details),
+    DatabaseError(ERROR_CODES.ExternalService, message, details),
   NOT_FOUND: (message, details) =>
-    DatabaseError(DB_ERROR_CODES.NotFound, message, details),
+    DatabaseError(ERROR_CODES.NotFound, message, details),
   PERMISSION_DENIED: (message, details) =>
-    DatabaseError(DB_ERROR_CODES.PermissionDenied, message, details),
+    DatabaseError(ERROR_CODES.PermissionDenied, message, details),
   WRITE_FAILED: (message, details) =>
-    DatabaseError(DB_ERROR_CODES.WriteFailed, message, details),
+    DatabaseError(ERROR_CODES.WriteFailed, message, details),
 };

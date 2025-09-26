@@ -1,5 +1,6 @@
   // ctt/cttAPI.mjs
-  import { getShipmentSummaryByCode } from "./shipment_summary.mjs";
+  import { checkTrackingSummary } from "./checkTrack_summary.mjs";
+import { getShipmentSummaryByCode } from "./shipment_summary.mjs";
 
   function badRequest(message) {
     const err = new Error(message);
@@ -20,7 +21,7 @@
       async getStatusAPI(req, res, next) {
         try {
           const rt = parseRt(req);
-          const summary = await getShipmentSummaryByCode(rt);
+          const summary = await checkTrackingSummary(rt);
 
           res
             .status(200)

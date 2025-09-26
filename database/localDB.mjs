@@ -1,23 +1,33 @@
 // database/localDB.mjs
-import fs, { writeFile } from 'fs';
-import path from 'path';
-import errors from '../errors/errors.mjs';
-const DEFAULT_FILE = path.resolve(process.cwd(), 'database', 'data.json');
+import fs from "fs";
+import path from "path";
+import errors from "../errors/errors.mjs";
+
+const DEFAULT_FILE = path.resolve(process.cwd(), "database", "data.json");
 const DB_FILE = process.env.LOCAL_DB_FILE || DEFAULT_FILE;
 
+/**
+ * Safely read and parse a JSON file.
+ *
+ * @param {string} file - Path to the JSON file.
+ * @returns {Object} Parsed object or empty object if missing/corrupt.
+ */
 function readFileSafe(file) {
   try {
     if (!fs.existsSync(file)) return {};
-    const txt = fs.readFileSync(file, 'utf8');
-    return JSON.parse(txt || '{}');
+    const txt = fs.readFileSync(file, "utf8");
+    return JSON.parse(txt || "{}");
   } catch (err) {
-    console.error('[localDB] read error:', err?.message || err);
+    console.error("[localDB] read error:", err?.message || err);
     return {};
   }
 }
 
-
-/** Ensure parent directory exists for file path */
+/**
+ * Ensure parent directory exists for a file path.
+ *
+ * @param {string} file - File path.
+ */
 function ensureDirForFile(file) {
   const dir = path.dirname(file);
   if (!fs.existsSync(dir)) {
@@ -25,7 +35,15 @@ function ensureDirForFile(file) {
   }
 }
 
-/** Atomic write: write to tmp file then rename */
+/**
+ * Atomically write an object to JSON file.
+ * Uses temp file + rename to avoid partial writes.
+ *
+ * @param {string} file - File path.
+ * @param {Object} obj - Data to persist.
+ * @returns {void}
+ * @throws {ApplicationError} If write fails.
+ */
 function writeFileAtomic(file, obj) {
   try {
     ensureDirForFile(file);
@@ -34,12 +52,17 @@ function writeFileAtomic(file, obj) {
     fs.renameSync(tmp, file);
   } catch (err) {
     console.error("[localDB] write error:", err?.message ?? err);
-    throw err;
+    throw errors.EXTERNAL_SERVICE_ERROR("Failed to write database file", {
+      original: err?.message ?? String(err),
+    });
   }
 }
 
 /**
- * Returns Promise<Array> sorted by written_at desc if present
+ * Get all orders, sorted by `written_at` descending.
+ *
+ * @async
+ * @returns {Promise<Object[]>} Array of orders (possibly empty).
  */
 export async function getAllOrders() {
   const map = readFileSafe(DB_FILE);
@@ -54,49 +77,62 @@ export async function getAllOrders() {
 }
 
 /**
- * Reads a single order from the file-backed map.
+ * Get a single order by ID.
  *
- * @param {string|number} id - The order id.
- * @returns {Promise<Object>} Resolves with the order if found, rejects if not.
+ * @async
+ * @param {string|number} id - Order identifier.
+ * @returns {Promise<Object>} The found order.
+ * @rejects {ApplicationError} NOT_FOUND if missing.
  */
 export async function getOrderById(id) {
   const map = readFileSafe(DB_FILE) || {};
   const bucket = map.orders ?? map;
   const key = String(id);
-  return Promise.resolve(bucket[key]).then(order => {
-    if (order == null) {
-      return Promise.reject(errors.NOT_FOUND(`Order with ID: ${key} not found`));
-    }
-    return order;
-  });
+
+  const order = bucket[key];
+  if (order == null) {
+    return Promise.reject(errors.NOT_FOUND(`Order with ID: ${key} not found`));
+  }
+  return order;
 }
 
-
-// database/localDB.mjs (excerpt)
+/**
+ * Create a new order.
+ *
+ * @async
+ * @param {Object} orderObject - Validated order object.
+ * @returns {Promise<Object>} Stored order object.
+ * @rejects {ApplicationError} INVALID_DATA if input is not an object.
+ */
 export async function createOrderDB(orderObject) {
   if (typeof orderObject !== "object" || orderObject === null) {
-    throw new TypeError("createOrderDB expects an object as orderObject");
+    return Promise.reject(errors.INVALID_DATA("createOrderDB expects a valid order object"));
   }
   const map = readFileSafe(DB_FILE);
   map[orderObject.id] = orderObject;
   writeFileAtomic(DB_FILE, map);
-  // Return the exact object stored (no mutation)
   return orderObject;
 }
 
- const isPlainObject = (v) => v && typeof v === 'object' && !Array.isArray(v);
+const isPlainObject = (v) => v && typeof v === "object" && !Array.isArray(v);
+
 /**
- * Update an order by id, changing only keys that ALREADY exist on the order.
- * Nested objects are merged shallowly (one level).
+ * Update an order by replacing with a new version.
  *
- * @param {string|number} id
- * @param {object} orderChanges - validated keys (already checked by services)
- * @returns {Promise<object>} updated order (including id)
+ * @async
+ * @param {string|number} id - Order ID.
+ * @param {Object} updatedOrder - Validated, merged order object.
+ * @returns {Promise<Object>} The updated order with id.
+ * @rejects {ApplicationError} NOT_FOUND if the order doesn’t exist.
  */
 export async function updateOrderDB(id, updatedOrder) {
   const map = readFileSafe(DB_FILE) || {};
   const bucket = isPlainObject(map.orders) ? map.orders : map;
   const key = String(id);
+
+  if (!bucket[key]) {
+    return Promise.reject(errors.NOT_FOUND(`Order with ID: ${key} not found`));
+  }
 
   bucket[key] = updatedOrder;
   if (bucket !== map) map.orders = bucket;
@@ -105,8 +141,12 @@ export async function updateOrderDB(id, updatedOrder) {
   return { id: key, ...updatedOrder };
 }
 
-
-// Optional export: helper to read raw map
+/**
+ * Get the raw database map (for debugging).
+ *
+ * @async
+ * @returns {Promise<Object>} Raw map of all stored data.
+ */
 export async function getRawMap() {
   return readFileSafe(DB_FILE);
 }

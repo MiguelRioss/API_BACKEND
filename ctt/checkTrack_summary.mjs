@@ -1,39 +1,26 @@
-// /lib/checkTrackingByDateLeft.mjs
+// /lib/checkTrackingSummary.mjs
+import puppeteer from "puppeteer-core";
+
 export async function checkTrackingSummary(input) {
-  const puppeteer = await (async () => {
-    try { return (await import("puppeteer")).default; } catch {}
-    try { return (await import("puppeteer-core")).default; } catch {}
-    throw new Error("Install puppeteer (dev) or puppeteer-core.");
-  })();
+  // Caminho do Chromium definido no Dockerfile/Render
+  const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || "/usr/bin/chromium";
 
-  async function launchBrowser() {
-    if (process.env.VERCEL) {
-      try {
-        const chromMod = await import("@sparticuz/chromium");
-        const chromium = chromMod.default ?? chromMod;
-        const executablePath =
-          typeof chromium.executablePath === "function"
-            ? await chromium.executablePath()
-            : chromium.executablePath;
+  const browser = await puppeteer.launch({
+    headless: true,
+    executablePath,
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--no-zygote",
+    ],
+    protocolTimeout: 60_000,
+  });
 
-        return puppeteer.launch({
-          args: [...chromium.args, "--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--no-zygote"],
-          defaultViewport: chromium.defaultViewport,
-          executablePath,
-          headless: chromium.headless,
-          protocolTimeout: 60_000,
-        });
-      } catch {}
-    }
-
-    return puppeteer.launch({
-      headless: "new",
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-      channel: process.env.PUPPETEER_CHANNEL || undefined,
-      protocolTimeout: 60_000,
-    });
-  }
+  const page = await browser.newPage();
+  await page.setUserAgent(
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+  );
 
   const buildUrl = (v) =>
     /^https?:\/\//i.test(v)
@@ -42,12 +29,7 @@ export async function checkTrackingSummary(input) {
 
   const url = buildUrl(String(input).trim());
 
-  const browser = await launchBrowser();
-  const page = await browser.newPage();
-  await page.setUserAgent(
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-  );
-
+  // Estrutura default do summary
   let summary = {
     delivered: { status: false, date: null, time: null },
     acceptedInCtt: { status: false, date: null, time: null },

@@ -1,22 +1,21 @@
 # Dockerfile
-# Base image with Chromium & Playwright deps preinstalled
 FROM mcr.microsoft.com/playwright:v1.55.1-jammy
 
 WORKDIR /app
 
-# Install dependencies first (uses Docker layer cache)
 COPY package*.json ./
 RUN npm ci
 
-# Copy the rest of your code
+# Install puppeteer-core only (lighter than puppeteer full)
+RUN npm install puppeteer-core
+
 COPY . .
 
-# Environment
 ENV NODE_ENV=production
 ENV PORT=3000
 
-# Expose the port your Express app listens on
-EXPOSE 3000
+# Chromium path baked into the Playwright image
+ENV PUPPETEER_EXECUTABLE_PATH=/ms-playwright/chromium-1080/chrome-linux/chrome
 
-# Start your server
+EXPOSE 3000
 CMD ["node", "server.mjs"]

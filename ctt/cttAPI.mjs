@@ -1,67 +1,51 @@
-  // ctt/cttAPI.mjs
-  import { checkTrackingSummary } from "./checkTrack_summary.mjs";
-import { getShipmentSummaryByCode } from "./shipment_summary.mjs";
+// ctt/cttAPI.mjs
+import { checkTrackingSummary } from "./checkTrackingByDateLeft.mjs"; // or your new file name
 
-  function badRequest(message) {
-    const err = new Error(message);
-    err.statusCode = 400;
-    return err;
-  }
+function badRequest(message) {
+  const err = new Error(message);
+  err.statusCode = 400;
+  return err;
+}
 
-  function parseRt(req) {
-    const rt = (req.query.rt || req.query.code || "").toString().trim().toUpperCase();
-    if (!rt) throw badRequest("Missing query parameter 'rt' (e.g., ?rt=RT160147615PT)");
-    if (!/^RT[0-9A-Z]{6,}PT$/.test(rt)) throw badRequest("Invalid RT code format.");
-    return rt;
-  }
+function parseRt(req) {
+  const rt = (req.query.rt || req.query.code || "").toString().trim().toUpperCase();
+  if (!rt) throw badRequest("Missing query parameter 'rt' (e.g., ?rt=RT160147615PT)");
+  if (!/^RT[0-9A-Z]{6,}PT$/.test(rt)) throw badRequest("Invalid RT code format.");
+  return rt;
+}
 
-  export default function createCttAPI() {
-    return {
-      /** GET /api/ctt?rt=RT160147615PT — sends summary JSON */
-      async getStatusAPI(req, res, next) {
-        try {
-          const rt = parseRt(req);
-          const summary = await checkTrackingSummary(rt);
+export default function createCttAPI() {
+  return {
+    /**
+     * GET /api/ctt?rt=RT160147615PT
+     * Scrapes CTT site and returns a structured summary:
+     * { delivered:{status,date,time}, acceptedInCtt:{...}, accepted:{...}, in_transit:{...}, waitingToBeDelivered:{...} }
+     */
+    async getStatusAPI(req, res, next) {
+      try {
+        const rt = parseRt(req);
+        const summary = await checkTrackingSummary(rt);
 
-          res
-            .status(200)
-            .json({
-              ok: true,
-              code: rt,
-              message: "CTT shipment summary",
-              summary, // { delivered:{status,date,time}, ... }
-            });
-        } catch (err) {
-          next(err);
-        }
-      },
+        res.status(200).json({
+          ok: true,
+          code: rt,
+          message: "CTT shipment summary (scraped)",
+          summary,
+        });
+      } catch (err) {
+        next(err);
+      }
+    },
 
-      /** GET /api/ctt/timeline?rt=RT160147615PT — sends paired events JSON */
-      // async getTimelineAPI(req, res, next) {
-      //   try {
-      //     const rt = parseRt(req);
-
-      //     // Build full URL for getPairedTimeline (if your impl needs it)
-      //     const params = new URLSearchParams({
-      //       ObjectCodeInput: rt,
-      //       SearchInput: rt,
-      //       IsFromPublicArea: "true",
-      //     });
-      //     const url = `https://appserver.ctt.pt/CustomerArea/PublicArea_Detail?${params.toString()}`;
-
-      //     const events = await getPairedTimeline(url); // [{date,time,message}, …]
-
-      //     res
-      //       .status(200)
-      //       .json({
-      //         ok: true,
-      //         code: rt,
-      //         message: "CTT paired timeline events",
-      //         events,
-      //       });
-      //   } catch (err) {
-      //     next(err);
-      //   }
-      // },
-    };
-  }
+    // Future: GET /api/ctt/timeline?rt=... → could reuse Puppeteer or cheerio if needed
+    // async getTimelineAPI(req, res, next) {
+    //   try {
+    //     const rt = parseRt(req);
+    //     const events = await getPairedTimeline(rt);
+    //     res.status(200).json({ ok: true, code: rt, events });
+    //   } catch (err) {
+    //     next(err);
+    //   }
+    // },
+  };
+}

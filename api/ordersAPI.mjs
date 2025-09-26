@@ -1,68 +1,51 @@
+import handlerFactory from "../utils/handleFactory.mjs";
+
 // api/ordersAPI.mjs
 export default function createOrdersAPI(ordersService) {
     if (!ordersService || typeof ordersService.getOrdersServices !== "function") {
-        throw new Error("createOrdersAPI expects the ordersService with getOrdersServices()");
+       throw "API dependency invalid";
     }
 
     return {
-        getOrdersAPI,
-        getOrderByIdAPI,
-        createOrderAPI,
-        updateOrderAPI
+       getOrdersAPI : handlerFactory(interalGetOrders),
+        getOrderByIdAPI: handlerFactory(internalGetOrderByID),
+        createOrderAPI: handlerFactory(internalCreateOrder),
+        updateOrderAPI: handlerFactory(internalUpdateOrder)
     };
 
-    async function getOrdersAPI(req, res) {
+    async function interalGetOrders(req, rsp) {
         // await the async service method!
-        const orders = await ordersService.getOrdersServices();
-        // return a value — your handler factory will JSON-serialize it
-        return { ok: true, orders };
+        return ordersService.getOrdersServices()
+            .then(
+                orders => rsp.json(orders)
+            );
     }
     // in api/ordersAPI.mjs
-    async function getOrderByIdAPI(req, res) {
+    async function internalGetOrderByID(req, rsp) {
         const id = req.params.id;
-        const order = await ordersService.getOrderByIdServices(id); // will throw NotFoundError if missing
-        return { ok: true, order };
+        return ordersService.getOrderByIdServices(id)
+            .then(order => rsp.json(order)); // will throw NotFoundError if missing
     }
 
-    async function createOrderAPI(req, res) {
-        try {   // accepts full order object in request body
-            const order = req.body;
-            console.info('[DEBUG CREATE ORDER] incoming body:', JSON.stringify(order));
-            // The handler does not catch errors; createHandler wrapper sends errors to central error handler.
-            const created = await ordersService.createOrderServices(order);
-            // created is the exact saved order object
-            return res.status(201).json({ok :true, order : created})
-        } catch (err) {
-            console.error('[DEBUG CREATE ORDER] ERROR ->', err && err.stack ? err.stack : err);
-            const details = {
-                message: err && err.message,
-                name: err && err.name,
-                code: err && err.code,
-                status: err && err.status,
-                // include any vendor error fields (e.g. firebase code)
-                firebase: err && err.details ? err.details : undefined,
-            };
-            return res.status(500).json({ ok: false, debug_error: details });
-        }
+    async function internalCreateOrder(req, rsp) {
+        let orderObj = req.body;
+        // The handler does not catch errors; createHandler wrapper sends errors to central error handler.
+        return ordersService.createOrderServices(orderObj).then(
+            orderObj => rsp.status(201).json({
+                description: "Order Created",
+                uri: `/api/orders/${orderObj.id}`
+            })
+        )
     }
 
-     async function updateOrderAPI(req, res) {
-        try {   // accepts full order object in request body
-            const orderID = req.params.id;
-            const orderChanges = req.body.changes
-            // The handler does not catch errors; createHandler wrapper sends errors to central error handler.
-            const updated = await ordersService.updateOrderServices(orderID,orderChanges)
-            // created is the exact saved order object
-            return res.status(200).json({ok :true, order : updated})
-        } catch (err) {
-            const details = {
-                message: err && err.message,
-                name: err && err.name,
-                code: err && err.code,
-                status: err && err.status,
-                firebase: err && err.details ? err.details : undefined,
-            };
-            return res.status(500).json({ ok: false, debug_error: details });
-        }
+    async function internalUpdateOrder(req, rsp) {
+        const orderID = req.params.id;
+        const orderChanges = req.body.changes
+        // The handler does not catch errors; createHandler wrapper sends errors to central error handler.
+        return ordersService.updateOrderServices(orderID, orderChanges).then(
+            order => rsp.json({
+                message: `Order with id ${order.id} updated`
+            })
+        )
     }
 }

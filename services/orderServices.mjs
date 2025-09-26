@@ -1,19 +1,14 @@
 ﻿// api/services/ordersServiceFactory.mjs
-import {
-  DomainError,
-  ValidationError,
-  NotFoundError,
-  ExternalServiceError,
-} from "../errors/domainErros.mjs";
 
 import {
-  validateIdOrThrow,
-  findOrderById,
   filterByStatus,
   filterByQuery,
   sortByWrittenAtDesc,
   applyLimit,
-  validateAndPrepareOrder
+  validateAndPrepareOrder,
+  mergeOrderChanges,
+  validateAndNormalizeID,
+  normalizeId
 } from "./servicesUtils.mjs";
 
 
@@ -30,8 +25,8 @@ import {
  * Service throws domain errors for HTTP layer to map.
  */
 export default function createOrdersService(db) {
-  if (!db || typeof db.getAllOrders !== "function") {
-    throw new Error("createOrdersService requires a db module with at least getAllOrders()");
+  if (!db) {
+    throw "Services dependency invalid";
   }
 
   return {
@@ -40,92 +35,81 @@ export default function createOrdersService(db) {
     createOrderServices,
     updateOrderServices
   };
-
-  // -------------------------
-  // getOrdersServices: supports optional filters
-  // { limit, status, q }
-  // ------------------------
-
-  async function getOrdersServices({ limit, status, q } = {}) {
-    try {
-      let orders = await db.getAllOrders();
-      if (!Array.isArray(orders)) orders = [];
-
-      // Compose the pure helpers
-      orders = filterByStatus(orders, status);
-
-      orders = filterByQuery(orders, q);
-      orders = sortByWrittenAtDesc(orders);
-      orders = applyLimit(orders, limit);
-
-      return orders;
-    } catch (err) {
-      throw new ExternalServiceError("Failed to read orders from DB", {
-        original: err?.message ?? String(err),
-      });
-    }
+  /**
+  * Fetches orders and applies filters, sorting, and limit in a chained style.
+  *
+  * @async
+  * @param {Object} [options]
+  * @param {number} [options.limit] - Maximum number of orders.
+  * @param {string|boolean} [options.status] - Status filter.
+  * @param {string} [options.q] - Query string.
+  * @returns {Promise<Object[]>} Filtered, sorted, and limited orders.
+  */
+  function getOrdersServices({ limit, status, q } = {}) {
+    return db.getAllOrders()
+      .then(orders => filterByStatus(orders, status))
+      .then(orders => filterByQuery(orders, q))
+      .then(orders => sortByWrittenAtDesc(orders))
+      .then(orders => applyLimit(orders, limit));
   }
 
-
-  // -------------------------
-  // getOrderByIdServices: flexible lookup (uses servicesUtils)
-  // -------------------------
+  /**
+   * Retrieves an order by its ID after validation and normalization.
+   *
+   * @async
+   * @function getOrderByIdServices
+   * @param {string|number} id - The raw id provided by the caller.
+   * @returns {Promise<Object|null>} Resolves with the order object if found, or null if not found.
+   * @rejects {VALIDATIONn} If the id is null, undefined, or empty after trimming.
+   */
   async function getOrderByIdServices(id) {
-    try {
-      // 1) validate input (throws ValidationError -> DomainError if invalid)
-      validateIdOrThrow(id);
-
-      // 2) normalise to a trimmed string for the DB layer
-      //    - this prevents numeric/string mismatch and removes accidental spaces
-      const idStr = String(id).trim();
-
-      // Optional: ensure idStr not empty after trim
-      if (idStr.length === 0) {
-        throw new Error('getOrderByIdServices: normalized id is empty');
-      }
-
-      // 3) prefer adapter direct lookup (adapter should expect a string)
-      if (typeof db.getOrderById === 'function') {
-        const direct = await db.getOrderById(idStr);
-        if (direct) return direct;
-        // if adapter returns falsy, fallthrough to explicit NotFound
-      }
-
-      // 4) if no adapter or not found, explicit NotFoundError
-      throw new NotFoundError(`Order ${idStr} not found`);
-    } catch (err) {
-      // preserve domain errors by code or instanceof
-      if (err && (err instanceof NotFoundError || err.code === 'NOT_FOUND')) throw err;
-      if (err && (err instanceof DomainError || err.code === 'VALIDATION_ERROR')) throw err;
-
-      // wrap unexpected errors for the upstream layer
-      const origDetail = err && (err.message || err.stack || String(err));
-      throw new ExternalServiceError('Failed looking up order', { original: origDetail });
-    }
+    const normalizedID = await validateAndNormalizeID(id);
+    return db.getOrderById(normalizedID);
   }
 
-  // inside createOrderServices
+  /**
+   * Creates a new order in the database.
+   *
+   * Workflow:
+   * 1. Validates and normalizes the input order.
+   * 2. Generates IDs, status, metadata, etc.
+   * 3. Persists the prepared order to the database.
+   *
+   * @async
+   * @function createOrderServices
+   * @param {Object} order - Raw order object to be validated and saved.
+   * @returns {Promise<Object>} Resolves with the created order as stored in the database.
+   * @rejects {ValidationError} If the order payload is invalid.
+   * @rejects {ExternalServiceError} If the DB call fails.
+   */
   async function createOrderServices(order) {
-    try {
-      const prepared = validateAndPrepareOrder(order);
-      // Assign if missing
-      return await db.createOrderDB(prepared, prepared.id);
-    } catch (err) {
-      if (err instanceof ValidationError || err?.code === "VALIDATION_ERROR") throw err;
-      throw new ExternalServiceError("Failed to create order", { original: err?.message ?? String(err) });
-    }
+    const prepared = await validateAndPrepareOrder(order); // ← await needed here
+    return db.createOrderDB(prepared, prepared.id);
   }
 
-  // inside createOrderServices
-  async function updateOrderServices(orderID,orderChanges) {
-    try {
-     // const prepared = validateAndPrepareOrder(order);
-     console.log(orderChanges)
-      return await db.updateOrderDB(orderID, orderChanges);
-    } catch (err) {
-      if (err instanceof ValidationError || err?.code === "VALIDATION_ERROR") throw err;
-      throw new ExternalServiceError("Failed to create order", { original: err?.message ?? String(err) });
-    }
-  }
 
+  /**
+  * Update an existing order by applying changes and persisting to DB.
+  *
+  * @async
+  * @param {string|number} orderID - The id of the order to update.
+  * @param {Object} orderChanges - Fields to merge into the order.
+  * @returns {Promise<Object>} The updated order as persisted in the DB.
+  * @throws {ValidationError} If the order ID is invalid.
+  * @throws {NotFoundError} If the order does not exist.
+  * @throws {ExternalServiceError} If the DB operation fails.
+  */
+  async function updateOrderServices(orderID, orderChanges = {}) {
+    return validateAndNormalizeID(orderID)
+      .then(normalizedId =>
+        db.getOrderById(normalizedId).then(existingOrder => {
+          const updated = mergeOrderChanges(existingOrder, orderChanges);
+          updated.updatedAt = new Date().toISOString();
+          return db.updateOrderDB(normalizedId, updated);
+        })
+      );
+  }
 }
+
+
+

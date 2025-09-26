@@ -1,20 +1,19 @@
 openapi: 3.0.3
 info:
   title: Orders API
-  description: API contract for the Orders service. Returns order list and single order by id. Versioned contract for services and HTTP layer.
-  version: "1.0.0"
+  description: API contract for the Orders service. Supports listing, fetching, creating, and updating orders. Versioned contract for services and HTTP layer.
+  version: "1.1.0"
 servers:
   - url: http://localhost:3000
     description: Local development server
 tags:
   - name: orders
-    description: Operations to list, fetch and create orders
+    description: Operations to list, fetch, create and update orders
 
 paths:
   /api/orders:
     get:
-      tags:
-        - orders
+      tags: [orders]
       summary: List orders
       description: >
         Return a list of orders. Supports optional filtering via query.
@@ -43,47 +42,15 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/OrdersResponse'
-              examples:
-                sample:
-                  summary: Example list response
-                  value:
-                    ok: true
-                    orders:
-                      - event_id: "evt_1SALZLPjytaoBek7ZzrMhi15"
-                        session_id: "cs_test_b1IUDa2CTVkK8XKrQcntt3daZKb7vA9hGXXWf8Vlh74F6fhKavPagaUFpp"
-                        written_at: "2025-09-23T02:03:03.792Z"
-                        name: "Alvaro Ferranti"
-                        email: "customer@example.com"
-                        amount_total: 3999
-                        currency: "eur"
-                        items:
-                          - id: "price_1"
-                            name: "IBOTINCTURE™ TOTAL EXTRACT (60 ML)"
-                            quantity: 1
-                            unit_amount: 3999
-                        metadata:
-                          addr_city: "Sintra"
-                          addr_ctry: "PT"
-                          addr_line1: "Rua Engenheiro Sampaio Baptista,12"
-                          addr_zip: "2710-691"
-                          full_name: "Alvaro Ferranti"
-                          phone: "965751649"
-                        track_url: ""
-                        status: false
-                        metadata_raw: {}
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '502':
-          $ref: '#/components/responses/ExternalServiceError'
-        '500':
-          $ref: '#/components/responses/InternalError'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '502': { $ref: '#/components/responses/ExternalServiceError' }
+        '500': { $ref: '#/components/responses/InternalError' }
 
     post:
-      tags:
-        - orders
+      tags: [orders]
       summary: Create a new order
       description: >
-        Create a new order. The service layer injects `event_id`, `written_at`, and `status` (default `false`) if missing.
+        Create a new order. The service layer injects `event_id`, `written_at`, and `status` (default structure) if missing.
         The request body should include required business fields; the response returns the stored order in `{ ok: true, order }`.
       requestBody:
         required: true
@@ -91,29 +58,6 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/NewOrder'
-            examples:
-              newOrderExample:
-                summary: Example new order payload
-                value:
-                  session_id: "cs_test_b1IUDa2CTVkK8XKrQcntt3daZKb7vA9hGXXWf8Vlh74F6fhKavPagaUFpp"
-                  name: "Alvaro Ferranti"
-                  email: "customer@example.com"
-                  amount_total: 3999
-                  currency: "eur"
-                  items:
-                    - id: "price_1"
-                      name: "IBOTINCTURE™ TOTAL EXTRACT (60 ML)"
-                      quantity: 1
-                      unit_amount: 3999
-                  metadata:
-                    addr_city: "Sintra"
-                    addr_ctry: "PT"
-                    addr_line1: "Rua Engenheiro Sampaio Baptista,12"
-                    addr_zip: "2710-691"
-                    full_name: "Alvaro Ferranti"
-                    phone: "965751649"
-                  track_url: ""
-                  metadata_raw: {}
       responses:
         '200':
           description: Order created (returns stored order)
@@ -121,45 +65,13 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/OrderResponse'
-              examples:
-                created:
-                  summary: Example created order response
-                  value:
-                    ok: true
-                    order:
-                      event_id: "evt_1SALZLPjytaoBek7ZzrMhi15"
-                      session_id: "cs_test_b1IUDa2CTVkK8XKrQcntt3daZKb7vA9hGXXWf8Vlh74F6fhKavPagaUFpp"
-                      written_at: "2025-09-23T02:03:03.792Z"
-                      name: "Alvaro Ferranti"
-                      email: "customer@example.com"
-                      amount_total: 3999
-                      currency: "eur"
-                      items:
-                        - id: "price_1"
-                          name: "IBOTINCTURE™ TOTAL EXTRACT (60 ML)"
-                          quantity: 1
-                          unit_amount: 3999
-                      metadata:
-                        addr_city: "Sintra"
-                        addr_ctry: "PT"
-                        addr_line1: "Rua Engenheiro Sampaio Baptista,12"
-                        addr_zip: "2710-691"
-                        full_name: "Alvaro Ferranti"
-                        phone: "965751649"
-                      track_url: ""
-                      status: false
-                      metadata_raw: {}
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '502':
-          $ref: '#/components/responses/ExternalServiceError'
-        '500':
-          $ref: '#/components/responses/InternalError'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '502': { $ref: '#/components/responses/ExternalServiceError' }
+        '500': { $ref: '#/components/responses/InternalError' }
 
   /api/orders/{id}:
     get:
-      tags:
-        - orders
+      tags: [orders]
       summary: Get a single order by id
       description: >
         Return a single order by identifier. `id` is treated primarily as a string.
@@ -169,7 +81,7 @@ paths:
         - name: id
           in: path
           required: true
-          description: Order identifier (event_id, id, session_id, or numeric id).
+          description: Order identifier.
           schema:
             type: string
       responses:
@@ -179,192 +91,139 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/OrderResponse'
-              examples:
-                orderExample:
-                  summary: Example order response
-                  value:
-                    ok: true
-                    order:
-                      event_id: "evt_1SALZLPjytaoBek7ZzrMhi15"
-                      session_id: "cs_test_b1IUDa2CTVkK8XKrQcntt3daZKb7vA9hGXXWf8Vlh74F6fhKavPagaUFpp"
-                      written_at: "2025-09-23T02:03:03.792Z"
-                      name: "Alvaro Ferranti"
-                      email: "customer@example.com"
-                      amount_total: 3999
-                      currency: "eur"
-                      items:
-                        - id: "price_1"
-                          name: "IBOTINCTURE™ TOTAL EXTRACT (60 ML)"
-                          quantity: 1
-                          unit_amount: 3999
-                      metadata:
-                        addr_city: "Sintra"
-                        addr_ctry: "PT"
-                        addr_line1: "Rua Engenheiro Sampaio Baptista,12"
-                        addr_zip: "2710-691"
-                        full_name: "Alvaro Ferranti"
-                        phone: "965751649"
-                      track_url: ""
-                      status: false
-                      metadata_raw: {}
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '502':
-          $ref: '#/components/responses/ExternalServiceError'
-        '500':
-          $ref: '#/components/responses/InternalError'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '502': { $ref: '#/components/responses/ExternalServiceError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+    patch:
+      tags: [orders]
+      summary: Update (patch) an existing order
+      description: >
+        Partially update an order. Only fields provided inside `changes` are applied.
+        Fields not present remain unchanged. Nested objects like `metadata` and `status` are merged according to service rules.
+        Response envelope is `{ ok: true, order: { ... } }`.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Order identifier.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [changes]
+              properties:
+                changes:
+                  type: object
+                  description: Partial order fields to update.
+                  additionalProperties: true
+            example:
+              changes:
+                name: "Updated Customer"
+                status:
+                  in_transit:
+                    status: true
+                    date: "2025-09-27"
+                    time: "14:30"
+                metadata:
+                  phone: "911111111"
+      responses:
+        '200':
+          description: Order updated (returns stored order)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '502': { $ref: '#/components/responses/ExternalServiceError' }
+        '500': { $ref: '#/components/responses/InternalError' }
 
 components:
   schemas:
     Item:
       type: object
-      required:
-        - id
-        - name
-        - quantity
-        - unit_amount
+      required: [id, name, quantity, unit_amount]
       properties:
-        id:
-          type: string
-          description: Price id or product id
-        name:
-          type: string
-        quantity:
-          type: integer
-          minimum: 0
-        unit_amount:
-          type: integer
-          description: Unit amount in minor units (cents)
+        id: { type: string }
+        name: { type: string }
+        quantity: { type: integer, minimum: 0 }
+        unit_amount: { type: integer, description: "Unit amount in minor units (cents)" }
       additionalProperties: true
 
     NewOrder:
       type: object
-      required:
-        - name
-        - items
-        - amount_total
-        - currency
+      required: [name, items, amount_total, currency]
       properties:
-        session_id:
-          type: string
-          description: Optional checkout session id
-        name:
-          type: string
-        email:
-          type: string
-          format: email
-        amount_total:
-          type: integer
-          description: Total amount in minor units (cents)
-        currency:
-          type: string
+        session_id: { type: string }
+        name: { type: string }
+        email: { type: string, format: email }
+        amount_total: { type: integer }
+        currency: { type: string }
         items:
           type: array
-          items:
-            $ref: '#/components/schemas/Item'
-        metadata:
-          type: object
-        track_url:
-          type: string
-        metadata_raw:
-          type: object
+          items: { $ref: '#/components/schemas/Item' }
+        metadata: { type: object }
+        track_url: { type: string }
+        metadata_raw: { type: object }
       additionalProperties: true
 
     Order:
       type: object
-      required:
-        - event_id
-        - written_at
-        - name
-        - amount_total
-        - currency
-        - items
-        - metadata
-        - status
-        - metadata_raw
+      required: [event_id, written_at, name, amount_total, currency, items, metadata, status, metadata_raw]
       properties:
-        event_id:
-          type: string
-        session_id:
-          type: [string, "null"]
-        written_at:
-          type: string
-          format: date-time
-        name:
-          type: string
-        email:
-          type: [string, "null"]
-          format: email
-        amount_total:
-          type: integer
-        currency:
-          type: string
+        event_id: { type: string }
+        session_id: { type: [string, "null"] }
+        written_at: { type: string, format: date-time }
+        name: { type: string }
+        email: { type: [string, "null"], format: email }
+        amount_total: { type: integer }
+        currency: { type: string }
         items:
           type: array
-          items:
-            $ref: '#/components/schemas/Item'
-        metadata:
-          type: object
-        track_url:
-          type: string
+          items: { $ref: '#/components/schemas/Item' }
+        metadata: { type: object }
+        track_url: { type: string }
         status:
-          type: boolean
-          default: false
-          description: "Order status. Must be present and default to false on create/store."
-        metadata_raw:
           type: object
+          description: Status map with delivery steps.
+          additionalProperties: true
+        metadata_raw: { type: object }
       additionalProperties: true
 
     OrdersResponse:
       type: object
-      required:
-        - ok
-        - orders
+      required: [ok, orders]
       properties:
-        ok:
-          type: boolean
-          const: true
+        ok: { type: boolean, const: true }
         orders:
           type: array
-          items:
-            $ref: '#/components/schemas/Order'
+          items: { $ref: '#/components/schemas/Order' }
 
     OrderResponse:
       type: object
-      required:
-        - ok
-        - order
+      required: [ok, order]
       properties:
-        ok:
-          type: boolean
-          const: true
-        order:
-          $ref: '#/components/schemas/Order'
+        ok: { type: boolean, const: true }
+        order: { $ref: '#/components/schemas/Order' }
 
     ErrorEnvelope:
       type: object
-      required:
-        - ok
-        - error
+      required: [ok, error]
       properties:
-        ok:
-          type: boolean
-          const: false
+        ok: { type: boolean, const: false }
         error:
           type: object
-          required:
-            - code
-            - message
+          required: [code, message]
           properties:
-            code:
-              type: string
-            message:
-              type: string
-            details:
-              type: object
-              description: optional structured details
+            code: { type: string }
+            message: { type: string }
+            details: { type: object }
           additionalProperties: true
 
   responses:
@@ -372,55 +231,21 @@ components:
       description: Validation error
       content:
         application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorEnvelope'
-          examples:
-            validation:
-              value:
-                ok: false
-                error:
-                  code: "VALIDATION_ERROR"
-                  message: "Order id is required"
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
     NotFound:
       description: Resource not found
       content:
         application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorEnvelope'
-          examples:
-            notfound:
-              value:
-                ok: false
-                error:
-                  code: "NOT_FOUND"
-                  message: "Order evt_XXXX not found"
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
     ExternalServiceError:
       description: Downstream DB or external service failure
       content:
         application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorEnvelope'
-          examples:
-            external:
-              value:
-                ok: false
-                error:
-                  code: "EXTERNAL_SERVICE_ERROR"
-                  message: "Failed to read orders from DB"
-                  details:
-                    original: "ENOENT: no such file or directory, open 'database/data.json'"
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
     InternalError:
       description: Unexpected server error
       content:
         application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorEnvelope'
-          examples:
-            internal:
-              value:
-                ok: false
-                error:
-                  code: "INTERNAL_ERROR"
-                  message: "Internal server error"
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
 
 security: []

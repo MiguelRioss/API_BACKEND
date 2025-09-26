@@ -1,7 +1,7 @@
 // database/localDB.mjs
 import fs, { writeFile } from 'fs';
 import path from 'path';
-
+import errors from '../errors/errors.mjs';
 const DEFAULT_FILE = path.resolve(process.cwd(), 'database', 'data.json');
 const DB_FILE = process.env.LOCAL_DB_FILE || DEFAULT_FILE;
 
@@ -54,12 +54,23 @@ export async function getAllOrders() {
 }
 
 /**
- * Returns Promise<Object|null>
+ * Reads a single order from the file-backed map.
+ *
+ * @param {string|number} id - The order id.
+ * @returns {Promise<Object>} Resolves with the order if found, rejects if not.
  */
 export async function getOrderById(id) {
-  const map = readFileSafe(DB_FILE);
-  return map?.[id] ?? null;
+  const map = readFileSafe(DB_FILE) || {};
+  const bucket = map.orders ?? map;
+  const key = String(id);
+  return Promise.resolve(bucket[key]).then(order => {
+    if (order == null) {
+      return Promise.reject(errors.NOT_FOUND(`Order with ID: ${key} not found`));
+    }
+    return order;
+  });
 }
+
 
 // database/localDB.mjs (excerpt)
 export async function createOrderDB(orderObject) {
@@ -73,7 +84,7 @@ export async function createOrderDB(orderObject) {
   return orderObject;
 }
 
-const isPlainObject = (v) => v && typeof v === 'object' && !Array.isArray(v);
+ const isPlainObject = (v) => v && typeof v === 'object' && !Array.isArray(v);
 /**
  * Update an order by id, changing only keys that ALREADY exist on the order.
  * Nested objects are merged shallowly (one level).
@@ -82,54 +93,16 @@ const isPlainObject = (v) => v && typeof v === 'object' && !Array.isArray(v);
  * @param {object} orderChanges - validated keys (already checked by services)
  * @returns {Promise<object>} updated order (including id)
  */
-export async function updateOrderDB(id, orderChanges = {}) {
+export async function updateOrderDB(id, updatedOrder) {
   const map = readFileSafe(DB_FILE) || {};
   const bucket = isPlainObject(map.orders) ? map.orders : map;
   const key = String(id);
-  const existing = bucket[key];
-  if (!existing) throw new Error(`Order "${key}" not found`);
 
-  // 1) Unwrap { changes: {...} } if present
-  const changes = (orderChanges && orderChanges.changes && isPlainObject(orderChanges.changes))
-    ? orderChanges.changes
-    : orderChanges;
-
-  // 2) Merge only existing keys; handle status specially
-  const updated = { ...existing };
-
-  for (const [k, v] of Object.entries(changes)) {
-    if (!Object.prototype.hasOwnProperty.call(existing, k)) {
-      // ignore unknown top-level keys
-      continue;
-    }
-
-    // Special case: status (shallow merge fields like {status,date,time} per subkey)
-    if (k === "status" && isPlainObject(v) && isPlainObject(existing.status)) {
-      updated.status = { ...existing.status };
-      for (const [sk, sv] of Object.entries(v)) {
-        const prev = isPlainObject(updated.status[sk]) ? updated.status[sk] : {};
-        updated.status[sk] = isPlainObject(sv) ? { ...prev, ...sv } : sv;
-      }
-      continue;
-    }
-
-    // Generic shallow merge for objects; replace for primitives/arrays
-    if (isPlainObject(v) && isPlainObject(existing[k])) {
-      updated[k] = { ...existing[k], ...v };
-    } else {
-      updated[k] = v;
-    }
-  }
-
-  updated.updatedAt = new Date().toISOString();
-  bucket[key] = updated;
-
+  bucket[key] = updatedOrder;
   if (bucket !== map) map.orders = bucket;
+  writeFileAtomic(DB_FILE, map);
 
-  // 3) Await the write so it actually persists before returning
-   writeFileAtomic(DB_FILE, map);
-
-  return { id: key, ...updated };
+  return { id: key, ...updatedOrder };
 }
 
 

@@ -1,0 +1,92 @@
+<mxfile host="65bd71144e">
+    <diagram name="Error Handling Architecture" id="arch-diagram">
+        <mxGraphModel dx="936" dy="751" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="server" value="Server (Express / Middleware / Routes setup)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#cce5ff;strokeColor=#2a5d9f;" vertex="1" parent="1">
+                    <mxGeometry x="50" y="120" width="200" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="13" style="edgeStyle=none;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="api" target="8">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="api" value="API (Routes + Controllers)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="1" vertex="1">
+                    <mxGeometry x="50" y="300" width="200" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="services" value="Services (Business Logic / Invalid Data)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" parent="1" vertex="1">
+                    <mxGeometry x="290" y="300" width="220" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="dbadapter" value="DB Adapter (Error Mapping)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+                    <mxGeometry x="550" y="300" width="220" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="rtdb" value="Firebase RTDB" style="shape=database;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+                    <mxGeometry x="800" y="370" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="localdb" value="Local DB" style="shape=database;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+                    <mxGeometry x="790" y="460" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="errors" value="Errors Module (Shared)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+                    <mxGeometry x="390" y="460" width="220" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="arrow0" edge="1" parent="1" source="server" target="api">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="arrow1" parent="1" source="api" target="services" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="arrow2" parent="1" source="services" target="dbadapter" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="arrow3" style="entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="dbadapter" target="rtdb" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="810" y="318.5714285714289" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="arrow4" edge="1" parent="1" source="dbadapter" target="localdb">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="2" style="edgeStyle=none;html=1;" edge="1" parent="1" source="api" target="errors">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="3" style="edgeStyle=none;html=1;" edge="1" parent="1" source="services" target="errors">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="4" style="edgeStyle=none;html=1;" edge="1" parent="1" source="dbadapter" target="errors">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="6" style="edgeStyle=none;html=1;exitX=0.576;exitY=1.006;exitDx=0;exitDy=0;exitPerimeter=0;" edge="1" parent="1" source="dbadapter" target="errors">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="811.5789473684208" y="340" as="sourcePoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="note2" value="Checks invalid data / business rules&lt;br&gt;USES HANDLER TO THROW ERROR&lt;div&gt;Gives all the data needed verified&lt;/div&gt;" style="text;whiteSpace=wrap;html=1;fillColor=none;strokeColor=none;" parent="1" vertex="1">
+                    <mxGeometry x="290" y="220" width="220" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="note3" value="Maps DB errors (e.g. FailCreatingOrder, OrderNotFound)" style="text;whiteSpace=wrap;html=1;fillColor=none;strokeColor=none;" parent="1" vertex="1">
+                    <mxGeometry x="560" y="240" width="220" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="note4" value="Shared error definitions (DomainError, ValidationError, etc.)" style="text;whiteSpace=wrap;html=1;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+                    <mxGeometry x="390" y="560" width="220" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="8" value="ErrosMapping" style="whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="150" y="460" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="9" value="Maps the erros into HTTP Erros" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+                    <mxGeometry x="110" y="520" width="190" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="11" value="" style="edgeStyle=none;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" edge="1" parent="1" source="api" target="note1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="150" y="380" as="sourcePoint"/>
+                        <mxPoint x="194" y="460" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="note1" value="Maps domain errors → HTTP codes&lt;br&gt;&lt;br&gt;&lt;span style=&quot;color: rgb(0,0,0);&quot;&gt;Later: Token AUTH&lt;/span&gt;" style="text;whiteSpace=wrap;html=1;fillColor=none;strokeColor=none;" parent="1" vertex="1">
+                    <mxGeometry x="30" y="390" width="200" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="14" value="Creates the route&lt;div&gt;And uses middlware&lt;/div&gt;" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+                    <mxGeometry x="30" y="63" width="130" height="40" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

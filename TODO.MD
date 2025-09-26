@@ -8,7 +8,7 @@ https://chatgpt.com/g/g-p-68a6e20ab0c88191958f694dcc5dc007-miguelstuff/c/68d3705
   * [ ] Fazer uma chamada api que se chama updateStatus , onde recebe o id e o status e vai fazer o update , ao chamar a função ja existente da base de dados
   * [ ] O react neste momento esta a por no body algo como changes , temos de tirar a responsabilidade do front end de fazer isso
     Quem faz isso é o API em que ve o body e vai buscar os objectos que estao la e encapsula num {changes : " objetos"}
-    
+    /2
 * [ ] FAZER COMPRA COM O WEBHOOK A PUXAR A BASE DE DADOS
 * [ ] VER COMO MEXER NO STOCK COMO DE ANTES
 

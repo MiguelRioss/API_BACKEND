@@ -1,38 +1,59 @@
 // api/services/servicesUtils.mjs
-import { ValidationError } from "../errors/domainErros.mjs";
 import { randomUUID } from "node:crypto";
+import errors from "../errors/errors.mjs";
 
+const allowedCurrencies = new Set(["eur", "usd", "gbp"]);
+const STATUS_KEYS = [
+  "delivered",
+  "acceptedInCtt",
+  "accepted",
+  "in_transit",
+  "waitingToBeDelivered",
+];
 
 /**
- * Utility validators and matching helpers used by services.
- * Pure functions, no DB access here.
+ * Validates and normalizes an id.
  *
- * Exported:
- *  - validateIdOrThrow(id)
- *  - normalizeId(id)
- *  - candidateMatches(candidate, needle)   (internal, exported for tests if desired)
- *  - orderMatchesId(order, needle)
- *  - findOrderById(ordersArray, id)
+ * @async
+ * @param {string|number} id - The id to validate.
+ * @returns {Promise<string>} Resolves with the normalized, trimmed id string.
+ * @rejects {ValidationError} If the id is null, undefined, or empty.
  */
-
-/** Throw ValidationError if id is empty-ish */
-export function validateIdOrThrow(id) {
+export async function validateAndNormalizeID(id) {
   if (id === null || typeof id === "undefined") {
-    throw new ValidationError("Order id is required");
+    return Promise.reject(
+      errors.INVALID_DATA(`To create an Order you must provide a valid id, not ${id}`)
+    );
   }
-  const s = String(id).trim();
+
+  const s = normalizeId(id);
   if (s === "") {
-    throw new ValidationError("Order id is required");
+    return Promise.reject(
+      errors.INVALID_DATA(`To create an Order you must provide a non-empty id`)
+    );
   }
+
   return s;
 }
 
-/** Normalize id to trimmed string */
+/**
+ * Converts an id into a trimmed string.
+ *
+ * @param {string|number} id - The raw id.
+ * @returns {string} Normalized id string.
+ */
 export function normalizeId(id) {
   return String(id).trim();
 }
 
-/** Return true if candidate matches needle by either strict string equality or numeric equality */
+/**
+ * Compares a candidate value against a needle.
+ * Matches by strict string equality or numeric equality (e.g. `"2"` equals `2`).
+ *
+ * @param {*} candidate - Value to test (string, number, etc.).
+ * @param {*} needle - Value to match against.
+ * @returns {boolean} True if candidate matches the needle, false otherwise.
+ */
 export function candidateMatches(candidate, needle) {
   if (candidate === null || typeof candidate === "undefined") return false;
   const c = String(candidate);
@@ -40,15 +61,19 @@ export function candidateMatches(candidate, needle) {
 
   if (c === n) return true;
 
-  // numeric tolerant comparison (e.g. '2' === 2)
   const cNum = Number(c);
   const nNum = Number(n);
-  if (!Number.isNaN(cNum) && !Number.isNaN(nNum) && cNum === nNum) return true;
-
-  return false;
+  return !Number.isNaN(cNum) && !Number.isNaN(nNum) && cNum === nNum;
 }
 
-/** Given an order object and needle string, test a set of candidate fields */
+/**
+ * Checks whether an order object matches a given id.
+ * Tests multiple candidate fields (event_id, id, session_id, metadata fields).
+ *
+ * @param {Object} order - The order object.
+ * @param {string|number} needle - The id to match.
+ * @returns {boolean} True if any candidate field matches.
+ */
 export function orderMatchesId(order, needle) {
   if (!order || !needle) return false;
   const candidates = [
@@ -57,7 +82,6 @@ export function orderMatchesId(order, needle) {
     order.session_id,
     order.metadata?.order_id,
     order.metadata?.tracking_id,
-    // you can add other candidate fields here if your data includes them
   ];
 
   for (const c of candidates) {
@@ -67,8 +91,11 @@ export function orderMatchesId(order, needle) {
 }
 
 /**
- * Find order in array by flexible id matching.
- * Returns the found order or null.
+ * Finds an order in an array by flexible id matching.
+ *
+ * @param {Object[]} ordersArray - Array of order objects.
+ * @param {string|number} id - The id to search for.
+ * @returns {Object|null} The matched order, or null if none found.
  */
 export function findOrderById(ordersArray, id) {
   const needle = normalizeId(id);
@@ -81,19 +108,27 @@ export function findOrderById(ordersArray, id) {
   return null;
 }
 
-
-// api/services/servicesUtils.mjs
 /**
- * Pure helpers for filtering, searching, sorting and paging order arrays.
- * These are side-effect free and easy to unit-test.
+ * Filters orders by a boolean status flag.
+ *
+ * @param {Object[]} orders - Array of orders.
+ * @param {boolean|string} [status] - Desired status (boolean or `"true"/"false"` string).
+ * @returns {Object[]} Filtered array of orders.
  */
-
 export function filterByStatus(orders = [], status) {
   if (typeof status === "undefined") return orders;
-  const want = typeof status === "boolean" ? status : String(status).toLowerCase() === "true";
+  const want =
+    typeof status === "boolean" ? status : String(status).toLowerCase() === "true";
   return orders.filter((o) => Boolean(o.status) === want);
 }
 
+/**
+ * Filters orders by a search query across common fields.
+ *
+ * @param {Object[]} orders - Array of orders.
+ * @param {string} q - Search string.
+ * @returns {Object[]} Filtered array of orders.
+ */
 export function filterByQuery(orders = [], q) {
   if (!q) return orders;
   const needle = String(q).toLowerCase();
@@ -113,6 +148,12 @@ export function filterByQuery(orders = [], q) {
   });
 }
 
+/**
+ * Sorts orders by `written_at` timestamp descending (newest first).
+ *
+ * @param {Object[]} orders - Array of orders.
+ * @returns {Object[]} Sorted array.
+ */
 export function sortByWrittenAtDesc(orders = []) {
   return orders.slice().sort((a, b) => {
     const aT = a?.written_at ?? "";
@@ -124,80 +165,208 @@ export function sortByWrittenAtDesc(orders = []) {
   });
 }
 
+/**
+ * Applies a numeric limit to an orders array.
+ *
+ * @param {Object[]} orders - Array of orders.
+ * @param {number} limit - Maximum number of orders to return.
+ * @returns {Object[]} Limited array.
+ */
 export function applyLimit(orders = [], limit) {
   if (!limit || !Number.isFinite(Number(limit))) return orders;
   return orders.slice(0, Number(limit));
 }
 
-
-// servicesUtils.mjs
-
 /**
  * Validates and normalizes an order payload.
- * - Ensures required fields exist and have the right types
- * - Validates each item (id, name, quantity, unit_amount)
- * - Checks that amount_total === sum(items.quantity * unit_amount)
- * - Normalizes strings (trim, lower-casing currency/email)
- * - Injects event_id, written_at, default status, metadata / metadata_raw
+ *
+ * @async
+ * @param {Object} order - Raw order object supplied by caller.
+ * @param {string} order.name - Customer name.
+ * @param {string} order.email - Customer email.
+ * @param {number} order.amount_total - Declared total in cents.
+ * @param {string} order.currency - Currency code (must be allowed).
+ * @param {Object[]} order.items - Array of order items.
+ * @param {Object} [order.metadata] - Optional metadata object.
+ * @returns {Promise<Object>} Normalized and enriched order object.
+ * @rejects {ValidationError} If invalid.
  */
-export function validateAndPrepareOrder(order) {
+export async function validateAndPrepareOrder(order) {
   if (!order || typeof order !== "object" || Array.isArray(order)) {
-    throw new ValidationError("Order object is required.");
+    return Promise.reject(
+      errors.INVALID_DATA("You did not Introduce an Object for your new Order")
+    );
   }
 
-  // ——— Basic required fields ———
-  const { name, email, amount_total, currency, items, metadata } = order;
+  const { name, email, amount_total, currency, items } = order;
 
   if (typeof name !== "string" || name.trim() === "") {
-    throw new ValidationError("Order.name is required and must be a non-empty string.");
+    return Promise.reject(
+      errors.INVALID_DATA("You did not Introduce a valid name for your new Order")
+    );
   }
 
   if (typeof email !== "string" || email.trim() === "") {
-    throw new ValidationError("Order.email is required and must be a non-empty string.");
+    return Promise.reject(
+      errors.INVALID_DATA("You did not Introduce a valid email for your new Order")
+    );
   }
   const emailTrimmed = email.trim().toLowerCase();
-  // light email sanity check (not overzealous)
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrimmed)) {
-    throw new ValidationError("Order.email must be a valid email address.");
+    return Promise.reject(
+      errors.INVALID_DATA("You did not Introduce a valid email for your new Order")
+    );
   }
 
   if (!Array.isArray(items) || items.length === 0) {
-    throw new ValidationError("Order.items is required and must be a non-empty array.");
+    return Promise.reject(
+      errors.INVALID_DATA("You did not Introduce a valid array for items in your new Order")
+    );
   }
 
   if (!Number.isInteger(amount_total) || amount_total < 0) {
-    throw new ValidationError("Order.amount_total must be a non-negative integer (e.g., cents).");
+    return Promise.reject(
+      errors.INVALID_DATA("You did not Introduce a valid amount_total in your new Order")
+    );
   }
 
   if (typeof currency !== "string" || currency.trim() === "") {
-    throw new ValidationError("Order.currency is required and must be a non-empty string.");
+    return Promise.reject(
+      errors.INVALID_DATA("You did not Introduce a valid currency in your new Order")
+    );
   }
   const currencyNorm = currency.trim().toLowerCase();
-  // optional: restrict to a known set if your system only supports a few
-  const allowedCurrencies = new Set(["eur", "usd", "gbp"]);
   if (!allowedCurrencies.has(currencyNorm)) {
-    throw new ValidationError(`Unsupported currency: ${currencyNorm}`);
+    return Promise.reject(
+      errors.INVALID_DATA("You did not Introduce a valid accepted currency in your new Order")
+    );
   }
 
-  // ——— Validate items ———
+  const normItems = validateItemsArray(items, amount_total);
+  const normMetadata = validateMetadata(order.metadata);
+  const initialStatus = makeDefaultStatus();
+
+  const prepared = {
+    ...order,
+    id: randomUUID(),
+    name: name.trim(),
+    email: emailTrimmed,
+    currency: currencyNorm,
+    items: normItems,
+    amount_total,
+    metadata: normMetadata,
+    status: initialStatus,
+    track_url: "",
+    event_id: randomUUID(),
+    written_at: new Date().toISOString(),
+  };
+  return prepared;
+}
+
+/**
+ * Updates the order status with validation.
+ *
+ * @param {Object} currentStatus - Current status object.
+ * @param {string} key - Status key to update (must be one of STATUS_KEYS).
+ * @param {Object} update - Status update.
+ * @param {boolean} update.status - True/false flag.
+ * @param {string|null} [update.date] - Date string.
+ * @param {string|null} [update.time] - Time string.
+ * @returns {Object} Updated status object.
+ * @throws {ValidationError} If the key or update is invalid.
+ */
+export function updateOrderStatus(currentStatus, key, { status, date = null, time = null }) {
+  if (!STATUS_KEYS.includes(key)) {
+    throw errors.INVALID_DATA(
+      `Unknown status step "${key}". Allowed: ${STATUS_KEYS.join(", ")}`
+    );
+  }
+  if (typeof status !== "boolean") {
+    throw errors.INVALID_DATA("status must be boolean");
+  }
+  return {
+    ...currentStatus,
+    [key]: { status, date, time },
+  };
+}
+
+/**
+ * Creates a default status object for an order.
+ *
+ * @returns {Object} Status object with all keys set to {status:false,date:null,time:null}.
+ */
+function makeDefaultStatus() {
+  const template = { status: false, date: null, time: null };
+  return Object.fromEntries(STATUS_KEYS.map((k) => [k, { ...template }]));
+}
+
+/**
+ * Validates and normalizes optional order metadata.
+ *
+ * @param {Object|undefined} metadata - Raw metadata input.
+ * @returns {Object} Normalized metadata object (never null).
+ * @throws {ValidationError} If metadata is not a plain object.
+ */
+function validateMetadata(metadata) {
+  if (typeof metadata === "undefined") {
+    return {};
+  }
+
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+    throw errors.INVALID_DATA("Order.metadata, if provided, must be an object.");
+  }
+
+  const coerceStr = (v) =>
+    typeof v === "string" ? v.trim() : v == null ? "" : String(v);
+
+  return {
+    addr_city: coerceStr(metadata.addr_city ?? ""),
+    addr_ctry: coerceStr(metadata.addr_ctry ?? ""),
+    addr_line1: coerceStr(metadata.addr_line1 ?? ""),
+    addr_zip: coerceStr(metadata.addr_zip ?? ""),
+    full_name: coerceStr(metadata.full_name ?? ""),
+    phone: coerceStr(metadata.phone ?? ""),
+    ...Object.fromEntries(
+      Object.entries(metadata)
+        .filter(([k]) =>
+          !["addr_city", "addr_ctry", "addr_line1", "addr_zip", "full_name", "phone"].includes(k)
+        )
+        .map(([k, v]) => [k, coerceStr(v)])
+    ),
+  };
+}
+
+/**
+ * Validates and normalizes an array of order items.
+ *
+ * @param {Object[]} items - Array of raw items.
+ * @param {number} amount_total - Declared total (in cents).
+ * @returns {Object[]} Normalized items.
+ * @throws {ValidationError} If any item is invalid or totals mismatch.
+ */
+function validateItemsArray(items, amount_total) {
   let computedTotal = 0;
+
   const normItems = items.map((it, idx) => {
     if (!it || typeof it !== "object") {
-      throw new ValidationError(`Order.items[${idx}] must be an object.`);
+      throw errors.INVALID_DATA(`Order.items[${idx}] must be an object.`);
     }
+
     const { id, name, quantity, unit_amount } = it;
 
     if (typeof id !== "string" || id.trim() === "") {
-      throw new ValidationError(`Order.items[${idx}].id must be a non-empty string.`);
+      throw errors.INVALID_DATA(`Order.items[${idx}].id must be a non-empty string.`);
     }
     if (typeof name !== "string" || name.trim() === "") {
-      throw new ValidationError(`Order.items[${idx}].name must be a non-empty string.`);
+      throw errors.INVALID_DATA(`Order.items[${idx}].name must be a non-empty string.`);
     }
     if (!Number.isInteger(quantity) || quantity <= 0) {
-      throw new ValidationError(`Order.items[${idx}].quantity must be a positive integer.`);
+      throw errors.INVALID_DATA(`Order.items[${idx}].quantity must be a positive integer.`);
     }
     if (!Number.isInteger(unit_amount) || unit_amount < 0) {
-      throw new ValidationError(`Order.items[${idx}].unit_amount must be a non-negative integer (e.g., cents).`);
+      throw errors.INVALID_DATA(
+        `Order.items[${idx}].unit_amount must be a non-negative integer (e.g., cents).`
+      );
     }
 
     computedTotal += quantity * unit_amount;
@@ -211,89 +380,59 @@ export function validateAndPrepareOrder(order) {
   });
 
   if (computedTotal !== amount_total) {
-    throw new ValidationError(
+    throw errors.INVALID_DATA(
       `Order.amount_total (${amount_total}) does not match items total (${computedTotal}).`
     );
   }
 
-  // ——— Validate metadata (optional but typed) ———
-  let normMetadata = {};
-  if (typeof metadata !== "undefined") {
-    if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
-      throw new ValidationError("Order.metadata, if provided, must be an object.");
-    }
-    const coerceStr = v => (typeof v === "string" ? v.trim() : v == null ? "" : String(v));
-    normMetadata = {
-      addr_city: coerceStr(metadata.addr_city ?? ""),
-      addr_ctry: coerceStr(metadata.addr_ctry ?? ""),
-      addr_line1: coerceStr(metadata.addr_line1 ?? ""),
-      addr_zip: coerceStr(metadata.addr_zip ?? ""),
-      full_name: coerceStr(metadata.full_name ?? ""),
-      phone: coerceStr(metadata.phone ?? ""),
-      // keep any extra keys but as strings where sensible
-      ...Object.fromEntries(
-        Object.entries(metadata).filter(([k]) =>
-          !["addr_city", "addr_ctry", "addr_line1", "addr_zip", "full_name", "phone"].includes(k)
-        )
-      ),
-    };
-  }
-
-
-  function makeDefaultStatus() {
-    return {
-      delivered: { status: false, date: null, time: null },
-      acceptedInCtt: { status: false, date: null, time: null },
-      accepted: { status: false, date: null, time: null },
-      in_transit: { status: false, date: null, time: null }, // ← canonical
-      wating_to_Be_Delivered: { status: false, date: null, time: null },
-    };
-  }
-  // ——— Build prepared (normalized) object ———
-  const prepared = {
-    ...order,
-    name: name.trim(),
-    email: emailTrimmed,
-    currency: currencyNorm,
-    items: normItems,
-    amount_total, // already validated
-    metadata: normMetadata,
-
-    // IMPORTANT: on creation, enforce all-false status regardless of input
-    status: makeDefaultStatus(),
-  };
-
-  // Inject event_id if missing/empty
-  if (typeof prepared.event_id !== "string" || prepared.event_id.trim() === "") {
-    prepared.event_id = randomUUID();
-  }
-
-  // Inject written_at if missing
-  if (!prepared.written_at) prepared.written_at = new Date().toISOString();
-
-  // Normalize / default status
-  if (typeof prepared.status === "undefined") prepared.status = false;
-
-  // Ensure metadata_raw exists (optional: snapshot raw input)
-  if (typeof prepared.metadata_raw === "undefined") prepared.metadata_raw = { ...order.metadata };
-  
-  if (!prepared.id) prepared.id = randomUUID();
-  
-  if (!prepared.track_url) prepared.track_url = ""
-  return prepared;
+  return normItems;
 }
 
+/**
+ * Checks if a value is a "plain object".
+ *
+ * @param {*} v - Any value.
+ * @returns {boolean} True if v is a non-null object and not an array.
+ */
+export const isPlainObject = (v) =>
+  v && typeof v === "object" && !Array.isArray(v);
 
-//Update orderStatus
-export function updateOrderStatus(currentStatus, key, { status, date = null, time = null }) {
-  if (!STATUS_KEYS.includes(key)) {
-    throw new ValidationError(`Unknown status step "${key}". Allowed: ${STATUS_KEYS.join(", ")}`);
+
+/**
+ * Merge changes into an existing order object.
+ *
+ * - Ignores unknown keys.
+ * - Special merge strategy for `status`: merges nested status objects per subkey.
+ * - Shallow merge for plain objects (e.g., metadata).
+ * - Replace for primitives and arrays.
+ *
+ * @param {Object} existing - The existing order object.
+ * @param {Object} changes - Partial order object with changes.
+ * @returns {Object} A new updated order object.
+ */
+export function mergeOrderChanges(existing, changes) {
+  const updated = { ...existing };
+
+  for (const [k, v] of Object.entries(changes)) {
+    if (!Object.prototype.hasOwnProperty.call(existing, k)) continue;
+
+    // Special case: status field
+    if (k === "status" && isPlainObject(v) && isPlainObject(existing.status)) {
+      updated.status = { ...existing.status };
+      for (const [sk, sv] of Object.entries(v)) {
+        const prev = isPlainObject(updated.status[sk]) ? updated.status[sk] : {};
+        updated.status[sk] = isPlainObject(sv) ? { ...prev, ...sv } : sv;
+      }
+      continue;
+    }
+
+    // Generic shallow merge for objects
+    if (isPlainObject(v) && isPlainObject(existing[k])) {
+      updated[k] = { ...existing[k], ...v };
+    } else {
+      updated[k] = v;
+    }
   }
-  if (typeof status !== "boolean") {
-    throw new ValidationError("status must be boolean");
-  }
-  return {
-    ...currentStatus,
-    [key]: { status, date, time },
-  };
+
+  return updated;
 }

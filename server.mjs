@@ -25,7 +25,7 @@ app.options('*', corsMiddleware);
 
 
 
-const db = await createDb();
+const db = await createDb({type : "local"});
 const ordersService = createOrdersService(db);
 const ordersApi = createOrdersAPI(ordersService);
 

@@ -221,26 +221,46 @@ async function handleCheckoutSessionCompleted({ event, stripe, ordersService, st
         : session.payment_intent?.id,
   });
   if (existing) {
+    const alreadyAdjusted = Boolean(existing?.metadata?.stock_adjusted_at);
+    if (alreadyAdjusted) {
+      logger?.info?.(
+        `[stripe-webhook] Duplicate suppressed for session ${session.id} (existing order ${existing.id}, stock already adjusted)`
+      );
+      return;
+    }
     logger?.info?.(
-      `[stripe-webhook] Duplicate suppressed for session ${session.id} (existing order ${existing.id})`
+      `[stripe-webhook] Duplicate session ${session.id} but stock not adjusted yet; proceeding to adjust stock only`
     );
-    return; // idempotent
+  } else {
+    const orderPayload = buildOrderPayload(session, lineItems);
+    const created = await ordersService.createOrderServices(orderPayload);
+    existing = created;
+    logger?.info?.(`[stripe-webhook] Created order for session ${session.id}`);
   }
-
-  const orderPayload = buildOrderPayload(session, lineItems);
-  await ordersService.createOrderServices(orderPayload);
-
-  logger?.info?.(`[stripe-webhook] Created order for session ${session.id}`);
   // Decrement stock per line item (best effort)
   try {
     if (stockService && typeof stockService.decrementStock === "function") {
       await Promise.allSettled(
-        lineItems.map((l) => stockService.decrementStock(l.price?.product ?? l.price?.id ?? l.id, l.quantity))
+        lineItems.map((l) =>
+          stockService.decrementStock(
+            l.price?.product ?? l.price?.id ?? l.id,
+            l.quantity,
+            l.description ?? l.price?.nickname ?? undefined
+          )
+        )
       );
     }
   } catch (e) {
     logger?.warn?.(`[stripe-webhook] Stock decrement failed for session ${session.id}: ${e?.message ?? e}`);
   }
+  // Mark order as adjusted to keep idempotency
+  try {
+    if (existing?.id && typeof ordersService.updateOrderServices === "function") {
+      await ordersService.updateOrderServices(existing.id, {
+        metadata: { ...(existing.metadata || {}), stock_adjusted_at: new Date().toISOString() },
+      });
+    }
+  } catch {}
 }
 
 async function handleAsyncSessionSucceeded({ event, stripe, ordersService, stockService, logger }) {
@@ -271,21 +291,39 @@ async function handleAsyncSessionSucceeded({ event, stripe, ordersService, stock
     logger?.info?.(
       `[stripe-webhook] Duplicate suppressed for async session ${session.id} (existing order ${existing.id})`
     );
-    return;
+    const alreadyAdjusted = Boolean(existing?.metadata?.stock_adjusted_at);
+    if (alreadyAdjusted) return;
+    logger?.info?.(`[stripe-webhook] Adjusting stock for async session ${session.id} (first time)`);
   }
 
-  const orderPayload = buildOrderPayload(session, lineItems);
-  await ordersService.createOrderServices(orderPayload);
-  logger?.info?.(`[stripe-webhook] Created order for async session ${session.id}`);
+  if (!existing) {
+    const orderPayload = buildOrderPayload(session, lineItems);
+    const created = await ordersService.createOrderServices(orderPayload);
+    existing = created;
+    logger?.info?.(`[stripe-webhook] Created order for async session ${session.id}`);
+  }
   try {
     if (stockService && typeof stockService.decrementStock === "function") {
       await Promise.allSettled(
-        lineItems.map((l) => stockService.decrementStock(l.price?.product ?? l.price?.id ?? l.id, l.quantity))
+        lineItems.map((l) =>
+          stockService.decrementStock(
+            l.price?.product ?? l.price?.id ?? l.id,
+            l.quantity,
+            l.description ?? l.price?.nickname ?? undefined
+          )
+        )
       );
     }
   } catch (e) {
     logger?.warn?.(`[stripe-webhook] Stock decrement failed for async session ${session.id}: ${e?.message ?? e}`);
   }
+  try {
+    if (existing?.id && typeof ordersService.updateOrderServices === "function") {
+      await ordersService.updateOrderServices(existing.id, {
+        metadata: { ...(existing.metadata || {}), stock_adjusted_at: new Date().toISOString() },
+      });
+    }
+  } catch {}
 }
 
 async function handlePaymentIntentSucceeded({ event, stripe, ordersService, stockService, logger }) {
@@ -330,14 +368,20 @@ async function handlePaymentIntentSucceeded({ event, stripe, ordersService, stoc
   }
 
   const orderPayload = buildOrderPayload(session, lineItems);
-  await ordersService.createOrderServices(orderPayload);
+  const created = await ordersService.createOrderServices(orderPayload);
   logger?.info?.(
     `[stripe-webhook] Created order via payment_intent.succeeded for session ${session.id}`
   );
   try {
     if (stockService && typeof stockService.decrementStock === "function") {
       await Promise.allSettled(
-        lineItems.map((l) => stockService.decrementStock(l.price?.product ?? l.price?.id ?? l.id, l.quantity))
+        lineItems.map((l) =>
+          stockService.decrementStock(
+            l.price?.product ?? l.price?.id ?? l.id,
+            l.quantity,
+            l.description ?? l.price?.nickname ?? undefined
+          )
+        )
       );
     }
   } catch (e) {
@@ -345,6 +389,13 @@ async function handlePaymentIntentSucceeded({ event, stripe, ordersService, stoc
       `[stripe-webhook] Stock decrement failed for PI ${paymentIntentId}: ${e?.message ?? e}`
     );
   }
+  try {
+    if (created?.id && typeof ordersService.updateOrderServices === "function") {
+      await ordersService.updateOrderServices(created.id, {
+        metadata: { ...(created.metadata || {}), stock_adjusted_at: new Date().toISOString() },
+      });
+    }
+  } catch {}
 }
 
 export default function createStripeWebhook({

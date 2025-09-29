@@ -11,6 +11,8 @@ export const ERROR_CODES = {
   NotFound: 101,
   PermissionDenied: 102,
   WriteFailed: 103,
+  InvalidData: 104,
+  NotAuthorized: 105,
 };
 
 export default {
@@ -22,4 +24,8 @@ export default {
     DatabaseError(ERROR_CODES.PermissionDenied, message, details),
   WRITE_FAILED: (message, details) =>
     DatabaseError(ERROR_CODES.WriteFailed, message, details),
+  INVALID_DATA: (message, details) =>
+    DatabaseError(ERROR_CODES.InvalidData, message, details),
+  NOT_AUTHORIZED: (message, details) =>
+    DatabaseError(ERROR_CODES.NotAuthorized, message, details),
 };

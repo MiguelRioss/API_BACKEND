@@ -139,3 +139,29 @@ export async function updateOrderDB(id, updatedOrder) {
     );
 }
 
+
+//Stocks
+/**
+ * Get all Stocks (RTDB depending on env).
+ *
+ * @returns {Promise<Object[]>} Array of Stocks Int.
+ * @rejects {EXTERNAL_SERVICE_ERROR} If DB call fails.
+ */
+export async function getStocks() {
+  const init = ensureInitDb();
+  if (init) return init; // ensureInitDb may return a rejected promise
+
+  if (useRealtimeDB()) {
+    const db = getRealtimeDB();
+    return db
+      .ref("/stock")
+      .once("value")
+      .then((snap) => snap.val() || {})
+      .then((val) => Object.entries(val).map(([id, data]) => ({ id, ...data })))
+      .catch((err) =>
+        Promise.reject(errors.EXTERNAL_SERVICE_ERROR("Failed to read orders from DB", { original: err }))
+      );
+  }
+
+  return Promise.resolve([]);
+}

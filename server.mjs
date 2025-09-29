@@ -42,7 +42,7 @@ app.patch("/api/orders/:id", ordersApi.updateOrderAPI);
 
 
 //Stock
-app.get("/api/stocks", stockApi.getStockAPI);
+app.get("/api/stock", stockApi.getStockAPI);
 //app.post("/api/stocks", ordersApi.updateOrderAPI);
 
 

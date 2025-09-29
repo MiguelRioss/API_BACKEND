@@ -12,7 +12,7 @@ export default function createStocksAPI(stockService) {
 
     async function interalGetStock(req, rsp) {
         // await the async service method!
-        return stockService.getStockService()
+        return stockService.getStockServices()
             .then(
                 orders => rsp.json(orders)
             );

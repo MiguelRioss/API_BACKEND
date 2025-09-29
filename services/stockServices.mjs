@@ -29,10 +29,9 @@ export default function createStockServices(db) {
     * @returns {Promise<Object[]>} Filtered, sorted, and limited orders.
     */
     async function getStockServices({ limit, q } = {}) {
-        return db.getAllOrders()
+        return db.getStocks()
             .then(stock => {
-                console.log(stock)
-                return 0 
+                return stock
             });
     }
 }

@@ -157,7 +157,7 @@ export async function getStocks() {
       .ref("/stock")
       .once("value")
       .then((snap) => snap.val() || {})
-      .then((val) => Object.entries(val).map(([id, data]) => ({ id, ...data })))
+      .then((val) => Object.entries(val).map(([id, data]) => ({ id : id , name: data.name , stock : data.stockValue })))
       .catch((err) =>
         Promise.reject(errors.EXTERNAL_SERVICE_ERROR("Failed to read orders from DB", { original: err }))
       );

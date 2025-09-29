@@ -18,4 +18,4 @@ https://chatgpt.com/g/g-p-68a6e20ab0c88191958f694dcc5dc007-miguelstuff/c/68d3705
 
 
 ## SUPER TODO
-* [ ] Procurar todos os erros possiveis na camada de services e tirar essas reponsabilidade se existir das outras camadas
+* [X] ~~*Procurar todos os erros possiveis na camada de services e tirar essas reponsabilidade se existir das outras camadas*~~ [2025-09-29]

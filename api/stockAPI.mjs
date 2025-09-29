@@ -1,6 +1,6 @@
 import handlerFactory from "../utils/handleFactory.mjs";
 
-// api/ordersAPI.mjs
+// api/stockAPI.mjs
 export default function createStocksAPI(stockService) {
     if (!stockService) {
        throw "API dependency invalid";
@@ -8,6 +8,7 @@ export default function createStocksAPI(stockService) {
 
     return {
        getStockAPI : handlerFactory(interalGetStock),
+       updateStockAPI : handlerFactory(interalUpdateStock)
     };
 
     async function interalGetStock(req, rsp) {
@@ -16,5 +17,12 @@ export default function createStocksAPI(stockService) {
             .then(
                 orders => rsp.json(orders)
             );
+    }
+
+    async function interalUpdateStock(req, rsp) {
+        const stockID = req.params.id;
+        const changes = req.body?.changes || {};
+        return stockService.updateStock(stockID, changes)
+            .then(updated => rsp.json(updated));
     }
 }

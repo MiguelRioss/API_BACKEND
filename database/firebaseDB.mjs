@@ -49,8 +49,8 @@ export async function getAllOrders() {
  * Get a single order by id.
  *
  * @param {string} idStr - Normalized order ID.
- * @returns {Promise<Object>} The found order.
- * @rejects {NOT_FOUND} If order doesn’t exist.
+ * @returns {Promise<Object>} The found order (with id property).
+ * @rejects {NOT_FOUND} If order doesn't exist.
  */
 export async function getOrderById(idStr) {
   const init = ensureInitDb();
@@ -66,6 +66,9 @@ export async function getOrderById(idStr) {
     return { id: idStr, ...val };
   }
 }
+
+
+
 
 /**
  * Create a new order in the DB.
@@ -164,4 +167,67 @@ export async function getStocks() {
   }
 
   return Promise.resolve([]);
+}
+
+/**
+ * Update an order by replacing it with the provided object.
+ * Same contract as localDB.updateOrderDB — service layer handles merging/normalization.
+ *
+ * @async
+ * @param {string|number} id - Order ID
+ * @param {Object} updatedOrder - Fully prepared order object
+ * @returns {Promise<Object>} The updated order (with id included)
+ * @rejects {NOT_FOUND} If the order doesn’t exist
+ * @rejects {EXTERNAL_SERVICE_ERROR} On DB write failure
+ */
+export async function updateStock(id, updatedStock) {
+  ensureInitDb(); // throws or rejects if Firebase isn’t ready
+
+
+  if (!useRealtimeDB()) {
+    return Promise.reject(
+      errors.EXTERNAL_SERVICE_ERROR("Firestore update not implemented yet")
+    );
+  }
+
+  const db = getRealtimeDB();
+  const ref = db.ref(`/stock/${id}`);
+  const snap = await ref.once("value");
+
+  if (!snap.exists()) {
+    return Promise.reject(errors.NOT_FOUND(`Order "${id}" not found`));
+  }
+
+  return ref
+    .set(updatedStock) // overwrite with prepared object
+    .then(() => ({ id: id, ...updatedStock }))
+    .catch((err) =>
+      Promise.reject(
+        errors.EXTERNAL_SERVICE_ERROR("Failed to update order in Firebase", {
+          original: err?.message ?? String(err),
+        })
+      )
+    );
+}
+
+/**
+ * Get a single order by id.
+ *
+ * @param {string} idStr - Normalized order ID.
+ * @returns {Promise<Object>} The found order.
+ * @rejects {NOT_FOUND} If order doesn’t exist.
+ */
+export async function getStockByID(idStr) {
+  const init = ensureInitDb();
+  if (init) return init;
+
+  if (useRealtimeDB()) {
+    const db = getRealtimeDB();
+    const snap = await db.ref(`/stock/${idStr}`).once("value");
+    const val = snap.val();
+    if (val === null || typeof val === "undefined") {
+      return Promise.reject(errors.NOT_FOUND(`Order ${idStr} not found`));
+    }
+    return { id: idStr, ...val };
+  }
 }

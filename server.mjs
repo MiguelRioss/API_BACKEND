@@ -24,7 +24,7 @@ const stockApi = createStocksAPI(stockService)
 const ordersApi = createOrdersAPI(ordersService);
 
 
-const stripeWebhookHandler = createStripeWebhook({ ordersService });
+const stripeWebhookHandler = createStripeWebhook({ ordersService, stockService });
 
 app.post(
   STRIPE_WEBHOOK_PATH,
@@ -43,17 +43,10 @@ app.patch("/api/orders/:id", ordersApi.updateOrderAPI);
 
 //Stock
 app.get("/api/stock", stockApi.getStockAPI);
-//app.post("/api/stocks", ordersApi.updateOrderAPI);
+app.patch("/api/stock/:id", stockApi.updateStockAPI);
 
 
-process.on("SIGINT", async () => {
-  await closeBrowser();
-  process.exit(0);
-});
-process.on("SIGTERM", async () => {
-  await closeBrowser();
-  process.exit(0);
-});
+
 
 app.listen(PORT, () => {
   console.log(`Server listening on http://localhost:${PORT}`);

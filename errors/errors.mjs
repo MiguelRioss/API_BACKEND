@@ -1,9 +1,7 @@
 // domain/dbErrors.mjs
 
 function DatabaseError(code, message, details = {}) {
-  this.code = code;
-  this.message = message;
-  this.details = details;
+  return { code, message, details };
 }
 
 export const ERROR_CODES = {

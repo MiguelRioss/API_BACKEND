@@ -1,41 +1,46 @@
-// api/services/ordersServiceFactory.mjs
+// services/stockServices.mjs
 
-/**
- * createOrdersService(db)
- * - db must expose:
- *    - async getStockServices(): Promise<Array>
- *
- * Returns:
- *  - getStockServices()
- *
- * Service throws domain errors for HTTP layer to map.
- */
 export default function createStockServices(db) {
-    if (!db) {
-        throw "Services dependency invalid";
-    }
+  if (!db) {
+    throw "Services dependency invalid";
+  }
 
-    return {
-        getStockServices,
-    };
-    /**
-    * Fetches orders and applies filters, sorting, and limit in a chained style.
-    *
-    * @async
-    * @param {Object} [options]
-    * @param {number} [options.limit] - Maximum number of orders.
-    * @param {string|boolean} [options.status] - Status filter.
-    * @param {string} [options.q] - Query string.
-    * @returns {Promise<Object[]>} Filtered, sorted, and limited orders.
-    */
-    async function getStockServices({ limit, q } = {}) {
-        return db.getStocks()
-            .then(stock => {
-                return stock
-            });
-    }
+  return {
+    getStockServices,
+    updateStock,
+    decrementStock,
+  };
+
+  async function getStockServices() {
+    return db.getStocks();
+  }
+
+  /**
+   * Update stock item by id with provided changes.
+   * Accepts payloads like: { changes: { stockValue: 1 } }
+   */
+  async function updateStock(stockID, stockChanges = {}) {
+    const id = String(stockID).trim();
+    const changes = stockChanges && typeof stockChanges === "object" ? stockChanges : {};
+
+    const existing = await db.getStockByID(id);
+    const updated = { ...existing, ...changes, updatedAt: new Date().toISOString() };
+    delete updated.id; // data stored under the id key in RTDB
+    return db.updateStock(id, updated);
+  }
+
+  /**
+   * Decrement stockValue by a positive integer delta.
+   */
+  async function decrementStock(stockID, delta = 0) {
+    const id = String(stockID).trim();
+    const n = Number(delta) || 0;
+    if (n <= 0) return db.getStockByID(id); // no-op
+    const existing = await db.getStockByID(id);
+    const current = Number(existing?.stockValue ?? 0);
+    const next = Math.max(0, current - n);
+    const updated = { ...existing, stockValue: next, updatedAt: new Date().toISOString() };
+    delete updated.id;
+    return db.updateStock(id, updated);
+  }
 }
-
-
-
-

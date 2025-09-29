@@ -196,7 +196,7 @@ async function findExistingOrder(ordersService, { sessionId, paymentIntentId }) 
   }
 }
 
-async function handleCheckoutSessionCompleted({ event, stripe, ordersService, logger }) {
+async function handleCheckoutSessionCompleted({ event, stripe, ordersService, stockService, logger }) {
   const session = event.data?.object;
   if (!session?.id) {
     throw createHttpError(400, "Checkout session payload missing id");
@@ -231,9 +231,19 @@ async function handleCheckoutSessionCompleted({ event, stripe, ordersService, lo
   await ordersService.createOrderServices(orderPayload);
 
   logger?.info?.(`[stripe-webhook] Created order for session ${session.id}`);
+  // Decrement stock per line item (best effort)
+  try {
+    if (stockService && typeof stockService.decrementStock === "function") {
+      await Promise.allSettled(
+        lineItems.map((l) => stockService.decrementStock(l.price?.product ?? l.price?.id ?? l.id, l.quantity))
+      );
+    }
+  } catch (e) {
+    logger?.warn?.(`[stripe-webhook] Stock decrement failed for session ${session.id}: ${e?.message ?? e}`);
+  }
 }
 
-async function handleAsyncSessionSucceeded({ event, stripe, ordersService, logger }) {
+async function handleAsyncSessionSucceeded({ event, stripe, ordersService, stockService, logger }) {
   // Some payment methods complete asynchronously. Stripe emits
   // `checkout.session.async_payment_succeeded` instead of `completed`.
   const session = event.data?.object;
@@ -267,9 +277,18 @@ async function handleAsyncSessionSucceeded({ event, stripe, ordersService, logge
   const orderPayload = buildOrderPayload(session, lineItems);
   await ordersService.createOrderServices(orderPayload);
   logger?.info?.(`[stripe-webhook] Created order for async session ${session.id}`);
+  try {
+    if (stockService && typeof stockService.decrementStock === "function") {
+      await Promise.allSettled(
+        lineItems.map((l) => stockService.decrementStock(l.price?.product ?? l.price?.id ?? l.id, l.quantity))
+      );
+    }
+  } catch (e) {
+    logger?.warn?.(`[stripe-webhook] Stock decrement failed for async session ${session.id}: ${e?.message ?? e}`);
+  }
 }
 
-async function handlePaymentIntentSucceeded({ event, stripe, ordersService, logger }) {
+async function handlePaymentIntentSucceeded({ event, stripe, ordersService, stockService, logger }) {
   // If the integration used Payment Element or PI API directly, we won't get
   // a checkout.session.completed event. Try to locate a related Checkout
   // Session via the payment_intent and reuse the same path.
@@ -315,10 +334,22 @@ async function handlePaymentIntentSucceeded({ event, stripe, ordersService, logg
   logger?.info?.(
     `[stripe-webhook] Created order via payment_intent.succeeded for session ${session.id}`
   );
+  try {
+    if (stockService && typeof stockService.decrementStock === "function") {
+      await Promise.allSettled(
+        lineItems.map((l) => stockService.decrementStock(l.price?.product ?? l.price?.id ?? l.id, l.quantity))
+      );
+    }
+  } catch (e) {
+    logger?.warn?.(
+      `[stripe-webhook] Stock decrement failed for PI ${paymentIntentId}: ${e?.message ?? e}`
+    );
+  }
 }
 
 export default function createStripeWebhook({
   ordersService,
+  stockService,
   stripeClient,
   webhookSecret = process.env.STRIPE_WEBHOOK_SECRET,
   logger = console,
@@ -341,6 +372,8 @@ export default function createStripeWebhook({
   }
 
   const stripe = client;
+
+  // stock decrement is handled inside event-specific handlers right after order creation
 
   return async function stripeWebhookHandler(req, res) {
     if (req.method !== "POST") {
@@ -372,13 +405,13 @@ export default function createStripeWebhook({
       logger?.info?.(`[stripe-webhook] Received event ${event.id} (${event.type})`);
       switch (event.type) {
         case "checkout.session.completed":
-          await handleCheckoutSessionCompleted({ event, stripe, ordersService, logger });
+          await handleCheckoutSessionCompleted({ event, stripe, ordersService, stockService, logger });
           break;
         case "checkout.session.async_payment_succeeded":
-          await handleAsyncSessionSucceeded({ event, stripe, ordersService, logger });
+          await handleAsyncSessionSucceeded({ event, stripe, ordersService, stockService, logger });
           break;
         case "payment_intent.succeeded":
-          await handlePaymentIntentSucceeded({ event, stripe, ordersService, logger });
+          await handlePaymentIntentSucceeded({ event, stripe, ordersService, stockService, logger });
           break;
         default:
           logger?.info?.(`[stripe-webhook] Ignored event ${event.type}`);

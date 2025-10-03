@@ -82,7 +82,6 @@ export default function createStockServices(db) {
     }
 
     const updated = { ...target, stockValue: next, updatedAt: new Date().toISOString() };
-    delete updated.id;
 
     return db.updateStock(id, updated);
   }

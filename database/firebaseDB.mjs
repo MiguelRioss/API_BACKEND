@@ -198,6 +198,28 @@ export async function getStocks() {
   return Promise.resolve([]);
 }
 
+
+/**
+ * Get all Products from DB.
+ */
+export async function getProducts() {
+  const init = ensureInitDb();
+  if (init) return init;
+
+  if (useRealtimeDB()) {
+    const db = getRealtimeDB();
+    return db.ref("/stock")
+      .once("value")
+      .then((snap) => snap.val() || {})
+      .then((val) =>
+        Object.entries(val).map(([id, data]) => ({
+          id: Number(id),
+          ...data,
+        }))
+      );
+  }
+  return [];
+}
 /**
  * Update an order by replacing it with the provided object.
  * Same contract as localDB.updateOrderDB — service layer handles merging/normalization.

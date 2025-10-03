@@ -9,8 +9,19 @@ export default function createStockServices(db) {
     getStockServices,
     updateStock,
     adjustStock,
+    getAllProducts,
+    getProductById
   };
 
+    async function getAllProducts() {
+    return db.getProducts();
+  }
+
+  async function getProductById(id) {
+    const product = await db.getProductById(id);
+    if (!product) return errors.NOT_FOUND(`Product ${id} not found`);
+    return product;
+  }
   async function getStockServices() {
     return db.getStocks();
   }

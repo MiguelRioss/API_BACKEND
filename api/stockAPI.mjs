@@ -8,7 +8,10 @@ export default function createStocksAPI(stockService) {
   return {
     getStockAPI: handlerFactory(internalGetStock),
     updateStockAPI: handlerFactory(internalUpdateStock),
-    adjustStockAPI: handlerFactory(internalAdjustStock), // ✅ new
+    adjustStockAPI: handlerFactory(internalAdjustStock),
+    getProductsAPI: handlerFactory(internalGetProducts),
+    getProductByIdAPI: handlerFactory(internalGetProductById),
+    updateProductAPI: handlerFactory(internalUpdateProduct),
   };
 
   async function internalGetStock(req, rsp) {
@@ -27,6 +30,23 @@ export default function createStocksAPI(stockService) {
     const stockID = req.params.id;
     const delta = req.body?.delta ?? 0; // + for increment, - for decrement
     const updated = await stockService.adjustStock(stockID, delta);
+    return rsp.json(updated);
+  }
+  async function internalGetProducts(req, rsp) {
+    const products = await stockService.getAllProducts();
+    return rsp.json(products);
+  }
+
+  async function internalGetProductById(req, rsp) {
+    const productID = req.params.id;
+    const product = await stockService.getProductById(productID);
+    return rsp.json(product);
+  }
+
+  async function internalUpdateProduct(req, rsp) {
+    const productID = req.params.id;
+    const changes = req.body?.changes || {};
+    const updated = await stockService.updateProduct(productID, changes);
     return rsp.json(updated);
   }
 }

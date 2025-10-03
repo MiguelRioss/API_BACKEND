@@ -46,6 +46,10 @@ app.get("/api/stock", stockApi.getStockAPI);
 app.patch("/api/stock/:id", stockApi.updateStockAPI);
 app.patch("/api/stock/:id/adjust", stockApi.adjustStockAPI);
 
+// Products
+app.get("/api/products", stockApi.getProductsAPI);
+app.get("/api/products/:id", stockApi.getProductByIdAPI);
+
 
 
 app.listen(PORT, () => {

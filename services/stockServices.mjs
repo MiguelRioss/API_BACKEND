@@ -12,16 +12,38 @@ export default function createStockServices(db) {
     getAllProducts,
     getProductById
   };
-
-    async function getAllProducts() {
-    return db.getProducts();
+  /**
+   * Get all products with business logic (fewTag / soldOut)
+   */
+  async function getAllProducts() {
+    const raw = await db.getProducts();
+    return raw.map((p) => {
+      const stockValue = p.stockValue ?? 0;
+      return {
+        ...p,
+        stockValue,
+        fewTag: stockValue < 20,
+        soldOut: stockValue === 0,
+      };
+    });
   }
-
   async function getProductById(id) {
     const product = await db.getProductById(id);
-    if (!product) return errors.NOT_FOUND(`Product ${id} not found`);
-    return product;
+
+    if (!product) {
+      return errors.NOT_FOUND(`Product ${id} not found`);
+    }
+
+    const stockValue = product.stockValue ?? 0;
+
+    return {
+      ...product,
+      stockValue,
+      fewTag: stockValue < 20,
+      soldOut: stockValue === 0,
+    };
   }
+
   async function getStockServices() {
     return db.getStocks();
   }

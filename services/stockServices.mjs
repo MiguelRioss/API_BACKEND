@@ -1,4 +1,4 @@
-// services/stockServices.mjs
+import errors from '../errors/errors.mjs'
 
 export default function createStockServices(db) {
   if (!db) {
@@ -8,7 +8,7 @@ export default function createStockServices(db) {
   return {
     getStockServices,
     updateStock,
-    decrementStock,
+    adjustStock,
   };
 
   async function getStockServices() {
@@ -29,47 +29,27 @@ export default function createStockServices(db) {
     return db.updateStock(id, updated);
   }
 
-  /**
-   * Decrement stockValue by a positive integer delta.
-   */
-  async function decrementStock(stockID, delta = 0, hintName = undefined) {
+  async function adjustStock(stockID, delta = 0) {
     const id = String(stockID || '').trim();
-    const n = Number(delta) || 0;
-    if (n <= 0) return id ? db.getStockByID(id) : getFirstStock();
+    if (!id) return errors.INVALID_DATA("Not a valid Id");
 
-    let target = null;
-    if (id) {
-      try {
-        target = await db.getStockByID(id);
-      } catch (e) {
-        // fall back to search by name if id not found
-      }
+    const n = Number(delta);
+    if (isNaN(n) || n === 0) {
+      return errors.INVALID_DATA("Delta must be a non-zero number");
     }
 
-    if (!target) {
-      const all = await db.getStocks();
-      const norm = (s) => (s || '').toString().trim().toLowerCase();
-      const h = norm(hintName);
-      // try exact name match, then includes
-      target = all.find((s) => norm(s.name) === h) || all.find((s) => h && norm(s.name).includes(h));
-      if (!target && id) {
-        target = all.find((s) => String(s.id) === id);
-      }
-      if (!target) return null; // nothing to decrement
-      // fetch full record to get raw fields (stockValue, etc.)
-      target = await db.getStockByID(target.id);
-    }
-
+    const target = await db.getStockByID(id);
     const current = Number(target?.stockValue ?? target?.stock ?? 0);
-    const next = Math.max(0, current - n);
+    const next = current + n;
+
+    if (next < 0) {
+      return errors.INVALID_DATA(`Not enough stock for ${id}`);
+    }
+
     const updated = { ...target, stockValue: next, updatedAt: new Date().toISOString() };
     delete updated.id;
-    return db.updateStock(target.id, updated);
+
+    return db.updateStock(id, updated);
   }
 
-  async function getFirstStock(){
-    const all = await db.getStocks();
-    if (!all || all.length === 0) return null;
-    return db.getStockByID(all[0].id);
-  }
 }

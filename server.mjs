@@ -5,7 +5,7 @@ import createOrdersService from "./services/orderServices.mjs";
 import { createDb } from "./database/databaseFactory.mjs";
 import createOrdersAPI from "./api/ordersAPI.mjs";
 import createCorsMiddleware from "./middleware/cors.mjs";
-import createStripeWebhook, { STRIPE_WEBHOOK_PATH } from "./webhook/stripe_webhook.mjs";
+import { createStripeWebhook, STRIPE_WEBHOOK_PATH } from "./stripe/index.js";
 import createStockServices from "./services/stockServices.mjs";
 import createStocksAPI from "./api/stockAPI.mjs";
 const app = express();
@@ -18,7 +18,7 @@ app.options("*", corsMiddleware);
 const db = await createDb({ type: process.env.DB_TYPE });
 
 const stockService = createStockServices(db)
-const ordersService = createOrdersService(db);
+const ordersService = createOrdersService(db,stockService);
 
 const stockApi = createStocksAPI(stockService)
 const ordersApi = createOrdersAPI(ordersService);
@@ -44,7 +44,7 @@ app.patch("/api/orders/:id", ordersApi.updateOrderAPI);
 //Stock
 app.get("/api/stock", stockApi.getStockAPI);
 app.patch("/api/stock/:id", stockApi.updateStockAPI);
-
+app.patch("/api/stock/:id/adjust", stockApi.adjustStockAPI);
 
 
 

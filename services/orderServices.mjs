@@ -84,7 +84,7 @@ export default function createOrdersService(db) {
    */
   async function createOrderServices(order) {
     const prepared = await validateAndPrepareOrder(order); // ← await needed here
-    return db.createOrderDB(prepared, prepared.id);
+    return db.createOrderDB(prepared);
   }
 
 
@@ -108,6 +108,55 @@ export default function createOrdersService(db) {
           return db.updateOrderDB(normalizedId, updated);
         })
       );
+  }
+}
+
+//Stock
+
+/**
+ * Decrement a single stock by qty using a transaction that prevents negative values.
+ * Throws Error('INSUFFICIENT_STOCK:<stockId>') if the transaction would go below zero.
+ */
+function txnDecrementStock(db, stockId, qty) {
+  return new Promise((resolve, reject) => {
+    const ref = db.ref(`/stock/${stockId}/stockValue`);
+    ref.transaction(
+      (current) => {
+        if (typeof current !== "number") return; // abort: invalid/missing stock
+        const next = current - qty;
+        if (next < 0) return; // abort: insufficient
+        return next;
+      },
+      (err, committed, snap) => {
+        if (err) return reject(err);
+        if (!committed) return reject(new Error(`INSUFFICIENT_STOCK:${stockId}`));
+        resolve(snap?.val());
+      },
+      false
+    );
+  });
+}
+
+/** Increment a single stock by qty (used for rollback). */
+function txnIncrementStock(db, stockId, qty) {
+  return new Promise((resolve, reject) => {
+    const ref = db.ref(`/stock/${stockId}/stockValue`);
+    ref.transaction(
+      (current) => (typeof current === "number" ? current + qty : qty),
+      (err, committed, snap) => {
+        if (err) return reject(err);
+        if (!committed) return reject(new Error(`ROLLBACK_FAILED:${stockId}`));
+        resolve(snap?.val());
+      },
+      false
+    );
+  });
+}
+
+/** Best-effort rollback of a batch of decrements. */
+async function rollbackBatch(db, decremented) {
+  for (const { stockId, qty } of decremented) {
+    try { await txnIncrementStock(db, stockId, qty); } catch {}
   }
 }
 

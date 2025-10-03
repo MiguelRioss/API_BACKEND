@@ -186,7 +186,7 @@ export function applyLimit(orders = [], limit) {
  * @param {string} order.email - Customer email.
  * @param {number} order.amount_total - Declared total in cents.
  * @param {string} order.currency - Currency code (must be allowed).
- * @param {Object[]} order.items - Array of order items.
+ * @param {Object[]} order.items - Array of order items { id:number, name:string, quantity:int, unit_amount:int }.
  * @param {Object} [order.metadata] - Optional metadata object.
  * @returns {Promise<Object>} Normalized and enriched order object.
  * @rejects {ValidationError} If invalid.
@@ -346,7 +346,6 @@ function validateMetadata(metadata) {
  */
 function validateItemsArray(items, amount_total) {
   let computedTotal = 0;
-
   const normItems = items.map((it, idx) => {
     if (!it || typeof it !== "object") {
       throw errors.INVALID_DATA(`Order.items[${idx}] must be an object.`);
@@ -354,8 +353,9 @@ function validateItemsArray(items, amount_total) {
 
     const { id, name, quantity, unit_amount } = it;
 
-    if (typeof id !== "string" || id.trim() === "") {
-      throw errors.INVALID_DATA(`Order.items[${idx}].id must be a non-empty string.`);
+    // id is an integer (stock/product id)
+    if (!Number.isInteger(id) || id < 0) {
+      throw errors.INVALID_DATA(`Order.items[${idx}].id must be a positive integer.`);
     }
     if (typeof name !== "string" || name.trim() === "") {
       throw errors.INVALID_DATA(`Order.items[${idx}].name must be a non-empty string.`);
@@ -372,7 +372,7 @@ function validateItemsArray(items, amount_total) {
     computedTotal += quantity * unit_amount;
 
     return {
-      id: String(id).trim(),
+      id: String(id),
       name: String(name).trim(),
       quantity,
       unit_amount,

@@ -77,7 +77,6 @@ export async function getOrderById(idStr) {
  * @returns {Promise<Object>} The created order.
  */
 export async function createOrderDB(orderData = {}) {
-  const id = orderData.id;
   const init = ensureInitDb();
   if (init) return init;
 
@@ -85,10 +84,27 @@ export async function createOrderDB(orderData = {}) {
   const payload = { ...orderData, createdAt };
 
   try {
-    if (useRealtimeDB()) {
-      const db = getRealtimeDB();
-      if (typeof id !== "undefined" && id !== null) {
-        const key = String(id);
+    if (!useRealtimeDB()) {
+      // If you later add Firestore, handle it here
+      return Promise.reject(
+        errors.EXTERNAL_SERVICE_ERROR("Firestore create not implemented yet")
+      );
+    }
+
+    const db = getRealtimeDB();
+
+    const stock = await getStocks()
+    console.log("calling findStockAndDecrement…");
+    await findStockAndDecrement(stock, orderData);
+
+    // ---- STOCK DECREMENT (normalized items) ----
+    // Expecting orderData.items: Array<{ stockId: string, qty: number }>
+
+
+    // ---- WRITE ORDER ----
+    try {
+      if (payload.id != null) {
+        const key = String(payload.id);
         await db.ref(`/orders/${key}`).set(payload);
         return { id: key, ...payload };
       } else {
@@ -96,11 +112,24 @@ export async function createOrderDB(orderData = {}) {
         await newRef.set(payload);
         return { id: newRef.key, ...payload };
       }
+    } catch (err) {
+      // Roll back stock if writing the order fails
+      await rollbackBatch(db, decremented);
+      return Promise.reject(
+        errors.EXTERNAL_SERVICE_ERROR("Failed to write order to DB", {
+          original: err,
+        })
+      );
     }
   } catch (err) {
-    return Promise.reject(errors.EXTERNAL_SERVICE_ERROR("Failed to write order to DB", { original: err }));
+    return Promise.reject(
+      errors.EXTERNAL_SERVICE_ERROR("Failed to write order to DB", {
+        original: err,
+      })
+    );
   }
 }
+
 /**
  * Update an order by replacing it with the provided object.
  * Same contract as localDB.updateOrderDB — service layer handles merging/normalization.
@@ -160,7 +189,7 @@ export async function getStocks() {
       .ref("/stock")
       .once("value")
       .then((snap) => snap.val() || {})
-      .then((val) => Object.entries(val).map(([id, data]) => ({ id : id , name: data.name , stock : data.stockValue })))
+      .then((val) => Object.entries(val).map(([id, data]) => ({ id: Number(id), name: data.name, stockValue: data.stockValue })))
       .catch((err) =>
         Promise.reject(errors.EXTERNAL_SERVICE_ERROR("Failed to read orders from DB", { original: err }))
       );
@@ -223,11 +252,96 @@ export async function getStockByID(idStr) {
 
   if (useRealtimeDB()) {
     const db = getRealtimeDB();
-    const snap = await db.ref(`/stock/${idStr}`).once("value");
+    const id = String(idStr).trim();
+    console.log("[getStockByID] looking up stock ID:", id);
+
+    const snap = await db.ref(`/stock/${id}`).once("value");
     const val = snap.val();
+
     if (val === null || typeof val === "undefined") {
-      return Promise.reject(errors.NOT_FOUND(`Order ${idStr} not found`));
+      return Promise.reject(errors.NOT_FOUND(`Stock ${id} not found`));
     }
-    return { id: idStr, ...val };
+
+    return { id, ...val };
   }
 }
+
+
+//StockHelpers
+
+
+/**
+ * Find each stock item from the order and update stock in DB with rollback on error.
+ *
+ * @param {Object[]} stockSnapshot - Current stock list from DB.
+ * @param {Object} orderData - The order data, expected to have .items array.
+ * @returns {Promise<void>}
+ */
+export async function findStockAndDecrement(stockSnapshot, orderData) {
+  console.log("here");
+  if (!orderData?.items || !Array.isArray(orderData.items)) return;
+
+  // Track successfully updated stocks for rollback
+  const updatedItems = [];
+
+  try {
+    for (const item of orderData.items) {
+      const stockId = Number(item.id);
+      const qty = Number(item.quantity);
+
+      const found = stockSnapshot.find((s) => s.id === stockId);
+      if (!found) {
+        console.warn(`[findStockAndDecrement] Stock ID ${stockId} not found`);
+        continue;
+      }
+
+      console.log(
+        `[findStockAndDecrement] Found stock ${stockId}:`,
+        found,
+        ` | requested qty: ${qty}`
+      );
+
+      const newStockValue = found.stockValue - qty;
+
+      if (newStockValue < 0) {
+        throw new Error(
+          `INSUFFICIENT_STOCK: ${stockId} (current ${found.stockValue}, requested ${qty})`
+        );
+      }
+
+      // Update DB
+      await updateStock(stockId, {
+        name: found.name,
+        stockValue: newStockValue,
+      });
+
+      // Save old value for rollback
+      updatedItems.push({
+        stockId,
+        oldValue: found.stockValue,
+        name: found.name,
+      });
+
+      console.log(
+        `[findStockAndDecrement] Updated stock ${stockId}: ${found.stockValue} → ${newStockValue}`
+      );
+    }
+  } catch (err) {
+    console.error("[findStockAndDecrement] Error occurred:", err);
+
+    // Rollback previously updated items
+    for (const rollbackItem of updatedItems) {
+      console.log(
+        `[findStockAndDecrement] Rolling back stock ${rollbackItem.stockId} → ${rollbackItem.oldValue}`
+      );
+      await updateStock(rollbackItem.stockId, {
+        name: rollbackItem.name,
+        stockValue: rollbackItem.oldValue,
+      });
+    }
+
+    throw err; // rethrow so caller knows it failed
+  }
+}
+
+

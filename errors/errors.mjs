@@ -11,6 +11,8 @@ export const ERROR_CODES = {
   WriteFailed: 103,
   InvalidData: 104,
   NotAuthorized: 105,
+  InternalError: 106,
+  BadRequest: 107,
 };
 
 export default {
@@ -26,4 +28,8 @@ export default {
     DatabaseError(ERROR_CODES.InvalidData, message, details),
   NOT_AUTHORIZED: (message, details) =>
     DatabaseError(ERROR_CODES.NotAuthorized, message, details),
+  INTERNAL_ERROR: (message, details) =>
+    DatabaseError(ERROR_CODES.InternalError, message, details),
+  BAD_REQUEST: (message, details) =>
+    DatabaseError(ERROR_CODES.BadRequest, message, details),
 };

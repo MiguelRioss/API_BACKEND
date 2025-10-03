@@ -28,7 +28,10 @@ export default function createStockServices(db) {
     });
   }
   async function getProductById(id) {
-    const product = await db.getProductById(id);
+    const product = await getAllProducts().then(products => products.find(p => {
+      if(p.id==0) console.log(products)
+    console.log('Comparing', p.id, id);
+      return p.id === id}));
 
     if (!product) {
       return errors.NOT_FOUND(`Product ${id} not found`);
@@ -58,7 +61,6 @@ export default function createStockServices(db) {
 
     const existing = await db.getStockByID(id);
     const updated = { ...existing, ...changes, updatedAt: new Date().toISOString() };
-    delete updated.id; // data stored under the id key in RTDB
     return db.updateStock(id, updated);
   }
 

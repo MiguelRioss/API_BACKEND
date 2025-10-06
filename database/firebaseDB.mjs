@@ -301,99 +301,24 @@ export async function getStockByID(idStr) {
  */
 // database/firebaseDB.mjs
 
+// database/firebaseDB.mjs
 export async function findStockAndDecrement(stockSnapshot, orderData) {
-  console.log("[findStockAndDecrement] start");
-  console.log("[findStockAndDecrement] stockSnapshot size:", Array.isArray(stockSnapshot) ? stockSnapshot.length : "n/a");
-  console.log("[findStockAndDecrement] orderData.items:", JSON.stringify(orderData?.items, null, 2));
+  if (!orderData?.items || !Array.isArray(orderData.items)) return [];
+  const applied = [];
 
-  if (!orderData?.items || !Array.isArray(orderData.items)) {
-    console.warn("[findStockAndDecrement] no items in orderData; nothing to do");
-    return;
+  for (const item of orderData.items) {
+    const stockId = Number(item.id);
+    const qty = Number(item.quantity);
+    const found = stockSnapshot.find(s => Number(s.id) === stockId);
+    if (!found) throw new Error(`STOCK_NOT_FOUND:${stockId}`);
+
+    const newVal = Number(found.stockValue) - qty;
+    if (!Number.isFinite(newVal) || newVal < 0) throw new Error(`INSUFFICIENT_STOCK:${stockId}`);
+
+    await updateStockValue(stockId, newVal);          // <-- only field-level update
+    applied.push({ stockId, prev: Number(found.stockValue) });
   }
-
-  const updatedItems = []; // for rollback
-
-  try {
-    for (const item of orderData.items) {
-      const rawId = item?.id;
-      const rawQty = item?.quantity;
-      const stockId = Number(rawId);
-      const qty = Number(rawQty);
-
-      console.log("[findStockAndDecrement] → candidate", {
-        rawId, rawQty, stockId, qty,
-      });
-
-      if (!Number.isFinite(stockId)) {
-        throw new Error(`BAD_STOCK_ID:${rawId}`);
-      }
-      if (!Number.isFinite(qty) || qty <= 0) {
-        throw new Error(`BAD_QTY:${rawQty} for stockId=${stockId}`);
-      }
-
-      const found = stockSnapshot.find((s) => Number(s.id) === stockId);
-      if (!found) {
-        console.warn(`[findStockAndDecrement] STOCK_NOT_FOUND in snapshot for id=${stockId}`);
-        throw new Error(`STOCK_NOT_FOUND:${stockId}`);
-      }
-
-      console.log("[findStockAndDecrement] found:", found);
-
-      const newStockValue = Number(found.stockValue) - qty;
-      console.log(
-        `[findStockAndDecrement] compute: id=${stockId} current=${found.stockValue} - qty=${qty} => new=${newStockValue}`
-      );
-
-      if (!Number.isFinite(newStockValue) || newStockValue < 0) {
-        console.warn(
-          `[findStockAndDecrement] INSUFFICIENT_STOCK: id=${stockId} current=${found.stockValue} requested=${qty}`
-        );
-        throw new Error(`INSUFFICIENT_STOCK:${stockId}`);
-      }
-
-      // Write to DB (overwrite only name + stockValue as requested)
-      console.log(
-        `[findStockAndDecrement] updating DB for id=${stockId} → { name:"${found.name}", stockValue:${newStockValue} }`
-      );
-      await updateStock(stockId, {
-        name: found.name,
-        stockValue: newStockValue,
-      });
-      console.log(`[findStockAndDecrement] ✅ updated id=${stockId} to stockValue=${newStockValue}`);
-
-      // Remember old value for rollback
-      updatedItems.push({
-        stockId,
-        prev: Number(found.stockValue),
-        name: found.name,
-      });
-    }
-
-    console.log("[findStockAndDecrement] success; applied decrements:", updatedItems);
-    return updatedItems;
-  } catch (err) {
-    console.error("[findStockAndDecrement] ERROR:", err);
-
-    // Rollback any applied updates (best-effort)
-    for (const u of updatedItems.reverse()) {
-      try {
-        console.log(
-          `[findStockAndDecrement] rollback: id=${u.stockId} → restore stockValue=${u.prev}`
-        );
-        await updateStock(u.stockId, { name: u.name, stockValue: u.prev });
-        console.log(`[findStockAndDecrement] ✅ rollback ok for id=${u.stockId}`);
-      } catch (rbErr) {
-        console.warn(
-          `[findStockAndDecrement] ⚠️ rollback failed for id=${u.stockId}:`,
-          rbErr?.message || rbErr
-        );
-      }
-    }
-
-    throw err;
-  } finally {
-    console.log("[findStockAndDecrement] end");
-  }
+  return applied;
 }
 
 
@@ -407,3 +332,13 @@ export async function findStockAndDecrement(stockSnapshot, orderData) {
 
 
 
+// database/firebaseDB.mjs
+export async function updateStockValue(id, stockValue) {
+  ensureInitDb();
+  if (!useRealtimeDB()) throw errors.EXTERNAL_SERVICE_ERROR("Firestore update not implemented yet");
+
+  const db = getRealtimeDB();
+  // PATCH the field (preserves all other product fields)
+  await db.ref(`/stock/${id}`).update({ stockValue });
+  return { id, stockValue };
+}

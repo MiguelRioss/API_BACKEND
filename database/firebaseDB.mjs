@@ -95,7 +95,7 @@ export async function createOrderDB(orderData = {}) {
 
     const stock = await getStocks()
     console.log("calling findStockAndDecrement…");
-    await findStockAndDecrement(stock, orderData);
+    await (stock, orderData);
 
     // ---- STOCK DECREMENT (normalized items) ----
     // Expecting orderData.items: Array<{ stockId: string, qty: number }>
@@ -288,82 +288,102 @@ export async function getStockByID(idStr) {
   }
 }
 
-
-//StockHelpers
-
-
 /**
- * Find each stock item from the order and update stock in DB with rollback on error.
+ * Find each stock item from the order and decrement stockValue ONLY.
+ * Uses RTDB transactions; performs best-effort rollback on error.
  *
- * @param {Object[]} stockSnapshot - Current stock list from DB.
- * @param {Object} orderData - The order data, expected to have .items array.
+ * @param {Object[]} stockSnapshot - Current stock list from DB (id, name, stockValue)
+ * @param {Object} orderData       - The order data (expects .items with {id, quantity})
  * @returns {Promise<void>}
  */
 export async function findStockAndDecrement(stockSnapshot, orderData) {
-  console.log("here");
   if (!orderData?.items || !Array.isArray(orderData.items)) return;
+  const init = ensureInitDb();
+  if (init) return init;
 
-  // Track successfully updated stocks for rollback
-  const updatedItems = [];
+  // Track applied decrements for rollback
+  const applied = [];
 
   try {
     for (const item of orderData.items) {
       const stockId = Number(item.id);
       const qty = Number(item.quantity);
 
+      // Optional guard using the snapshot (not required for correctness)
       const found = stockSnapshot.find((s) => s.id === stockId);
       if (!found) {
-        console.warn(`[findStockAndDecrement] Stock ID ${stockId} not found`);
+        console.warn(`[findStockAndDecrement] Stock ID ${stockId} not found in snapshot`);
+        // You can choose to continue or throw. Continuing here:
         continue;
       }
 
-      console.log(
-        `[findStockAndDecrement] Found stock ${stockId}:`,
-        found,
-        ` | requested qty: ${qty}`
-      );
+      // Concurrency-safe decrement: only /stock/{id}/stockValue changes
+      await txnDecrementStockValue(stockId, qty);
+      applied.push({ stockId, qty });
 
-      const newStockValue = found.stockValue - qty;
-
-      if (newStockValue < 0) {
-        throw new Error(
-          `INSUFFICIENT_STOCK: ${stockId} (current ${found.stockValue}, requested ${qty})`
-        );
-      }
-
-      // Update DB
-      await updateStock(stockId, {
-        name: found.name,
-        stockValue: newStockValue,
-      });
-
-      // Save old value for rollback
-      updatedItems.push({
-        stockId,
-        oldValue: found.stockValue,
-        name: found.name,
-      });
-
-      console.log(
-        `[findStockAndDecrement] Updated stock ${stockId}: ${found.stockValue} → ${newStockValue}`
-      );
+      console.log(`[findStockAndDecrement] decremented stock ${stockId} by ${qty}`);
     }
   } catch (err) {
     console.error("[findStockAndDecrement] Error occurred:", err);
 
-    // Rollback previously updated items
-    for (const rollbackItem of updatedItems) {
-      console.log(
-        `[findStockAndDecrement] Rolling back stock ${rollbackItem.stockId} → ${rollbackItem.oldValue}`
-      );
-      await updateStock(rollbackItem.stockId, {
-        name: rollbackItem.name,
-        stockValue: rollbackItem.oldValue,
-      });
+    // Best-effort rollback of previously applied decrements
+    for (const x of applied.reverse()) {
+      try {
+        await txnIncrementStockValue(x.stockId, x.qty);
+        console.log(`[findStockAndDecrement] rolled back stock ${x.stockId} by +${x.qty}`);
+      } catch (rbErr) {
+        console.warn("[findStockAndDecrement] rollback failed:", rbErr);
+      }
     }
-
-    throw err; // rethrow so caller knows it failed
+    throw err; // let caller handle
   }
 }
 
 
+/**
+ * Atomically decrement stockValue by qty. Rejects if insufficient.
+ */
+function txnDecrementStockValue(stockId, qty) {
+  const db = getRealtimeDB();
+  const ref = db.ref(`/stock/${stockId}/stockValue`);
+
+  return new Promise((resolve, reject) => {
+    ref.transaction(
+      (current) => {
+        if (typeof current !== "number") return;     // abort (invalid node)
+        const next = current - qty;
+        if (next < 0) return;                         // abort (insufficient)
+        return next;                                  // commit
+      },
+      (err, committed, snap) => {
+        if (err) return reject(err);
+        if (!committed) return reject(new Error(`INSUFFICIENT_STOCK:${stockId}`));
+        resolve(snap?.val()); // new value
+      },
+      false
+    );
+  });
+}
+
+/**
+ * Atomically increment stockValue by qty (used for rollback).
+ */
+function txnIncrementStockValue(stockId, qty) {
+  const db = getRealtimeDB();
+  const ref = db.ref(`/stock/${stockId}/stockValue`);
+
+  return new Promise((resolve, reject) => {
+    ref.transaction(
+      (current) => {
+        if (typeof current !== "number") return qty;  // create if missing
+        return current + qty;
+      },
+      (err, committed, snap) => {
+        if (err) return reject(err);
+        if (!committed) return reject(new Error(`ROLLBACK_FAILED:${stockId}`));
+        resolve(snap?.val());
+      },
+      false
+    );
+  });
+}

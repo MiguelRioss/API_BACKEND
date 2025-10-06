@@ -45,7 +45,7 @@ export default function createOrdersService(db) {
   * @param {string} [options.q] - Query string.
   * @returns {Promise<Object[]>} Filtered, sorted, and limited orders.
   */
-  function getOrdersServices({ limit, status, q } = {}) {
+  async function getOrdersServices({ limit, status, q } = {}) {
     return db.getAllOrders()
       .then(orders => filterByStatus(orders, status))
       .then(orders => filterByQuery(orders, q))

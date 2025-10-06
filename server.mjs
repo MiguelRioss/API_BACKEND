@@ -5,7 +5,6 @@ import createOrdersService from "./services/orderServices.mjs";
 import { createDb } from "./database/databaseFactory.mjs";
 import createOrdersAPI from "./api/ordersAPI.mjs";
 import createCorsMiddleware from "./middleware/cors.mjs";
-import { createStripeWebhook, STRIPE_WEBHOOK_PATH } from "./stripe/index.js";
 import createStockServices from "./services/stockServices.mjs";
 import createStocksAPI from "./api/stockAPI.mjs";
 const app = express();
@@ -24,13 +23,6 @@ const stockApi = createStocksAPI(stockService)
 const ordersApi = createOrdersAPI(ordersService);
 
 
-const stripeWebhookHandler = createStripeWebhook({ ordersService, stockService });
-
-app.post(
-  STRIPE_WEBHOOK_PATH,
-  express.raw({ type: "application/json" }),
-  stripeWebhookHandler
-);
 
 app.use(express.json());
 

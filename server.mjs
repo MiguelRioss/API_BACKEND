@@ -7,7 +7,7 @@ import createOrdersAPI from "./api/ordersAPI.mjs";
 import createCorsMiddleware from "./middleware/cors.mjs";
 import createStockServices from "./services/stockServices.mjs";
 import createStocksAPI from "./api/stockAPI.mjs";
-
+import "dotenv/config";
 import checkoutRoutes from "./routes/checkoutSessions.mjs";
 import stripeWebhook from "./stripe/webhook.mjs";
 

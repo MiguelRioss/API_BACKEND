@@ -63,13 +63,18 @@ export default function checkoutRoutes({ ordersService, stockService }) {
         }
 
         const unit_amount = Math.round(price * 100);
+        // in routes/checkoutSessions.mjs when building line_items
         line_items.push({
           price_data: {
             currency: "eur",
-            product_data: { name: product.title || product.name || `Product ${id}` },
-            unit_amount,
+            product_data: {
+              name: product.title || product.name,
+              // 👇 stash your internal id on the Stripe Product
+              metadata: { productId: String(product.id) }
+            },
+            unit_amount: Math.round(price * 100),
           },
-          quantity,
+          quantity: Number(qty),
         });
       }
 

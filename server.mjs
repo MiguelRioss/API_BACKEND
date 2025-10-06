@@ -27,7 +27,7 @@ const stockApi = createStocksAPI(stockService)
 const ordersApi = createOrdersAPI(ordersService);
 
 
-app.use("/api/stripe/webhook", stripeWebhook);
+app.use("/api/stripe/webhook", stripeWebhook({ ordersService, stockService }));
 
 app.use(express.json());
 

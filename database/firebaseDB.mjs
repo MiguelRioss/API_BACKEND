@@ -82,26 +82,21 @@ export async function createOrderDB(orderData = {}) {
 
   const createdAt = new Date().toISOString();
   const payload = { ...orderData, createdAt };
+  let appliedDecrements = [];
 
   try {
     if (!useRealtimeDB()) {
-      // If you later add Firestore, handle it here
       return Promise.reject(
         errors.EXTERNAL_SERVICE_ERROR("Firestore create not implemented yet")
       );
     }
 
     const db = getRealtimeDB();
+    const stockSnapshot = await getStocks();
 
-    const stock = await getStocks()
-    console.log("calling findStockAndDecrement…");
-    await (stock, orderData);
+    console.log("[createOrderDB] calling findStockAndDecrement");
+    appliedDecrements = (await findStockAndDecrement(stockSnapshot || [], orderData)) || [];
 
-    // ---- STOCK DECREMENT (normalized items) ----
-    // Expecting orderData.items: Array<{ stockId: string, qty: number }>
-
-
-    // ---- WRITE ORDER ----
     try {
       if (payload.id != null) {
         const key = String(payload.id);
@@ -113,8 +108,7 @@ export async function createOrderDB(orderData = {}) {
         return { id: newRef.key, ...payload };
       }
     } catch (err) {
-      // Roll back stock if writing the order fails
-      await rollbackBatch(db, decremented);
+      await rollbackAppliedDecrements(appliedDecrements);
       return Promise.reject(
         errors.EXTERNAL_SERVICE_ERROR("Failed to write order to DB", {
           original: err,
@@ -122,6 +116,13 @@ export async function createOrderDB(orderData = {}) {
       );
     }
   } catch (err) {
+    if (appliedDecrements.length) {
+      try {
+        await rollbackAppliedDecrements(appliedDecrements);
+      } catch (rollbackErr) {
+        console.warn("[createOrderDB] rollback after failure failed:", rollbackErr);
+      }
+    }
     return Promise.reject(
       errors.EXTERNAL_SERVICE_ERROR("Failed to write order to DB", {
         original: err,
@@ -294,7 +295,7 @@ export async function getStockByID(idStr) {
  *
  * @param {Object[]} stockSnapshot - Current stock list from DB (id, name, stockValue)
  * @param {Object} orderData       - The order data (expects .items with {id, quantity})
- * @returns {Promise<void>}
+ * @returns {Promise<Object[]>} Applied decrements { stockId, qty }
  */
 export async function findStockAndDecrement(stockSnapshot, orderData) {
   if (!orderData?.items || !Array.isArray(orderData.items)) return;
@@ -337,6 +338,8 @@ export async function findStockAndDecrement(stockSnapshot, orderData) {
     }
     throw err; // let caller handle
   }
+
+  return applied;
 }
 
 
@@ -387,3 +390,22 @@ function txnIncrementStockValue(stockId, qty) {
     );
   });
 }
+
+async function rollbackAppliedDecrements(applied = []) {
+  if (!Array.isArray(applied) || applied.length === 0) return;
+
+  for (const { stockId, qty } of [...applied].reverse()) {
+    const numericQty = Number(qty);
+    if (!Number.isFinite(numericQty) || numericQty <= 0) continue;
+
+    try {
+      await txnIncrementStockValue(stockId, numericQty);
+      console.log(`[rollbackAppliedDecrements] restored stock ${stockId} by +${numericQty}`);
+    } catch (err) {
+      console.warn(`[rollbackAppliedDecrements] Failed to restore stock ${stockId}:`, err);
+    }
+  }
+}
+
+
+

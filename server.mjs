@@ -7,6 +7,10 @@ import createOrdersAPI from "./api/ordersAPI.mjs";
 import createCorsMiddleware from "./middleware/cors.mjs";
 import createStockServices from "./services/stockServices.mjs";
 import createStocksAPI from "./api/stockAPI.mjs";
+
+import checkoutRoutes from "./routes/checkoutSessions.mjs";
+import stripeWebhook from "./stripe/webhook.mjs";
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -23,9 +27,11 @@ const stockApi = createStocksAPI(stockService)
 const ordersApi = createOrdersAPI(ordersService);
 
 
+app.use("/api/stripe/webhook", stripeWebhook);
 
 app.use(express.json());
 
+app.use("/api", checkoutRoutes({ordersService, stockService}));
 
 app.get("/api/orders", ordersApi.getOrdersAPI);
 app.get("/api/orders/:id", ordersApi.getOrderByIdAPI);

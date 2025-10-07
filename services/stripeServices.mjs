@@ -5,7 +5,8 @@ import { createUrlCheckoutSession, buildStripeLineItems } from "./stripeUtils.mj
 
 
 export default function createStripeServices(stockServices) {
-    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+    const stripe = stripeSecretKey ? new Stripe(stripeSecretKey) : null;
 
     return { createCheckoutSession };
 
@@ -26,11 +27,14 @@ export default function createStripeServices(stockServices) {
         // 1) Load catalog via stockServices
         const catalog = await stockServices.getAllProducts(); // returns an array
         if (!Array.isArray(catalog)) {
-            return errors.badRequestRequest("Catalog fetch failed (not an array)");
+            if (catalog && typeof catalog === "object" && catalog.httpStatus) {
+                return catalog;
+            }
+            return errors.internalError("Catalog fetch failed (not an array)");
         }
 
-        if (!process.env.STRIPE_SECRET_KEY) {
-            return new errors.forbidden("STRIPE_SECRET_KEY missing");
+        if (!stripe) {
+            return errors.forbidden("STRIPE_SECRET_KEY missing");
         }
 
         //Map BY ID to O(1) search
@@ -42,10 +46,12 @@ export default function createStripeServices(stockServices) {
             currency: "eur",
             errorFactory: (msg) => errors.badRequest(msg), // optional
         });
-        if(line_items instanceof Error) {
+
+        if (!Array.isArray(line_items)) {
             return line_items; // early return on error
         }
-        const url = await createUrlCheckoutSession({
+
+        const sessionUrl = await createUrlCheckoutSession({
             stripe,
             line_items,
             customer,
@@ -57,6 +63,10 @@ export default function createStripeServices(stockServices) {
         });
 
         // Return just the URL (controller will res.json({ url }))
-        return { url }
+        if (typeof sessionUrl !== "string") {
+            return sessionUrl;
+        }
+
+        return { url: sessionUrl }
     }
 }

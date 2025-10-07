@@ -87,15 +87,37 @@ export default function stripeWebhook({ ordersService, emailService, stockServic
 
         // 7) Email (don’t fail webhook on email errors)
         try {
-          await emailService.sendOrderInvoiceEmail({
+          // Build invoice HTML
+          const invoiceHtml = buildOrderInvoiceHtml({
             order: orderPayload,
             orderId: saved?.id || session.id,
-            live: event.livemode === true,
           });
-          if (debug) console.log("📧 Invoice email sent");
+
+          // Create PDF invoice file
+          const pdfPath = await createPdfInvoice(invoiceHtml, "./assets/logo/ibogenics_logo_cropped.png");
+
+          // Build short thank-you email HTML
+          const thankYouHtml = buildThankYouEmailHtml({ order: orderPayload });
+
+          // Send email with PDF attachment
+          await emailService.send({
+            to: orderPayload.email,
+            subject: "Thank you for your order – Ibogenics",
+            html: thankYouHtml,
+            attachments: [
+              {
+                filename: `Invoice-${saved?.id || session.id}.pdf`,
+                path: pdfPath,
+                contentType: "application/pdf",
+              },
+            ],
+          });
+
+          if (debug) console.log("📧 Invoice email sent with PDF attachment");
         } catch (e) {
           console.error("📧 Email send failed:", e?.message);
         }
+
       }
 
       return res.sendStatus(200);

@@ -1,5 +1,5 @@
 // services/emailService.mjs
-import { buildOrderInvoiceHtml } from "./emailTemplates.mjs";
+import { buildThankYouEmailHtml } from "./emailTemplates.mjs";
 
 /**
  * High-level email service that builds + sends order invoices.
@@ -23,7 +23,7 @@ export default function createEmailService({ transport }) {
     const toName = isTestRoute ? "Test Recipient" : (order?.name || "");
     if (!toEmail) return; // gracefully skip if no recipient
 
-    const html = buildOrderInvoiceHtml({ order, orderId });
+    const html = buildThankYouEmailHtml({ order, orderId });
     const subject = `Your Order ${orderId || ""}`.trim();
 
     await transport.send({

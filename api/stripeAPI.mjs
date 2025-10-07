@@ -1,8 +1,5 @@
 // controllers/stripeApi.mjs
-import Stripe from "stripe";
-import fetch from "node-fetch"; // If you're on Node 18+, you can remove this and use global fetch
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+import handlerFactory from "../utils/handleFactory.mjs";
 
 /**
  * POST /checkout-sessions
@@ -15,9 +12,8 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
  * }
  */
 export default function createStripeAPI(stripeServices) {
-    const startedAt = Date.now();
     return {
-        handleCheckoutSession
+      handleCheckoutSession: handlerFactory(handleCheckoutSession)
     }
 
 
@@ -31,8 +27,6 @@ export default function createStripeAPI(stripeServices) {
 
         return stripeServices.createCheckoutSession({
             items, clientReferenceId, customer, address
-        }).then(
-            session => rsp.json({ url: session.url })
-        )
+        });
     }
 }

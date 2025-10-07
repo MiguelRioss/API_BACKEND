@@ -1,3 +1,5 @@
+import errors from "../errors/errors.mjs";
+
 // utils/stripe.mjs
 // Reusable helper to create a Stripe Checkout Session and return its URL.
 
@@ -25,50 +27,76 @@ export async function createUrlCheckoutSession({
     cancelUrl = `${process.env.PUBLIC_BASE_URL}/#/checkout/cancel`,
     billingSameAsShipping = false,
 }) {
-    if (!stripe) return new Error("Stripe client is required");
+    if (!stripe) {
+        return errors.internalError("Stripe client is required");
+    }
     if (!Array.isArray(line_items) || line_items.length === 0) {
-        return new Error("line_items must be a non-empty array");
+        return errors.invalidData("line_items must be a non-empty array");
     }
 
-    const session = await stripe.checkout.sessions.create({
-        mode: "payment",
-        line_items,
+    let session;
 
-        // Only collect billing if the payment method/bank requires it
-        billing_address_collection: "auto",
+    try {
+        session = await stripe.checkout.sessions.create({
+            mode: "payment",
+            line_items,
+
+            // Only collect billing if the payment method/bank requires it
+            billing_address_collection: "auto",
 
         // Don’t collect shipping / phone in Checkout
-        // shipping_address_collection: undefined,
-        phone_number_collection: { enabled: false },
+            // shipping_address_collection: undefined,
+            phone_number_collection: { enabled: false },
 
-        // Let Checkout create a Customer
-        customer_creation: "always",
+            // Let Checkout create a Customer
+            customer_creation: "always",
 
-        // Prefill email if you have it
-        customer_email: customer?.email || undefined,
+            // Prefill email if you have it
+            customer_email: customer?.email || undefined,
 
         // ❌ REMOVE customer_update unless you pass `customer: 'cus_xxx'`
         // customer_update: { name: "auto", address: "auto" },
 
-        success_url: successUrl,
-        cancel_url: cancelUrl,
-        client_reference_id: clientReferenceId,
+            success_url: successUrl,
+            cancel_url: cancelUrl,
+            client_reference_id: clientReferenceId,
 
-        // Store your pre-checkout data for the webhook
-        metadata: {
-            full_name: customer?.name || "",
-            phone: customer?.phone || "",
-            notes: customer?.notes || "",
-            addr_line1: address?.line1 || "",
-            addr_line2: address?.line2 || "",
-            addr_city: address?.city || "",
-            addr_postal: address?.postal_code || "",
-            addr_country: address?.country || "",
-            billing_same_as_shipping: String(Boolean(billingSameAsShipping)),
-        },
-    });
+            // Store your pre-checkout data for the webhook
+            metadata: {
+                full_name: customer?.name || "",
+                phone: customer?.phone || "",
+                notes: customer?.notes || "",
+                addr_line1: address?.line1 || "",
+                addr_line2: address?.line2 || "",
+                addr_city: address?.city || "",
+                addr_postal: address?.postal_code || "",
+                addr_country: address?.country || "",
+                billing_same_as_shipping: String(Boolean(billingSameAsShipping)),
+            },
+        });
+    } catch (stripeError) {
+        if (stripeError?.type === "StripeCardError") {
+            return errors.stripeCardError(stripeError.message, {
+                stripeCode: stripeError.code,
+            });
+        }
 
-    if (!session?.url) return new Error("Stripe session created without URL");
+        if (stripeError?.type === "StripeAuthenticationError") {
+            return errors.stripeAuthFailed(stripeError.message);
+        }
+
+        if (stripeError?.type === "StripeRateLimitError") {
+            return errors.stripeRateLimited(stripeError.message);
+        }
+
+        return errors.externalService("Stripe session creation failed", {
+            reason: stripeError?.message || "Unknown error",
+        });
+    }
+
+    if (!session?.url) {
+        return errors.externalService("Stripe session created without URL");
+    }
     return session.url;
 }
 
@@ -82,7 +110,7 @@ export async function createUrlCheckoutSession({
  * @param {{id:(string|number), qty?:number}[]} params.items - Cart items.
  * @param {Map<string, any>} params.byId - Map of productId(string) -> product object.
  * @param {string} [params.currency="eur"] - ISO currency for Stripe price_data.
- * @param {(msg:string)=>Error} [params.errorFactory] - Optional custom error creator.
+ * @param {(msg:string, details?:object)=>object} [params.errorFactory] - Optional custom error creator.
  * @returns {Array<Object>} Stripe line_items
  */
 export function buildStripeLineItems({
@@ -91,7 +119,8 @@ export function buildStripeLineItems({
     currency = "eur",
     errorFactory,
 }) {
-    const err = (msg) => (errorFactory ? errorFactory(msg) : new Error(msg));
+    const err = (msg, details) =>
+        errorFactory ? errorFactory(msg, details) : errors.invalidData(msg, details);
 
     if (!Array.isArray(items) || items.length === 0) {
         return err("No items in payload");

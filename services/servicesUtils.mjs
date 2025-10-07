@@ -307,33 +307,23 @@ function makeDefaultStatus() {
  * @returns {Object} Normalized metadata object (never null).
  * @throws {ValidationError} If metadata is not a plain object.
  */
-function validateMetadata(metadata) {
-  if (typeof metadata === "undefined") {
-    return {};
+function validateMetadata(meta) {
+  if (!meta || typeof meta !== "object" || Array.isArray(meta)) return {};
+  const clean = {};
+
+  for (const [key, val] of Object.entries(meta)) {
+    // Keep objects intact
+    if (val && typeof val === "object") {
+      clean[key] = val;
+    } else if (typeof val === "string" || typeof val === "number" || typeof val === "boolean") {
+      clean[key] = val;
+    } else {
+      // ignore null/undefined
+      clean[key] = "";
+    }
   }
 
-  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
-    throw errors.invalidData("Order.metadata, if provided, must be an object.");
-  }
-
-  const coerceStr = (v) =>
-    typeof v === "string" ? v.trim() : v == null ? "" : String(v);
-
-  return {
-    addr_city: coerceStr(metadata.addr_city ?? ""),
-    addr_ctry: coerceStr(metadata.addr_ctry ?? ""),
-    addr_line1: coerceStr(metadata.addr_line1 ?? ""),
-    addr_zip: coerceStr(metadata.addr_zip ?? ""),
-    full_name: coerceStr(metadata.full_name ?? ""),
-    phone: coerceStr(metadata.phone ?? ""),
-    ...Object.fromEntries(
-      Object.entries(metadata)
-        .filter(([k]) =>
-          !["addr_city", "addr_ctry", "addr_line1", "addr_zip", "full_name", "phone"].includes(k)
-        )
-        .map(([k, v]) => [k, coerceStr(v)])
-    ),
-  };
+  return clean;
 }
 
 /**

@@ -1,6 +1,6 @@
-﻿// stripe/webhook.mjs
 import express from "express";
 import Stripe from "stripe";
+
 import {
   normalizeLineItems,
   normalizeLineItemsWithCatalog,
@@ -11,6 +11,12 @@ import {
 export default function stripeWebhook({ ordersService, emailService, stockService }) {
   if (!process.env.STRIPE_SECRET_KEY) throw new Error("Missing STRIPE_SECRET_KEY");
   if (!process.env.STRIPE_WEBHOOK_SECRET) throw new Error("Missing STRIPE_WEBHOOK_SECRET");
+  if (!ordersService || typeof ordersService.createOrderServices !== "function") {
+    throw new Error("stripeWebhook requires ordersService.createOrderServices()");
+  }
+  if (!emailService || typeof emailService.sendOrderInvoiceEmail !== "function") {
+    throw new Error("stripeWebhook requires emailService.sendOrderInvoiceEmail()");
+  }
 
   const router = express.Router();
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
@@ -23,11 +29,17 @@ export default function stripeWebhook({ ordersService, emailService, stockServic
       const sig = req.headers["stripe-signature"];
       event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
     } catch (err) {
-      console.error("❌ Webhook signature verification failed:", err.message);
+      console.error("[stripeWebhook] Signature verification failed:", err.message);
       return res.status(400).send(`Webhook Error: ${err.message}`);
     }
 
-    if (debug) console.log("🔔 Stripe event:", { type: event.type, id: event.id, live: event.livemode });
+    if (debug) {
+      console.log("[stripeWebhook] Event received:", {
+        type: event.type,
+        id: event.id,
+        live: event.livemode,
+      });
+    }
 
     try {
       if (event.type === "checkout.session.completed") {
@@ -40,35 +52,30 @@ export default function stripeWebhook({ ordersService, emailService, stockServic
         });
 
         if (debug) {
-          console.log("🛒 Line item meta preview:");
-          console.dir(
-            lineItems.map(li => ({
-              li: li.id,
-              desc: li.description,
-              priceId: li.price?.id,
-              prodId: li.price?.product?.id,
-              prodMeta: li.price?.product?.metadata,
-              priceMeta: li.price?.metadata,
-            })),
-            { depth: null }
-          );
+          console.log("[stripeWebhook] Line item preview:", lineItems.map((li) => ({
+            id: li.id,
+            description: li.description,
+            priceId: li.price?.id,
+            productId: li.price?.product?.id,
+            productMeta: li.price?.product?.metadata,
+            priceMeta: li.price?.metadata,
+          })));
         }
 
         // 2) Strict normalization first (requires productId metadata)
         let items = normalizeLineItems(lineItems);
 
         // 3) If any item.id is missing/invalid, try name-based fallback with local catalog
-        const anyMissing = items.some(it =>
-          it.id === "" || it.id === "undefined" || Number.isNaN(it.id)
+        const anyMissing = items.some(
+          (it) => it.id === "" || it.id === "undefined" || Number.isNaN(it.id)
         );
         if (anyMissing) {
-          if (debug) console.log("ℹ️ Missing productId metadata; attempting catalog fallback…");
+          if (debug) console.log("[stripeWebhook] Missing productId metadata; attempting catalog fallback.");
           try {
-            // stockService should expose your local catalog
             const catalog = await stockService.getAllProducts();
             items = normalizeLineItemsWithCatalog(lineItems, catalog);
           } catch (e) {
-            console.warn("⚠️ Could not load catalog for fallback:", e?.message || e);
+            console.warn("[stripeWebhook] Could not load catalog for fallback:", e?.message || e);
           }
         }
 
@@ -78,52 +85,34 @@ export default function stripeWebhook({ ordersService, emailService, stockServic
         // 5) Idempotency guard
         if (ordersService.getOrderByStripeSessionId) {
           const exists = await ordersService.getOrderByStripeSessionId(session.id);
-          if (exists) return res.sendStatus(200);
+          if (exists) {
+            if (debug) console.log("[stripeWebhook] Order already processed, skipping.");
+            return res.sendStatus(200);
+          }
         }
 
         // 6) Persist
         const saved = await ordersService.createOrderServices(orderPayload);
-        if (debug) console.log("✅ Order created:", { id: saved?.id });
+        if (debug) console.log("[stripeWebhook] Order persisted:", { id: saved?.id });
 
-        // 7) Email (don’t fail webhook on email errors)
+        // 7) Email (don't fail webhook on email errors)
         try {
-          // Build invoice HTML
-          const invoiceHtml = buildOrderInvoiceHtml({
+          await emailService.sendOrderInvoiceEmail({
             order: orderPayload,
             orderId: saved?.id || session.id,
+            live: event.livemode,
           });
-
-          // Create PDF invoice file
-          const pdfPath = await createPdfInvoice(invoiceHtml, "./assets/logo/ibogenics_logo_cropped.png");
-
-          // Build short thank-you email HTML
-          const thankYouHtml = buildThankYouEmailHtml({ order: orderPayload });
-
-          // Send email with PDF attachment
-          await emailService.send({
-            to: orderPayload.email,
-            subject: "Thank you for your order – Ibogenics",
-            html: thankYouHtml,
-            attachments: [
-              {
-                filename: `Invoice-${saved?.id || session.id}.pdf`,
-                path: pdfPath,
-                contentType: "application/pdf",
-              },
-            ],
-          });
-
-          if (debug) console.log("📧 Invoice email sent with PDF attachment");
+          if (debug) console.log("[stripeWebhook] Invoice email sent via Brevo.");
         } catch (e) {
-          console.error("📧 Email send failed:", e?.message);
+          console.error("[stripeWebhook] Email send failed:", e?.message || e);
         }
-
       }
 
       return res.sendStatus(200);
     } catch (err) {
-      console.error("⚠️ Webhook handler error:", err);
-      return res.sendStatus(200); // switch to 500 if you want Stripe to retry on failures
+      console.error("[stripeWebhook] Handler error:", err);
+      // Stripe should retry on 500s. Return 200 if you want to swallow the error instead.
+      return res.sendStatus(200);
     }
   });
 

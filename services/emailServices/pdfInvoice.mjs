@@ -1,7 +1,7 @@
 import puppeteer from "puppeteer";
-import path from "path";
-import fs from "fs/promises";
-import { fileURLToPath } from "url";
+import path from "node:path";
+import fs from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 
 /**
  * Create a styled PDF invoice from HTML and company logo (Ibogenics theme)
@@ -135,7 +135,7 @@ export async function createPdfInvoice(html, logoPath, outputPath = "./invoice.p
       </section>
 
       <footer>
-        © ${new Date().getFullYear()} Ibogenics Ltd — All rights reserved
+        &copy; ${new Date().getFullYear()} Ibogenics Ltd - All rights reserved
       </footer>
     </body>
   </html>`;
@@ -160,8 +160,9 @@ async function buildLogoSrc(logoPath) {
   if (/^https?:\/\//i.test(logoPath)) return logoPath;
 
   const candidatePaths = [];
-  if (path.isAbsolute(logoPath)) candidatePaths.push(logoPath);
-  else {
+  if (path.isAbsolute(logoPath)) {
+    candidatePaths.push(logoPath);
+  } else {
     candidatePaths.push(path.resolve(process.cwd(), logoPath));
     const moduleDir = path.dirname(fileURLToPath(import.meta.url));
     candidatePaths.push(path.resolve(moduleDir, logoPath));
@@ -172,7 +173,9 @@ async function buildLogoSrc(logoPath) {
       const fileBuffer = await fs.readFile(candidate);
       const mimeType = getMimeType(candidate);
       return `data:${mimeType};base64,${fileBuffer.toString("base64")}`;
-    } catch (_) {}
+    } catch {
+      // Ignore and try next candidate
+    }
   }
 
   console.warn(`[pdfInvoice] Logo not found at provided path: ${logoPath}`);
@@ -186,10 +189,15 @@ function getMimeType(filePath) {
   const ext = path.extname(filePath).toLowerCase();
   switch (ext) {
     case ".jpg":
-    case ".jpeg": return "image/jpeg";
-    case ".svg":  return "image/svg+xml";
-    case ".webp": return "image/webp";
-    case ".gif":  return "image/gif";
-    default:      return "image/png";
+    case ".jpeg":
+      return "image/jpeg";
+    case ".svg":
+      return "image/svg+xml";
+    case ".webp":
+      return "image/webp";
+    case ".gif":
+      return "image/gif";
+    default:
+      return "image/png";
   }
 }

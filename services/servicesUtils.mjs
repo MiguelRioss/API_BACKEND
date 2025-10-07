@@ -22,14 +22,14 @@ const STATUS_KEYS = [
 export async function validateAndNormalizeID(id) {
   if (id === null || typeof id === "undefined") {
     return Promise.reject(
-      errors.INVALID_DATA(`To create an Order you must provide a valid id, not ${id}`)
+      errors.invalidData(`To create an Order you must provide a valid id, not ${id}`)
     );
   }
 
   const s = normalizeId(id);
   if (s === "") {
     return Promise.reject(
-      errors.INVALID_DATA(`To create an Order you must provide a non-empty id`)
+      errors.invalidData(`To create an Order you must provide a non-empty id`)
     );
   }
 
@@ -194,7 +194,7 @@ export function applyLimit(orders = [], limit) {
 export async function validateAndPrepareOrder(order) {
   if (!order || typeof order !== "object" || Array.isArray(order)) {
     return Promise.reject(
-      errors.INVALID_DATA("You did not Introduce an Object for your new Order")
+      errors.invalidData("You did not Introduce an Object for your new Order")
     );
   }
 
@@ -202,43 +202,43 @@ export async function validateAndPrepareOrder(order) {
 
   if (typeof name !== "string" || name.trim() === "") {
     return Promise.reject(
-      errors.INVALID_DATA("You did not Introduce a valid name for your new Order")
+      errors.invalidData("You did not Introduce a valid name for your new Order")
     );
   }
 
   if (typeof email !== "string" || email.trim() === "") {
     return Promise.reject(
-      errors.INVALID_DATA("You did not Introduce a valid email for your new Order")
+      errors.invalidData("You did not Introduce a valid email for your new Order")
     );
   }
   const emailTrimmed = email.trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrimmed)) {
     return Promise.reject(
-      errors.INVALID_DATA("You did not Introduce a valid email for your new Order")
+      errors.invalidData("You did not Introduce a valid email for your new Order")
     );
   }
 
   if (!Array.isArray(items) || items.length === 0) {
     return Promise.reject(
-      errors.INVALID_DATA("You did not Introduce a valid array for items in your new Order")
+      errors.invalidData("You did not Introduce a valid array for items in your new Order")
     );
   }
 
   if (!Number.isInteger(amount_total) || amount_total < 0) {
     return Promise.reject(
-      errors.INVALID_DATA("You did not Introduce a valid amount_total in your new Order")
+      errors.invalidData("You did not Introduce a valid amount_total in your new Order")
     );
   }
 
   if (typeof currency !== "string" || currency.trim() === "") {
     return Promise.reject(
-      errors.INVALID_DATA("You did not Introduce a valid currency in your new Order")
+      errors.invalidData("You did not Introduce a valid currency in your new Order")
     );
   }
   const currencyNorm = currency.trim().toLowerCase();
   if (!allowedCurrencies.has(currencyNorm)) {
     return Promise.reject(
-      errors.INVALID_DATA("You did not Introduce a valid accepted currency in your new Order")
+      errors.invalidData("You did not Introduce a valid accepted currency in your new Order")
     );
   }
 
@@ -277,12 +277,12 @@ export async function validateAndPrepareOrder(order) {
  */
 export function updateOrderStatus(currentStatus, key, { status, date = null, time = null }) {
   if (!STATUS_KEYS.includes(key)) {
-    throw errors.INVALID_DATA(
+    throw errors.invalidData(
       `Unknown status step "${key}". Allowed: ${STATUS_KEYS.join(", ")}`
     );
   }
   if (typeof status !== "boolean") {
-    throw errors.INVALID_DATA("status must be boolean");
+    throw errors.invalidData("status must be boolean");
   }
   return {
     ...currentStatus,
@@ -313,7 +313,7 @@ function validateMetadata(metadata) {
   }
 
   if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
-    throw errors.INVALID_DATA("Order.metadata, if provided, must be an object.");
+    throw errors.invalidData("Order.metadata, if provided, must be an object.");
   }
 
   const coerceStr = (v) =>
@@ -348,23 +348,23 @@ function validateItemsArray(items, amount_total) {
   let computedTotal = 0;
   const normItems = items.map((it, idx) => {
     if (!it || typeof it !== "object") {
-      throw errors.INVALID_DATA(`Order.items[${idx}] must be an object.`);
+      throw errors.invalidData(`Order.items[${idx}] must be an object.`);
     }
 
     const { id, name, quantity, unit_amount } = it;
 
     // id is an integer (stock/product id)
     if (!Number.isInteger(id) || id < 0) {
-      throw errors.INVALID_DATA(`Order.items[${idx}].id must be a positive integer.`);
+      throw errors.invalidData(`Order.items[${idx}].id must be a positive integer.`);
     }
     if (typeof name !== "string" || name.trim() === "") {
-      throw errors.INVALID_DATA(`Order.items[${idx}].name must be a non-empty string.`);
+      throw errors.invalidData(`Order.items[${idx}].name must be a non-empty string.`);
     }
     if (!Number.isInteger(quantity) || quantity <= 0) {
-      throw errors.INVALID_DATA(`Order.items[${idx}].quantity must be a positive integer.`);
+      throw errors.invalidData(`Order.items[${idx}].quantity must be a positive integer.`);
     }
     if (!Number.isInteger(unit_amount) || unit_amount < 0) {
-      throw errors.INVALID_DATA(
+      throw errors.invalidData(
         `Order.items[${idx}].unit_amount must be a non-negative integer (e.g., cents).`
       );
     }
@@ -380,7 +380,7 @@ function validateItemsArray(items, amount_total) {
   });
 
   if (computedTotal !== amount_total) {
-    throw errors.INVALID_DATA(
+    throw errors.invalidData(
       `Order.amount_total (${amount_total}) does not match items total (${computedTotal}).`
     );
   }

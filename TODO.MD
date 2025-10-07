@@ -29,4 +29,9 @@ https://chatgpt.com/g/g-p-68a6e20ab0c88191958f694dcc5dc007-miguelstuff/c/68d3705
   * [X] ~~*Nos stock o id do produto tem de ser int*~~ [2025-10-03] 
 
 
+- [ ] See if there is a way of only putting the data in my web site
+  - [ ] Maybe when comming from the website it will full filled all that data and i dont have to put that info there
+    - [] If they want they can change biiling adress from the delivering addres with checkButton? 
+  - [ ] See if there is a way of sending a better looking email and the receipe will be on pdf 
+  - [ ]  Can i create a pdf For ibogenics template and then use pdf to create the invoice
 * [ ] THere should be no error with writed failed http violation

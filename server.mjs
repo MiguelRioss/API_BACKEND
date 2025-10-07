@@ -1,55 +1,152 @@
-﻿
+﻿// server.mjs (fully commented)
 
 import express from "express";
-import createOrdersService from "./services/orderServices.mjs";
+import "dotenv/config"; // Load environment variables ASAP
+
+// --- Services & APIs (domain/application layers)
 import { createDb } from "./database/databaseFactory.mjs";
-import createOrdersAPI from "./api/ordersAPI.mjs";
+
 import createCorsMiddleware from "./middleware/cors.mjs";
+
 import createStockServices from "./services/stockServices.mjs";
+import createOrdersService from "./services/orderServices.mjs";
+import createStripeServices from "./services/stripeServices.mjs";
+
 import createStocksAPI from "./api/stockAPI.mjs";
-import "dotenv/config";
-import checkoutRoutes from "./routes/checkoutSessions.mjs";
+import createOrdersAPI from "./api/ordersAPI.mjs";
+import createStripeAPI from "./api/stripeAPI.mjs";
+
+// --- Email (transport + service)
+import createEmailService from "./services/emailServices/emailService.mjs";
+import brevoTransport from "./services/emailServices/brevoTransports.mjs";
+
+// --- Stripe webhook router (must use raw body; mount before express.json())
 import stripeWebhook from "./stripe/webhook.mjs";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// -----------------------------------------------------------------------------
+// CORS
+// -----------------------------------------------------------------------------
 const corsMiddleware = createCorsMiddleware();
+// Apply CORS for all routes
 app.use(corsMiddleware);
+// Preflight for all routes
 app.options("*", corsMiddleware);
 
+// -----------------------------------------------------------------------------
+// Email Service (uses Brevo transport)
+// -----------------------------------------------------------------------------
+/**
+ * emailService abstracts the act of sending emails (e.g., invoices).
+ * brevoTransport is a provider-specific adapter (Brevo/SendingBlue).
+ * If you switch providers later, only swap this transport.
+ */
+const emailService = createEmailService({ transport: brevoTransport });
+
+// -----------------------------------------------------------------------------
+// Database & Domain Services
+// -----------------------------------------------------------------------------
+/**
+ * Create the database connection/driver based on env (e.g., memory, sqlite, pg).
+ * All lower layers (services) receive this db handle.
+ */
 const db = await createDb({ type: process.env.DB_TYPE });
 
-const stockService = createStockServices(db)
-const ordersService = createOrdersService(db,stockService);
+/**
+ * Domain services encapsulate business logic and data access:
+ * - stockService: products & stock operations
+ * - ordersService: order creation/retrieval/update
+ * - stripeServices: create checkout sessions, etc. (uses stockService)
+ */
+const stockService = createStockServices(db);
+const ordersService = createOrdersService(db);
 
-const stockApi = createStocksAPI(stockService)
+// NOTE: Ensure the factory signature matches your import:
+// If your factory is `createStripeServices({ stockServices })`, pass an object.
+// If it's positional `createStripeServices(stockService)`, keep as-is.
+const stripeServices = createStripeServices(stockService);
+
+// -----------------------------------------------------------------------------
+// API Layer (controllers)
+// -----------------------------------------------------------------------------
+/**
+ * Controllers turn HTTP requests into service calls and HTTP responses.
+ * They DO NOT directly touch the database; they call services.
+ */
+const stockApi = createStocksAPI(stockService);
 const ordersApi = createOrdersAPI(ordersService);
+const stripeAPi = createStripeAPI(stripeServices);
 
+// -----------------------------------------------------------------------------
+// Stripe Webhook
+// -----------------------------------------------------------------------------
+/**
+ * IMPORTANT ORDERING:
+ * 1) Mount the Stripe webhook BEFORE express.json() because it needs express.raw().
+ * 2) The router itself uses `express.raw({ type: "application/json" })`.
+ * 3) This endpoint is called by Stripe (server-to-server) after checkout completes.
+ */
+app.use("/api/stripe/webhook", stripeWebhook({ ordersService, emailService }));
 
-app.use("/api/stripe/webhook", stripeWebhook({ ordersService, stockService }));
-
+// -----------------------------------------------------------------------------
+// Global JSON Parser (for normal JSON API routes)
+// -----------------------------------------------------------------------------
+/**
+ * After the webhook, enable JSON parsing for all other routes.
+ * Do NOT put this before the webhook, or signature verification will fail.
+ */
 app.use(express.json());
 
-app.use("/api", checkoutRoutes({ordersService, stockService}));
-
+// -----------------------------------------------------------------------------
+// Orders API
+// -----------------------------------------------------------------------------
+/**
+ * Basic CRUD for orders (if your business logic allows).
+ * Typically, creation is handled by the webhook; but you expose endpoints
+ * for admin or system integrations if needed.
+ */
 app.get("/api/orders", ordersApi.getOrdersAPI);
 app.get("/api/orders/:id", ordersApi.getOrderByIdAPI);
 app.post("/api/orders", ordersApi.createOrderAPI);
 app.patch("/api/orders/:id", ordersApi.updateOrderAPI);
 
-
-//Stock
+// -----------------------------------------------------------------------------
+// Stock API
+// -----------------------------------------------------------------------------
+/**
+ * Endpoints to read/update stock levels.
+ * Adjust route protection as needed (e.g., admin auth middleware).
+ */
 app.get("/api/stock", stockApi.getStockAPI);
 app.patch("/api/stock/:id", stockApi.updateStockAPI);
 app.patch("/api/stock/:id/adjust", stockApi.adjustStockAPI);
 
-// Products
+// -----------------------------------------------------------------------------
+// Products API
+// -----------------------------------------------------------------------------
+/**
+ * Public product catalog endpoints used by your frontend and Stripe checkout session builder.
+ * - /api/products: list all products
+ * - /api/products/:id: get a single product by id
+ */
 app.get("/api/products", stockApi.getProductsAPI);
 app.get("/api/products/:id", stockApi.getProductByIdAPI);
 
+// -----------------------------------------------------------------------------
+// Stripe Checkout Session API
+// -----------------------------------------------------------------------------
+/**
+ * This route is called by your frontend to start a Stripe Checkout Session.
+ * The controller delegates to stripeServices.createCheckoutSession(),
+ * which validates items, builds line_items, and returns a Checkout URL.
+ */
+app.post("/api/checkout-sessions", stripeAPi.handleCheckoutSession);
 
-
+// -----------------------------------------------------------------------------
+// Server Boot
+// -----------------------------------------------------------------------------
 app.listen(PORT, () => {
   console.log(`Server listening on http://localhost:${PORT}`);
 });

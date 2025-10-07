@@ -1,4 +1,4 @@
-import {ERROR_CODES}  from "./errors.mjs"
+import ERROR_CODES from "./errors.mjs"
 
 
 function HttpError(status, obj) {

@@ -6,14 +6,14 @@ import { isObj, canonStatusKey, STATUS_KEYS } from "./firebase/utilsDB.mjs";
 
 /**
  * Ensure Firebase is initialized before any db operation.
- * Wraps init errors as EXTERNAL_SERVICE_ERROR.
+ * Wraps init errors as externalService.
  */
 function ensureInitDb() {
   try {
     initFirebase();
   } catch (err) {
     return Promise.reject(
-      errors.EXTERNAL_SERVICE_ERROR(`Firebase initialization failed: ${err?.message ?? err}`, {
+      errors.externalService(`Firebase initialization failed: ${err?.message ?? err}`, {
         original: err,
       })
     );
@@ -24,7 +24,7 @@ function ensureInitDb() {
  * Get all orders (RTDB or Firestore depending on env).
  *
  * @returns {Promise<Object[]>} Array of orders.
- * @rejects {EXTERNAL_SERVICE_ERROR} If DB call fails.
+ * @rejects {externalService} If DB call fails.
  */
 export async function getAllOrders() {
   const init = ensureInitDb();
@@ -38,7 +38,7 @@ export async function getAllOrders() {
       .then((snap) => snap.val() || {})
       .then((val) => Object.entries(val).map(([id, data]) => ({ id, ...data })))
       .catch((err) =>
-        Promise.reject(errors.EXTERNAL_SERVICE_ERROR("Failed to read orders from DB", { original: err }))
+        Promise.reject(errors.externalService("Failed to read orders from DB", { original: err }))
       );
   }
 
@@ -50,7 +50,7 @@ export async function getAllOrders() {
  *
  * @param {string} idStr - Normalized order ID.
  * @returns {Promise<Object>} The found order (with id property).
- * @rejects {NOT_FOUND} If order doesn't exist.
+ * @rejects {notFound} If order doesn't exist.
  */
 export async function getOrderById(idStr) {
   const init = ensureInitDb();
@@ -61,7 +61,7 @@ export async function getOrderById(idStr) {
     const snap = await db.ref(`/orders/${idStr}`).once("value");
     const val = snap.val();
     if (val === null || typeof val === "undefined") {
-      return Promise.reject(errors.NOT_FOUND(`Order ${idStr} not found`));
+      return Promise.reject(errors.notFound(`Order ${idStr} not found`));
     }
     return { id: idStr, ...val };
   }
@@ -87,7 +87,7 @@ export async function createOrderDB(orderData = {}) {
   try {
     if (!useRealtimeDB()) {
       return Promise.reject(
-        errors.EXTERNAL_SERVICE_ERROR("Firestore create not implemented yet")
+        errors.externalService("Firestore create not implemented yet")
       );
     }
 
@@ -126,7 +126,7 @@ export async function createOrderDB(orderData = {}) {
     }
 
     return Promise.reject(
-      errors.EXTERNAL_SERVICE_ERROR("Failed to write order to DB", { original: err })
+      errors.externalService("Failed to write order to DB", { original: err })
     );
   }
 }
@@ -141,8 +141,8 @@ export async function createOrderDB(orderData = {}) {
  * @param {string|number} id - Order ID
  * @param {Object} updatedOrder - Fully prepared order object
  * @returns {Promise<Object>} The updated order (with id included)
- * @rejects {NOT_FOUND} If the order doesn’t exist
- * @rejects {EXTERNAL_SERVICE_ERROR} On DB write failure
+ * @rejects {notFound} If the order doesn’t exist
+ * @rejects {externalService} On DB write failure
  */
 export async function updateOrderDB(id, updatedOrder) {
   ensureInitDb(); // throws or rejects if Firebase isn’t ready
@@ -150,7 +150,7 @@ export async function updateOrderDB(id, updatedOrder) {
 
   if (!useRealtimeDB()) {
     return Promise.reject(
-      errors.EXTERNAL_SERVICE_ERROR("Firestore update not implemented yet")
+      errors.externalService("Firestore update not implemented yet")
     );
   }
 
@@ -159,7 +159,7 @@ export async function updateOrderDB(id, updatedOrder) {
   const snap = await ref.once("value");
 
   if (!snap.exists()) {
-    return Promise.reject(errors.NOT_FOUND(`Order "${id}" not found`));
+    return Promise.reject(errors.notFound(`Order "${id}" not found`));
   }
 
   return ref
@@ -167,7 +167,7 @@ export async function updateOrderDB(id, updatedOrder) {
     .then(() => ({ id: id, ...updatedOrder }))
     .catch((err) =>
       Promise.reject(
-        errors.EXTERNAL_SERVICE_ERROR("Failed to update order in Firebase", {
+        errors.externalService("Failed to update order in Firebase", {
           original: err?.message ?? String(err),
         })
       )
@@ -180,7 +180,7 @@ export async function updateOrderDB(id, updatedOrder) {
  * Get all Stocks (RTDB depending on env).
  *
  * @returns {Promise<Object[]>} Array of Stocks Int.
- * @rejects {EXTERNAL_SERVICE_ERROR} If DB call fails.
+ * @rejects {externalService} If DB call fails.
  */
 export async function getStocks() {
   const init = ensureInitDb();
@@ -194,7 +194,7 @@ export async function getStocks() {
       .then((snap) => snap.val() || {})
       .then((val) => Object.entries(val).map(([id, data]) => ({ id: Number(id), name: data.name, stockValue: data.stockValue })))
       .catch((err) =>
-        Promise.reject(errors.EXTERNAL_SERVICE_ERROR("Failed to read orders from DB", { original: err }))
+        Promise.reject(errors.externalService("Failed to read orders from DB", { original: err }))
       );
   }
 
@@ -231,8 +231,8 @@ export async function getProducts() {
  * @param {string|number} id - Order ID
  * @param {Object} updatedOrder - Fully prepared order object
  * @returns {Promise<Object>} The updated order (with id included)
- * @rejects {NOT_FOUND} If the order doesn’t exist
- * @rejects {EXTERNAL_SERVICE_ERROR} On DB write failure
+ * @rejects {notFound} If the order doesn’t exist
+ * @rejects {externalService} On DB write failure
  */
 export async function updateStock(id, updatedStock) {
   ensureInitDb(); // throws or rejects if Firebase isn’t ready
@@ -240,7 +240,7 @@ export async function updateStock(id, updatedStock) {
 
   if (!useRealtimeDB()) {
     return Promise.reject(
-      errors.EXTERNAL_SERVICE_ERROR("Firestore update not implemented yet")
+      errors.externalService("Firestore update not implemented yet")
     );
   }
 
@@ -249,7 +249,7 @@ export async function updateStock(id, updatedStock) {
   const snap = await ref.once("value");
 
   if (!snap.exists()) {
-    return Promise.reject(errors.NOT_FOUND(`Order "${id}" not found`));
+    return Promise.reject(errors.notFound(`Order "${id}" not found`));
   }
 
   return ref
@@ -257,7 +257,7 @@ export async function updateStock(id, updatedStock) {
     .then(() => ({ id: id, ...updatedStock }))
     .catch((err) =>
       Promise.reject(
-        errors.EXTERNAL_SERVICE_ERROR("Failed to update order in Firebase", {
+        errors.externalService("Failed to update order in Firebase", {
           original: err?.message ?? String(err),
         })
       )
@@ -269,7 +269,7 @@ export async function updateStock(id, updatedStock) {
  *
  * @param {string} idStr - Normalized order ID.
  * @returns {Promise<Object>} The found order.
- * @rejects {NOT_FOUND} If order doesn’t exist.
+ * @rejects {notFound} If order doesn’t exist.
  */
 export async function getStockByID(idStr) {
   const init = ensureInitDb();
@@ -284,7 +284,7 @@ export async function getStockByID(idStr) {
     const val = snap.val();
 
     if (val === null || typeof val === "undefined") {
-      return Promise.reject(errors.NOT_FOUND(`Stock ${id} not found`));
+      return Promise.reject(errors.notFound(`Stock ${id} not found`));
     }
 
     return { id, ...val };
@@ -310,7 +310,7 @@ export async function findStockAndDecrement(stockSnapshot, orderData) {
     const stockId = Number(item.id);
     const qty = Number(item.quantity);
     const found = stockSnapshot.find(s => Number(s.id) === stockId);
-    if (!found) throw new Error(`STOCK_NOT_FOUND:${stockId}`);
+    if (!found) throw new Error(`STOCK_notFound:${stockId}`);
 
     const newVal = Number(found.stockValue) - qty;
     if (!Number.isFinite(newVal) || newVal < 0) throw new Error(`INSUFFICIENT_STOCK:${stockId}`);
@@ -335,7 +335,7 @@ export async function findStockAndDecrement(stockSnapshot, orderData) {
 // database/firebaseDB.mjs
 export async function updateStockValue(id, stockValue) {
   ensureInitDb();
-  if (!useRealtimeDB()) throw errors.EXTERNAL_SERVICE_ERROR("Firestore update not implemented yet");
+  if (!useRealtimeDB()) throw errors.externalService("Firestore update not implemented yet");
 
   const db = getRealtimeDB();
   // PATCH the field (preserves all other product fields)

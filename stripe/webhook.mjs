@@ -1,17 +1,21 @@
 ﻿// stripe/webhook.mjs
 import express from "express";
 import Stripe from "stripe";
+import {
+  normalizeLineItems,
+  normalizeLineItemsWithCatalog,
+  buildOrderPayload,
+} from "./webHookutils.mjs";
 
-// stripe/webhook.mjs
-import { buildOrderPayload, normalizeLineItems /* or normalizeLineItemsWithCatalog */ } from "./webHookutils.mjs";
-
-export default function stripeWebhook({ ordersService, emailService }) {
+// Inject stockService so we can do catalog fallback locally
+export default function stripeWebhook({ ordersService, emailService, stockService }) {
   if (!process.env.STRIPE_SECRET_KEY) throw new Error("Missing STRIPE_SECRET_KEY");
   if (!process.env.STRIPE_WEBHOOK_SECRET) throw new Error("Missing STRIPE_WEBHOOK_SECRET");
 
   const router = express.Router();
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
   const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  const debug = process.env.NODE_ENV !== "production";
 
   router.post("/", express.raw({ type: "application/json" }), async (req, res) => {
     let event;
@@ -23,38 +27,65 @@ export default function stripeWebhook({ ordersService, emailService }) {
       return res.status(400).send(`Webhook Error: ${err.message}`);
     }
 
-    const debug = process.env.NODE_ENV !== "production";
     if (debug) console.log("🔔 Stripe event:", { type: event.type, id: event.id, live: event.livemode });
 
     try {
       if (event.type === "checkout.session.completed") {
         const session = event.data.object;
 
-        // Retrieve line items
-        // ...
+        // 1) Fetch line items with expansions so metadata/product name are available
         const { data: lineItems } = await stripe.checkout.sessions.listLineItems(session.id, {
           limit: 100,
           expand: ["data.price", "data.price.product"],
         });
 
-        // If you want the strict version (requires metadata.productId present):
-        const items = normalizeLineItems(lineItems);
+        if (debug) {
+          console.log("🛒 Line item meta preview:");
+          console.dir(
+            lineItems.map(li => ({
+              li: li.id,
+              desc: li.description,
+              priceId: li.price?.id,
+              prodId: li.price?.product?.id,
+              prodMeta: li.price?.product?.metadata,
+              priceMeta: li.price?.metadata,
+            })),
+            { depth: null }
+          );
+        }
 
+        // 2) Strict normalization first (requires productId metadata)
+        let items = normalizeLineItems(lineItems);
 
-        // Build order payload for your DB
+        // 3) If any item.id is missing/invalid, try name-based fallback with local catalog
+        const anyMissing = items.some(it =>
+          it.id === "" || it.id === "undefined" || Number.isNaN(it.id)
+        );
+        if (anyMissing) {
+          if (debug) console.log("ℹ️ Missing productId metadata; attempting catalog fallback…");
+          try {
+            // stockService should expose your local catalog
+            const catalog = await stockService.getAllProducts();
+            items = normalizeLineItemsWithCatalog(lineItems, catalog);
+          } catch (e) {
+            console.warn("⚠️ Could not load catalog for fallback:", e?.message || e);
+          }
+        }
+
+        // 4) Build order payload for your DB
         const orderPayload = buildOrderPayload({ session, items });
 
-        // Idempotency guard
+        // 5) Idempotency guard
         if (ordersService.getOrderByStripeSessionId) {
           const exists = await ordersService.getOrderByStripeSessionId(session.id);
           if (exists) return res.sendStatus(200);
         }
 
-        // Persist
+        // 6) Persist
         const saved = await ordersService.createOrderServices(orderPayload);
         if (debug) console.log("✅ Order created:", { id: saved?.id });
 
-        // Delegate email to the emailService
+        // 7) Email (don’t fail webhook on email errors)
         try {
           await emailService.sendOrderInvoiceEmail({
             order: orderPayload,
@@ -64,14 +95,13 @@ export default function stripeWebhook({ ordersService, emailService }) {
           if (debug) console.log("📧 Invoice email sent");
         } catch (e) {
           console.error("📧 Email send failed:", e?.message);
-          // Don’t fail the webhook on email issues
         }
       }
 
       return res.sendStatus(200);
     } catch (err) {
       console.error("⚠️ Webhook handler error:", err);
-      return res.sendStatus(200);
+      return res.sendStatus(200); // switch to 500 if you want Stripe to retry on failures
     }
   });
 

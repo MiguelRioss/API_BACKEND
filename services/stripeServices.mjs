@@ -40,7 +40,7 @@ export default function createStripeServices(stockServices) {
             items,         // [{ id, qty }, ...]
             byId,          // Map<string, product>
             currency: "eur",
-            errorFactory: (msg) => errors.BAD_REQUEST(msg), // optional
+            errorFactory: (msg) => errors.bad(msg), // optional
         });
         const url = await createUrlCheckoutSession({
             stripe,

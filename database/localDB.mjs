@@ -52,7 +52,7 @@ function writeFileAtomic(file, obj) {
     fs.renameSync(tmp, file);
   } catch (err) {
     console.error("[localDB] write error:", err?.message ?? err);
-    throw errors.EXTERNAL_SERVICE_ERROR("Failed to write database file", {
+    throw errors.externalService("Failed to write database file", {
       original: err?.message ?? String(err),
     });
   }
@@ -82,7 +82,7 @@ export async function getAllOrders() {
  * @async
  * @param {string|number} id - Order identifier.
  * @returns {Promise<Object>} The found order.
- * @rejects {ApplicationError} NOT_FOUND if missing.
+ * @rejects {ApplicationError} notFound if missing.
  */
 export async function getOrderById(id) {
   const map = readFileSafe(DB_FILE) || {};
@@ -91,7 +91,7 @@ export async function getOrderById(id) {
 
   const order = bucket[key];
   if (order == null) {
-    return Promise.reject(errors.NOT_FOUND(`Order with ID: ${key} not found`));
+    return Promise.reject(errors.notFound(`Order with ID: ${key} not found`));
   }
   return order;
 }
@@ -102,11 +102,11 @@ export async function getOrderById(id) {
  * @async
  * @param {Object} orderObject - Validated order object.
  * @returns {Promise<Object>} Stored order object.
- * @rejects {ApplicationError} INVALID_DATA if input is not an object.
+ * @rejects {ApplicationError} invalidData if input is not an object.
  */
 export async function createOrderDB(orderObject) {
   if (typeof orderObject !== "object" || orderObject === null) {
-    return Promise.reject(errors.INVALID_DATA("createOrderDB expects a valid order object"));
+    return Promise.reject(errors.invalidData("createOrderDB expects a valid order object"));
   }
   const map = readFileSafe(DB_FILE);
   map[orderObject.id] = orderObject;
@@ -123,7 +123,7 @@ const isPlainObject = (v) => v && typeof v === "object" && !Array.isArray(v);
  * @param {string|number} id - Order ID.
  * @param {Object} updatedOrder - Validated, merged order object.
  * @returns {Promise<Object>} The updated order with id.
- * @rejects {ApplicationError} NOT_FOUND if the order doesn’t exist.
+ * @rejects {ApplicationError} notFound if the order doesn’t exist.
  */
 export async function updateOrderDB(id, updatedOrder) {
   const map = readFileSafe(DB_FILE) || {};
@@ -131,7 +131,7 @@ export async function updateOrderDB(id, updatedOrder) {
   const key = String(id);
 
   if (!bucket[key]) {
-    return Promise.reject(errors.NOT_FOUND(`Order with ID: ${key} not found`));
+    return Promise.reject(errors.notFound(`Order with ID: ${key} not found`));
   }
 
   bucket[key] = updatedOrder;

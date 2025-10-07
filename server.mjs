@@ -88,8 +88,7 @@ const stripeAPi = createStripeAPI(stripeServices);
  * 2) The router itself uses `express.raw({ type: "application/json" })`.
  * 3) This endpoint is called by Stripe (server-to-server) after checkout completes.
  */
-app.use("/api/stripe/webhook", stripeWebhook({ ordersService, emailService }));
-
+app.use("/api/stripe/webhook", stripeWebhook({ ordersService, emailService, stockService }));
 // -----------------------------------------------------------------------------
 // Global JSON Parser (for normal JSON API routes)
 // -----------------------------------------------------------------------------

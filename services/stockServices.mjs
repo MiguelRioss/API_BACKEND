@@ -34,7 +34,7 @@ export default function createStockServices(db) {
       return p.id === id}));
 
     if (!product) {
-      return errors.NOT_FOUND(`Product ${id} not found`);
+      return errors.notFound(`Product ${id} not found`);
     }
 
     const stockValue = product.stockValue ?? 0;
@@ -66,11 +66,11 @@ export default function createStockServices(db) {
 
   async function adjustStock(stockID, delta = 0) {
     const id = String(stockID || '').trim();
-    if (!id) return errors.INVALID_DATA("Not a valid Id");
+    if (!id) return errors.invalidData("Not a valid Id");
 
     const n = Number(delta);
     if (isNaN(n) || n === 0) {
-      return errors.INVALID_DATA("Delta must be a non-zero number");
+      return errors.invalidData("Delta must be a non-zero number");
     }
 
     const target = await db.getStockByID(id);
@@ -78,7 +78,7 @@ export default function createStockServices(db) {
     const next = current + n;
 
     if (next < 0) {
-      return errors.INVALID_DATA(`Not enough stock for ${id}`);
+      return errors.invalidData(`Not enough stock for ${id}`);
     }
 
     const updated = { ...target, stockValue: next, updatedAt: new Date().toISOString() };

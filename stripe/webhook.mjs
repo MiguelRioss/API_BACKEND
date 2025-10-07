@@ -3,7 +3,7 @@ import express from "express";
 import Stripe from "stripe";
 
 // stripe/webhook.mjs
-import { buildOrderPayload, normalizeLineItems /* or normalizeLineItemsWithCatalog */ } from "../utils/stripe/normalizeLineItems.mjs";
+import { buildOrderPayload, normalizeLineItems /* or normalizeLineItemsWithCatalog */ } from "./webHookutils.mjs";
 
 export default function stripeWebhook({ ordersService, emailService }) {
   if (!process.env.STRIPE_SECRET_KEY) throw new Error("Missing STRIPE_SECRET_KEY");

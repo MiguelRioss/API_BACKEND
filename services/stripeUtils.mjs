@@ -25,9 +25,9 @@ export async function createUrlCheckoutSession({
     cancelUrl = `${process.env.PUBLIC_BASE_URL}/#/checkout/cancel`,
     billingSameAsShipping = false,
 }) {
-    if (!stripe) throw new Error("Stripe client is required");
+    if (!stripe) return new Error("Stripe client is required");
     if (!Array.isArray(line_items) || line_items.length === 0) {
-        throw new Error("line_items must be a non-empty array");
+        return new Error("line_items must be a non-empty array");
     }
 
     const session = await stripe.checkout.sessions.create({
@@ -68,7 +68,7 @@ export async function createUrlCheckoutSession({
         },
     });
 
-    if (!session?.url) throw new Error("Stripe session created without URL");
+    if (!session?.url) return new Error("Stripe session created without URL");
     return session.url;
 }
 
@@ -94,10 +94,10 @@ export function buildStripeLineItems({
     const err = (msg) => (errorFactory ? errorFactory(msg) : new Error(msg));
 
     if (!Array.isArray(items) || items.length === 0) {
-        throw err("No items in payload");
+        return err("No items in payload");
     }
     if (!(byId instanceof Map)) {
-        throw err("byId must be a Map(productId -> product)");
+        return err("byId must be a Map(productId -> product)");
     }
 
     const line_items = [];
@@ -105,22 +105,22 @@ export function buildStripeLineItems({
     for (const { id, qty } of items) {
         const key = String(id);
         const product = byId.get(key);
-        if (!product) throw err(`Product not found for id ${id}`);
+        if (!product) return err(`Product not found for id ${id}`);
 
         const price = Number(product.priceInEuros);
         if (!Number.isFinite(price) || price <= 0) {
-            throw err(`Invalid price for product ${id}`);
+            return err(`Invalid price for product ${id}`);
         }
 
         const quantity = Math.max(1, Number(qty) || 1);
 
         // Stock guards (optional but recommended)
         if (product.soldOut) {
-            throw err(`${product.name || product.title} is sold out`);
+            return err(`${product.name || product.title} is sold out`);
         }
         const stockValueNum = Number(product.stockValue);
         if (Number.isFinite(stockValueNum) && stockValueNum < quantity) {
-            throw err(`Not enough stock for ${product.name || product.title}`);
+            return err(`Not enough stock for ${product.name || product.title}`);
         }
 
         const unit_amount = Math.round(price * 100); // euros -> cents

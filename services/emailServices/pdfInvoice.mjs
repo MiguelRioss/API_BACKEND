@@ -1,4 +1,6 @@
-import puppeteer from "puppeteer";
+import puppeteer from "puppeteer-core";
+import chromium from "@sparticuz/chromium";
+
 import path from "node:path";
 import fs from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -11,7 +13,13 @@ import { fileURLToPath } from "node:url";
  * @returns {Promise<string>} - absolute path to generated PDF
  */
 export async function createPdfInvoice(html, logoPath, outputPath = "./invoice.pdf") {
-  const browser = await puppeteer.launch({ headless: true });
+  const browser = await puppeteer.launch({
+    args: chromium.args,
+    defaultViewport: chromium.defaultViewport,
+    executablePath: await chromium.executablePath(),
+    headless: chromium.headless,
+  });
+
   const page = await browser.newPage();
   const logoSrc = await buildLogoSrc(logoPath);
 

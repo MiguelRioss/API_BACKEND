@@ -83,6 +83,7 @@ export default function createOrdersService(db) {
    * @rejects {ExternalServiceError} If the DB call fails.
    */
   async function createOrderServices(order) {
+    console.log("[ordersService] Creating order:", order);
     const prepared = await validateAndPrepareOrder(order); // ← await needed here
     return db.createOrderDB(prepared);
   }

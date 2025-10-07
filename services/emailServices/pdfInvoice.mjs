@@ -66,6 +66,31 @@ export async function createPdfInvoice(html, logoPath, outputPath = "./invoice.p
           line-height: 1.75;
         }
 
+        .addresses {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 24px;
+          margin-top: 18px;
+        }
+
+        .address-block {
+          flex: 1 1 220px;
+          min-width: 220px;
+        }
+
+        .address-block h3 {
+          margin: 0 0 6px;
+          font-size: 13px;
+          letter-spacing: 0.05em;
+          text-transform: uppercase;
+          color: #555;
+        }
+
+        .address-block p {
+          margin: 0;
+          line-height: 1.6;
+        }
+
         .details p {
           margin: 6px 0;
         }

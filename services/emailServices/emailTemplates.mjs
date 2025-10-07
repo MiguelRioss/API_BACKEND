@@ -46,19 +46,25 @@ function formatDate(date = new Date()) {
 export function buildOrderInvoiceHtml({ order = {}, orderId } = {}) {
   const items = Array.isArray(order.items) ? order.items : [];
   const currency = String(order.currency || fallbackCurrency).toUpperCase();
-  const customerName = escapeHtml(order.name || "Customer");
-  const address = order?.metadata?.address || {};
-  const addressLines = [
-    address.line1,
-    address.line2,
-    `${address.postal_code || ""} ${address.city || ""}`.trim(),
-    address.country,
-  ]
-    .map((line) => escapeHtml(line || ""))
-    .filter(Boolean)
-    .join("<br/>");
-
   const invoiceNumber = escapeHtml(orderId ? `#${orderId}` : "");
+
+  const shippingAddress = coalesceAddress(
+    order?.metadata?.shipping_address,
+    order?.shipping_address
+  );
+  const billingAddress = coalesceAddress(
+    order?.metadata?.billing_address,
+    order?.billing_address
+  );
+  const legacyAddress = coalesceAddress(order?.metadata?.address);
+
+  const addressBlocks = buildAddressBlocks({
+    shipping: shippingAddress,
+    billing: billingAddress,
+    fallback: legacyAddress,
+    customerName: order?.name,
+    billingSameFlag: order?.metadata?.billing_same_as_shipping,
+  });
 
   const itemsMarkup = items.length
     ? items
@@ -85,7 +91,7 @@ export function buildOrderInvoiceHtml({ order = {}, orderId } = {}) {
     <section class="details">
       <h2>Invoice ${invoiceNumber}</h2>
       <p><strong>Date:</strong> ${formatDate()}</p>
-      <p><strong>Billed to:</strong><br/>${customerName}${addressLines ? `<br/>${addressLines}` : ""}</p>
+      ${addressBlocks}
     </section>
 
     <ul class="line-items">
@@ -132,3 +138,169 @@ export default {
   buildOrderInvoiceHtml,
   buildThankYouEmailHtml,
 };
+
+function buildAddressBlocks({ shipping, billing, fallback, customerName, billingSameFlag }) {
+  const shippingHas = hasAddress(shipping);
+  const billingHas = hasAddress(billing);
+  const fallbackHas = hasAddress(fallback);
+  const billingSame = normalizeBoolean(billingSameFlag);
+
+  const sections = [];
+
+  if (shippingHas && billingHas) {
+    const treatAsSame = billingSame || addressesEqual(shipping, billing);
+    if (treatAsSame) {
+      sections.push({
+        label: "Billing & Shipping",
+        address: withFallbackName(shipping, customerName),
+      });
+    } else {
+      sections.push({
+        label: "Shipping address",
+        address: withFallbackName(shipping, customerName),
+      });
+      sections.push({
+        label: "Billing address",
+        address: withFallbackName(billing, customerName),
+      });
+    }
+  } else if (shippingHas) {
+    sections.push({
+      label: "Shipping address",
+      address: withFallbackName(shipping, customerName),
+    });
+    if (fallbackHas && !addressesEqual(shipping, fallback)) {
+      sections.push({
+        label: "Billing address",
+        address: withFallbackName(fallback, customerName),
+      });
+    }
+  } else if (billingHas) {
+    sections.push({
+      label: "Billing address",
+      address: withFallbackName(billing, customerName),
+    });
+  } else if (fallbackHas) {
+    sections.push({
+      label: "Billing address",
+      address: withFallbackName(fallback, customerName),
+    });
+  } else {
+    const safeName = escapeHtml(customerName || "Customer");
+    sections.push({
+      label: "Billing contact",
+      address: { lines: [safeName] },
+    });
+  }
+
+  const blocks = sections
+    .map(({ label, address }) => renderAddressBlock(label, address))
+    .join("");
+
+  return `<div class="addresses">${blocks}</div>`;
+}
+
+function renderAddressBlock(label, address = {}) {
+  const safeLabel = escapeHtml(label);
+  const lines = Array.isArray(address.lines) ? address.lines : buildAddressLines(address);
+
+  const lineMarkup = lines.join("<br/>");
+
+  return `
+    <div class="address-block">
+      <h3>${safeLabel}</h3>
+      <p>${lineMarkup}</p>
+    </div>
+  `;
+}
+
+function buildAddressLines(address = {}) {
+  const lines = [];
+  const name = escapeHtml(address.name || "");
+  if (name) lines.push(`<strong>${name}</strong>`);
+
+  if (address.company) {
+    lines.push(escapeHtml(address.company));
+  }
+
+  if (address.line1) lines.push(escapeHtml(address.line1));
+  if (address.line2) lines.push(escapeHtml(address.line2));
+
+  const cityParts = [];
+  if (address.postal_code) cityParts.push(escapeHtml(address.postal_code));
+  if (address.city) cityParts.push(escapeHtml(address.city));
+  if (cityParts.length) lines.push(cityParts.join(" "));
+
+  if (address.state) lines.push(escapeHtml(address.state));
+  if (address.country) lines.push(escapeHtml(address.country));
+
+  if (address.phone) {
+    lines.push(`<span style="color:#666;">Phone: ${escapeHtml(address.phone)}</span>`);
+  }
+
+  return lines.length ? lines : [escapeHtml(address.fallback || "")];
+}
+
+function hasAddress(address) {
+  if (!address) return false;
+  const keys = ["line1", "line2", "city", "state", "postal_code", "country"];
+  return keys.some((key) => {
+    const value = address[key];
+    return value != null && String(value).trim() !== "";
+  });
+}
+
+function addressesEqual(a = {}, b = {}) {
+  const keys = ["name", "line1", "line2", "city", "state", "postal_code", "country", "phone"];
+  return keys.every((key) => normalizeString(a[key]) === normalizeString(b[key]));
+}
+
+function withFallbackName(address = {}, fallbackName = "") {
+  const clone = { ...(address || {}) };
+  if (!clone.name && fallbackName) clone.name = normalizeString(fallbackName);
+  return clone;
+}
+
+function coalesceAddress(...candidates) {
+  for (const candidate of candidates) {
+    if (candidate && typeof candidate === "object") {
+      return {
+        name: normalizeString(candidate.name),
+        company: normalizeString(candidate.company),
+        line1: normalizeString(candidate.line1),
+        line2: normalizeString(candidate.line2),
+        city: normalizeString(candidate.city),
+        state: normalizeString(candidate.state),
+        postal_code: normalizeString(candidate.postal_code),
+        country: normalizeString(candidate.country),
+        phone: normalizeString(candidate.phone),
+      };
+    }
+  }
+  return {
+    name: "",
+    company: "",
+    line1: "",
+    line2: "",
+    city: "",
+    state: "",
+    postal_code: "",
+    country: "",
+    phone: "",
+  };
+}
+
+function normalizeString(value) {
+  if (value == null) return "";
+  return String(value).trim();
+}
+
+function normalizeBoolean(value) {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value === 1;
+  if (typeof value === "string") {
+    const lower = value.trim().toLowerCase();
+    return lower === "true" || lower === "1" || lower === "yes";
+  }
+  return false;
+}

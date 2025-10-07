@@ -92,16 +92,44 @@
     /**
      * Build your internal order payload from a Stripe Checkout Session + normalized items.
      */
-    export function buildOrderPayload({ session, items }) {
-        const shipping = session?.shipping_details?.address || {};
-        const billing = session?.customer_details?.address || {};
+export function buildOrderPayload({ session, items }) {
         const meta = session?.metadata || {};
 
-        const pick = (a, b, c, fallback = "") => a ?? b ?? c ?? fallback;
+        const shippingDetails = session?.shipping_details || {};
+        const billingDetails = session?.customer_details || {};
+
+        const shippingAddress = normalizeAddress([
+            pickAddressFields(shippingDetails),
+            buildMetaAddress(meta, "ship"),
+            buildMetaAddress(meta, "addr"),
+        ]);
+
+        const billingAddress = normalizeAddress([
+            pickAddressFields(billingDetails),
+            buildMetaAddress(meta, "bill"),
+            buildMetaAddress(meta, "addr"),
+        ]);
+
+        const contactPhone = pickFirst([
+            billingDetails?.phone,
+            shippingDetails?.phone,
+            meta?.phone,
+        ]);
+
+        const legacyAddress =
+            hasAddress(shippingAddress) ? shippingAddress :
+            hasAddress(billingAddress) ? billingAddress :
+            buildMetaAddress(meta, "addr");
 
         return {
-            name: pick(session?.customer_details?.name, meta?.full_name, ""),
-            email: pick(session?.customer_details?.email, session?.customer_email, ""),
+            name: pickFirst([
+                billingDetails?.name,
+                meta?.full_name,
+            ]),
+            email: pickFirst([
+                billingDetails?.email,
+                session?.customer_email,
+            ]),
             amount_total: Number(session?.amount_total) || 0, // cents
             currency: String(session?.currency || "").toLowerCase(),
             items: Array.isArray(items) ? items : [],
@@ -110,16 +138,118 @@
                 stripe_session_id: session?.id || "",
                 client_reference_id: session?.client_reference_id || "",
                 payment_status: session?.payment_status || "",
-                phone: pick(session?.customer_details?.phone, meta?.phone, ""),
+                phone: contactPhone,
                 notes: meta?.notes || "",
-                address: {
-                    // Prefer shipping, then billing, then your pre-checkout metadata
-                    line1: pick(shipping.line1, billing.line1, meta?.addr_line1, ""),
-                    line2: pick(shipping.line2, billing.line2, meta?.addr_line2, ""),
-                    city: pick(shipping.city, billing.city, meta?.addr_city, ""),
-                    postal_code: pick(shipping.postal_code, billing.postal_code, meta?.addr_postal, ""),
-                    country: pick(shipping.country, billing.country, meta?.addr_country, ""),
-                },
+                billing_same_as_shipping: toBoolean(meta?.billing_same_as_shipping),
+                shipping_address: shippingAddress,
+                billing_address: billingAddress,
+                address: normalizeAddress([legacyAddress]),
             },
         };
+    }
+
+function pickAddressFields(details = {}) {
+        const addr = details?.address || details;
+        return {
+            name: details?.name ?? addr?.name ?? "",
+            line1: addr?.line1 ?? "",
+            line2: addr?.line2 ?? "",
+            city: addr?.city ?? "",
+            state: addr?.state ?? addr?.province ?? addr?.region ?? "",
+            postal_code: addr?.postal_code ?? addr?.postalCode ?? "",
+            country: addr?.country ?? "",
+            phone: details?.phone ?? addr?.phone ?? "",
+        };
+    }
+
+function buildMetaAddress(meta = {}, prefix = "") {
+        const normalizeKey = (key) => key ? String(key).trim() : "";
+        const p = prefix ? `${prefix}_` : "";
+        return {
+            name: normalizeKey(meta[`${p}name`]),
+            line1: normalizeKey(meta[`${p}line1`]),
+            line2: normalizeKey(meta[`${p}line2`]),
+            city: normalizeKey(meta[`${p}city`]),
+            state: normalizeKey(meta[`${p}state`]),
+            postal_code: normalizeKey(meta[`${p}postal`]) || normalizeKey(meta[`${p}postal_code`]),
+            country: normalizeKey(meta[`${p}country`]),
+            phone: normalizeKey(meta[`${p}phone`]),
+        };
+    }
+
+function emptyAddress() {
+        return {
+            name: "",
+            line1: "",
+            line2: "",
+            city: "",
+            state: "",
+            postal_code: "",
+            country: "",
+            phone: "",
+        };
+    }
+
+function normalizeAddress(candidates = []) {
+        const result = emptyAddress();
+        for (const candidate of candidates) {
+            if (!candidate) continue;
+
+            const source = candidate.address ? pickAddressFields(candidate) : candidate;
+
+            mergeAddress(result, source);
+        }
+        return result;
+    }
+
+function mergeAddress(target, source = {}) {
+        if (!target || !source) return;
+
+        const map = {
+            name: ["name"],
+            line1: ["line1"],
+            line2: ["line2"],
+            city: ["city"],
+            state: ["state", "province", "region"],
+            postal_code: ["postal_code", "postalCode", "zip"],
+            country: ["country"],
+            phone: ["phone"],
+        };
+
+        for (const [key, aliases] of Object.entries(map)) {
+            if (target[key]) continue;
+
+            for (const alias of aliases) {
+                const value = source?.[alias];
+                if (value != null && String(value).trim() !== "") {
+                    target[key] = String(value).trim();
+                    break;
+                }
+            }
+        }
+    }
+
+function hasAddress(address) {
+        if (!address) return false;
+        return ["line1", "line2", "city", "state", "postal_code", "country"].some((key) => {
+            const value = address[key];
+            return value != null && String(value).trim() !== "";
+        });
+    }
+
+function pickFirst(values = [], fallback = "") {
+        for (const value of values) {
+            if (value != null && String(value).trim() !== "") {
+                return String(value).trim();
+            }
+        }
+        return fallback;
+    }
+
+function toBoolean(value) {
+        if (typeof value === "boolean") return value;
+        if (typeof value === "string") {
+            return value.toLowerCase() === "true" || value === "1";
+        }
+        return false;
     }

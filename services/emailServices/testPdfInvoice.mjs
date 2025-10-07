@@ -9,13 +9,29 @@ const order = {
   amount_total: 12900,
   currency: "eur",
   metadata: {
+    billing_same_as_shipping: false,
+    phone: "+351912345678",
+    shipping_address: {
+      name: "Jane Doe",
+      line1: "Rua das Flores 10",
+      city: "Lisboa",
+      postal_code: "1100-001",
+      country: "Portugal",
+      phone: "+351912345678",
+    },
+    billing_address: {
+      name: "Jane Doe",
+      line1: "Rua das Limeiras 22",
+      city: "Porto",
+      postal_code: "4000-100",
+      country: "Portugal",
+    },
     address: {
       line1: "Rua das Flores 10",
       city: "Lisboa",
       postal_code: "1100-001",
       country: "Portugal",
     },
-    phone: "+351912345678",
   },
   items: [
     { name: "Ibogenics Tincture TA", quantity: 1, unit_amount: 8900 },

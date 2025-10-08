@@ -2,8 +2,7 @@ import puppeteer from "puppeteer-core";
 import chromium from "@sparticuz/chromium";
 
 import path from "node:path";
-import fs from "node:fs/promises";
-import { fileURLToPath } from "node:url";
+import { buildLogoSrc } from "./utils.mjs";
 
 /**
  * Create a styled PDF invoice from HTML and company logo (Ibogenics theme)
@@ -185,35 +184,6 @@ export async function createPdfInvoice(html, logoPath, outputPath = "./invoice.p
   return path.resolve(outputPath);
 }
 
-/**
- * Converts logo path into a usable data URI or remote URL
- */
-async function buildLogoSrc(logoPath) {
-  if (!logoPath) return "";
-  if (/^https?:\/\//i.test(logoPath)) return logoPath;
-
-  const candidatePaths = [];
-  if (path.isAbsolute(logoPath)) {
-    candidatePaths.push(logoPath);
-  } else {
-    candidatePaths.push(path.resolve(process.cwd(), logoPath));
-    const moduleDir = path.dirname(fileURLToPath(import.meta.url));
-    candidatePaths.push(path.resolve(moduleDir, logoPath));
-  }
-
-  for (const candidate of candidatePaths) {
-    try {
-      const fileBuffer = await fs.readFile(candidate);
-      const mimeType = getMimeType(candidate);
-      return `data:${mimeType};base64,${fileBuffer.toString("base64")}`;
-    } catch {
-      // Ignore and try next candidate
-    }
-  }
-
-  console.warn(`[pdfInvoice] Logo not found at provided path: ${logoPath}`);
-  return "";
-}
 
 /**
  * Detect MIME type from file extension

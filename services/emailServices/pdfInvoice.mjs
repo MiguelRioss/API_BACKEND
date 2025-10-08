@@ -4,6 +4,8 @@ import chromium from "@sparticuz/chromium";
 import path from "node:path";
 import { buildLogoSrc } from "./utils.mjs";
 
+const DEFAULT_INVOICE_LOGO_PATH = process.env.INVOICE_LOGO_PATH || "./assets/logo.png";
+
 /**
  * Create a styled PDF invoice from HTML and company logo (Ibogenics theme)
  * @param {string} html - main invoice HTML from buildOrderInvoiceHtml()
@@ -11,7 +13,11 @@ import { buildLogoSrc } from "./utils.mjs";
  * @param {string} [outputPath="./invoice.pdf"]
  * @returns {Promise<string>} - absolute path to generated PDF
  */
-export async function createPdfInvoice(html, logoPath, outputPath = "./invoice.pdf") {
+export async function createPdfInvoice(
+  html,
+  logoPath = DEFAULT_INVOICE_LOGO_PATH,
+  outputPath = "./invoice.pdf"
+) {
   const browser = await puppeteer.launch({
     args: chromium.args,
     defaultViewport: chromium.defaultViewport,

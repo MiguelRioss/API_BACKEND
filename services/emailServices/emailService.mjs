@@ -6,6 +6,8 @@ import { join } from "node:path";
 import { buildOrderInvoiceHtml, buildThankYouEmailHtml } from "./emailTemplates.mjs";
 import { createPdfInvoice } from "./pdfInvoice.mjs";
 
+const DEFAULT_LOGO_PATH = process.env.INVOICE_LOGO_PATH || "./assets/logo.png";
+
 
 // -----------------------------------------------------------------------------
 // Email Service Factory
@@ -27,6 +29,7 @@ export default function createEmailService({ transport } = {}) {
     order,
     orderId,
     live = false,
+    logoPath = DEFAULT_LOGO_PATH,
   } = {}) {
     if (!order || typeof order !== "object") {
       throw new Error("sendOrderInvoiceEmail requires an order object");
@@ -47,7 +50,7 @@ export default function createEmailService({ transport } = {}) {
 
     let pdfAbsolutePath = tempPdfPath;
     try {
-      pdfAbsolutePath = await createPdfInvoice(invoiceHtml, undefined, tempPdfPath);
+      pdfAbsolutePath = await createPdfInvoice(invoiceHtml, logoPath, tempPdfPath);
     } catch (err) {
       console.error("[emailService] Failed to generate PDF invoice:", err);
       throw err;

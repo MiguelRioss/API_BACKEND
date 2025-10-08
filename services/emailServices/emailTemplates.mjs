@@ -158,6 +158,7 @@ function buildAddressBlocks({ shipping, billing, fallback, customerName, billing
   const billingSame = normalizeBoolean(billingSameFlag);
 
   const sections = [];
+  const seenContacts = createSeenContacts();
 
   if (shippingHas && billingHas) {
     const treatAsSame = billingSame || addressesEqual(shipping, billing);
@@ -206,15 +207,17 @@ function buildAddressBlocks({ shipping, billing, fallback, customerName, billing
   }
 
   const blocks = sections
-    .map(({ label, address }) => renderAddressBlock(label, address))
+    .map(({ label, address }) => renderAddressBlock(label, address, seenContacts))
     .join("");
 
   return `<div class="addresses">${blocks}</div>`;
 }
 
-function renderAddressBlock(label, address = {}) {
+function renderAddressBlock(label, address = {}, seenContacts = createSeenContacts()) {
   const safeLabel = escapeHtml(label);
-  const lines = Array.isArray(address.lines) ? address.lines : buildAddressLines(address);
+  const lines = Array.isArray(address.lines)
+    ? address.lines
+    : buildAddressLines(address, seenContacts);
 
   const lineMarkup = lines.join("<br/>");
 
@@ -226,7 +229,7 @@ function renderAddressBlock(label, address = {}) {
   `;
 }
 
-function buildAddressLines(address = {}) {
+function buildAddressLines(address = {}, seenContacts = createSeenContacts()) {
   const lines = [];
   const name = escapeHtml(address.name || "");
   if (name) lines.push(`<strong>${name}</strong>`);
@@ -244,11 +247,22 @@ function buildAddressLines(address = {}) {
   if (address.country) lines.push(escapeHtml(address.country));
 
   // ✅ New: include phone and email if present
-  if (address.phone) {
-    lines.push(`<span style="color:#666;">Phone: ${escapeHtml(address.phone)}</span>`);
+  const normalizedPhone = normalizeString(address.phone);
+  if (normalizedPhone) {
+    const phoneKey = normalizedPhone.replace(/\s+/g, "");
+    if (!seenContacts.phones.has(phoneKey)) {
+      lines.push(`<span style="color:#666;">Phone: ${escapeHtml(normalizedPhone)}</span>`);
+      seenContacts.phones.add(phoneKey);
+    }
   }
-  if (address.email) {
-    lines.push(`<span style="color:#666;">Email: ${escapeHtml(address.email)}</span>`);
+
+  const normalizedEmailRaw = normalizeString(address.email);
+  const normalizedEmail = normalizedEmailRaw.toLowerCase();
+  if (normalizedEmail) {
+    if (!seenContacts.emails.has(normalizedEmail)) {
+      lines.push(`<span style="color:#666;">Email: ${escapeHtml(normalizedEmailRaw)}</span>`);
+      seenContacts.emails.add(normalizedEmail);
+    }
   }
 
   return lines.length ? lines : [escapeHtml(address.fallback || "")];
@@ -273,6 +287,13 @@ function withFallbackName(address = {}, fallbackName = "") {
   const clone = { ...(address || {}) };
   if (!clone.name && fallbackName) clone.name = normalizeString(fallbackName);
   return clone;
+}
+
+function createSeenContacts() {
+  return {
+    phones: new Set(),
+    emails: new Set(),
+  };
 }
 
 function coalesceAddress(...candidates) {

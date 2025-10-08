@@ -19,7 +19,7 @@ export default function createEmailService({ transport } = {}) {
     throw new Error("emailService expects a transport with a send() function");
   }
 
-  return { sendOrderInvoiceEmail };
+  return { sendOrderInvoiceEmail , sendContactEmail };
 
   /**
    * Sends invoice to the buyer (or TEST_RECIPIENT in test mode), BCCs OWNER_EMAIL.
@@ -78,6 +78,45 @@ export default function createEmailService({ transport } = {}) {
     }
   }
 }
+
+
+
+async function sendContactEmail({ name, email, subject, message, orderId, country }) {
+  const toEmail = process.env.OWNER_EMAIL;
+  if (!toEmail) throw new Error("OWNER_EMAIL not configured");
+
+  const html = `
+    <div style="font-family:Helvetica,Arial,sans-serif; line-height:1.6; color:#222; font-size:14px;">
+      <h3 style="color:#111;">New message from MesoContact</h3>
+      <p><strong>Name:</strong> ${escapeHtml(name || "")}</p>
+      <p><strong>Email:</strong> ${escapeHtml(email || "")}</p>
+      <p><strong>Country:</strong> ${escapeHtml(country || "")}</p>
+      <p><strong>Order ID:</strong> ${escapeHtml(orderId || "")}</p>
+      <p><strong>Subject:</strong> ${escapeHtml(subject || "—")}</p>
+      <p style="margin-top:12px; white-space:pre-wrap;">${escapeHtml(message || "")}</p>
+    </div>
+  `;
+
+  const subjectLine = `[MesoContact] ${subject || "New Message"}`;
+
+  await transport.send({
+    toEmail,
+    toName: "Mesodose Team",
+    subject: subjectLine,
+    html,
+    bcc: process.env.TEST_RECIPIENT || undefined,
+  });
+}
+
+function escapeHtml(value = "") {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 
 function buildSubject(orderId) {
   const suffix = orderId ? ` #${String(orderId).trim()}` : "";

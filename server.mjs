@@ -15,6 +15,7 @@ import createStripeServices from "./services/stripeServices.mjs";
 import createStocksAPI from "./api/stockAPI.mjs";
 import createOrdersAPI from "./api/ordersAPI.mjs";
 import createStripeAPI from "./api/stripeAPI.mjs";
+import createEmailAPI from "./api/emailApi.mjs"; // --- New Contact API
 
 // --- Email (transport + service)
 import createEmailService from "./services/emailServices/emailService.mjs";
@@ -78,6 +79,7 @@ const stripeServices = createStripeServices(stockService);
 const stockApi = createStocksAPI(stockService);
 const ordersApi = createOrdersAPI(ordersService);
 const stripeAPi = createStripeAPI(stripeServices);
+const emailApi = createEmailAPI(emailService); // --- New Contact API
 
 // -----------------------------------------------------------------------------
 // Stripe Webhook
@@ -142,6 +144,17 @@ app.get("/api/products/:id", stockApi.getProductByIdAPI);
  * which validates items, builds line_items, and returns a Checkout URL.
  */
 app.post("/api/checkout-sessions", stripeAPi.handleCheckoutSession);
+
+
+
+// -----------------------------------------------------------------------------
+// Contact Form API
+// -----------------------------------------------------------------------------
+/**
+ * Handles frontend contact form submissions from /api/contactUs.
+ * You can expand later to use Brevo or another mailer.
+ */
+app.post("/api/contactUs",emailApi.handleContactForm); // --- New Contact API
 
 // -----------------------------------------------------------------------------
 // Server Boot

@@ -68,18 +68,18 @@ export function buildOrderInvoiceHtml({ order = {}, orderId } = {}) {
 
   const itemsMarkup = items.length
     ? items
-        .map((item) => {
-          const qty = Number(item.quantity) || 1;
-          const itemTotal = Number(item.unit_amount || 0) * qty;
-          const maybeQty = qty > 1 ? ` <span style="color:#666;">(x${qty})</span>` : "";
-          return `
+      .map((item) => {
+        const qty = Number(item.quantity) || 1;
+        const itemTotal = Number(item.unit_amount || 0) * qty;
+        const maybeQty = qty > 1 ? ` <span style="color:#666;">(x${qty})</span>` : "";
+        return `
             <li>
               <span class="item-name">${escapeHtml(item.name || "Item")}${maybeQty}</span>
               <span class="item-amount">${formatMoney(itemTotal, currency)}</span>
             </li>
           `;
-        })
-        .join("")
+      })
+      .join("")
     : `
       <li>
         <span class="item-name">Order summary</span>
@@ -219,10 +219,7 @@ function buildAddressLines(address = {}) {
   const name = escapeHtml(address.name || "");
   if (name) lines.push(`<strong>${name}</strong>`);
 
-  if (address.company) {
-    lines.push(escapeHtml(address.company));
-  }
-
+  if (address.company) lines.push(escapeHtml(address.company));
   if (address.line1) lines.push(escapeHtml(address.line1));
   if (address.line2) lines.push(escapeHtml(address.line2));
 
@@ -234,12 +231,17 @@ function buildAddressLines(address = {}) {
   if (address.state) lines.push(escapeHtml(address.state));
   if (address.country) lines.push(escapeHtml(address.country));
 
+  // ✅ New: include phone and email if present
   if (address.phone) {
     lines.push(`<span style="color:#666;">Phone: ${escapeHtml(address.phone)}</span>`);
+  }
+  if (address.email) {
+    lines.push(`<span style="color:#666;">Email: ${escapeHtml(address.email)}</span>`);
   }
 
   return lines.length ? lines : [escapeHtml(address.fallback || "")];
 }
+
 
 function hasAddress(address) {
   if (!address) return false;
@@ -274,6 +276,7 @@ function coalesceAddress(...candidates) {
         postal_code: normalizeString(candidate.postal_code),
         country: normalizeString(candidate.country),
         phone: normalizeString(candidate.phone),
+        email: normalizeString(candidate.email), // ✅ include email
       };
     }
   }
@@ -287,6 +290,7 @@ function coalesceAddress(...candidates) {
     postal_code: "",
     country: "",
     phone: "",
+    email: "", // ✅ empty fallback
   };
 }
 

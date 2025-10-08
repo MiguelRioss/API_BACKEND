@@ -32,6 +32,7 @@ export default function createOrdersAPI(ordersService) {
         // The handler does not catch errors; createHandler wrapper sends errors to central error handler.
         return ordersService.createOrderServices(orderObj).then(
             orderObj => rsp.status(201).json({
+                id: orderObj.id,
                 description: "Order Created",
                 uri: `/api/orders/${orderObj.id}`
             })

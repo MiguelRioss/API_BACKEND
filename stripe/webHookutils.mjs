@@ -143,7 +143,6 @@ export function buildOrderPayload({ session, items }) {
                 billing_same_as_shipping: toBoolean(meta?.billing_same_as_shipping),
                 shipping_address: shippingAddress,
                 billing_address: billingAddress,
-                address: normalizeAddress([legacyAddress]),
             },
         };
     }

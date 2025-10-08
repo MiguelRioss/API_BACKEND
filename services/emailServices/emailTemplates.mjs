@@ -56,6 +56,18 @@ export function buildOrderInvoiceHtml({ order = {}, orderId } = {}) {
     order?.metadata?.billing_address,
     order?.billing_address
   );
+
+  // ✅ Fallback: inject metadata.phone into billing/shipping if missing
+  if (order?.metadata?.phone) {
+    if (!billingAddress.phone) billingAddress.phone = order.metadata.phone;
+    if (!shippingAddress.phone) shippingAddress.phone = order.metadata.phone;
+  }
+
+  // ✅ Fallback: inject order.email into billing/shipping if missing
+  if (order?.email) {
+    if (!billingAddress.email) billingAddress.email = order.email;
+    if (!shippingAddress.email) shippingAddress.email = order.email;
+  }
   const legacyAddress = coalesceAddress(order?.metadata?.address);
 
   const addressBlocks = buildAddressBlocks({

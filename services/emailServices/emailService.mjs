@@ -1,7 +1,7 @@
 import os from "node:os";
 import fs from "node:fs/promises";
 import { randomUUID } from "node:crypto";
-
+import { join } from "node:path";
 
 import { buildOrderInvoiceHtml, buildThankYouEmailHtml } from "./emailTemplates.mjs";
 import { createPdfInvoice } from "./pdfInvoice.mjs";
@@ -41,14 +41,6 @@ export default function createEmailService({ transport } = {}) {
       return;
     }
 
-    // ✅ Debug log — check if phone number and dial code exist
-    console.log("📞 Order contact details:");
-    console.log("Name:", order.name);
-    console.log("Email:", order.email);
-    console.log("Phone:", order.phone || order.phoneNumber || "❌ No phone field found");
-    console.log("Dial code:", order.dialCode || order.countryCode || "❌ No dial code found");
-    console.log("--------------------------------------");
-
     const invoiceHtml = buildOrderInvoiceHtml({ order, orderId });
     const pdfFilename = `Invoice-${safeSlug(orderId || new Date().toISOString())}.pdf`;
     const tempPdfPath = join(os.tmpdir(), `invoice-${randomUUID()}.pdf`);
@@ -80,10 +72,9 @@ export default function createEmailService({ transport } = {}) {
         ],
       });
     } finally {
-      await fs.unlink(pdfAbsolutePath).catch(() => { });
+      await fs.unlink(pdfAbsolutePath).catch(() => {});
     }
   }
-
 
   // ---------------------------------------------------------------------------
   // 2️⃣ Send Contact Form Email
@@ -115,8 +106,8 @@ export default function createEmailService({ transport } = {}) {
           <table width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;">
             <tr><td width="150" style="color:#777;">Name:</td><td><strong>${escapeHtml(name || "—")}</strong></td></tr>
             <tr><td style="color:#777;">Email:</td><td><a href="mailto:${escapeHtml(
-      email || ""
-    )}" style="color:${brandColor};text-decoration:none;">${escapeHtml(email || "—")}</a></td></tr>
+              email || ""
+            )}" style="color:${brandColor};text-decoration:none;">${escapeHtml(email || "—")}</a></td></tr>
             <tr><td style="color:#777;">Country:</td><td>${escapeHtml(country || "—")}</td></tr>
             <tr><td style="color:#777;">Order ID:</td><td>${escapeHtml(orderId || "—")}</td></tr>
             <tr><td style="color:#777;">Subject:</td><td>${escapeHtml(subject || "—")}</td></tr>

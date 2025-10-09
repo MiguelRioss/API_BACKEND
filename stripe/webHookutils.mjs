@@ -93,11 +93,10 @@
      * Build your internal order payload from a Stripe Checkout Session + normalized items.
      */
 export function buildOrderPayload({ session, items }) {
-    console.log("BUilding order session", session);
-        const meta = session?.metadata || {};
+        const meta = session?.metadata;
 
-        const shippingDetails = session?.shipping_details || {};
-        const billingDetails = session?.customer_details || {};
+        const shippingDetails = session?.shipping_details ;
+        const billingDetails = session?.customer_details ;
 
         const shippingAddress = normalizeAddress([
             pickAddressFields(shippingDetails),
@@ -111,26 +110,19 @@ export function buildOrderPayload({ session, items }) {
             buildMetaAddress(meta, "addr"),
         ]);
 
-        const contactPhone = pickFirst([
-            billingDetails?.phone,
-            shippingDetails?.phone,
-            meta?.phone,
-        ]);
-
+        const contactPhone =  meta?.phone
+        const name_FullName = meta?.full_name
+        const emailDetails =  session?.customer_email
         return {
-            name: pickFirst([
-                billingDetails?.name,
-                meta?.full_name,
-            ]),
-            email: pickFirst([
-                billingDetails?.email,
-                session?.customer_email,
-            ]),
+            name: name_FullName,
+            email: name_FullName,
             amount_total: Number(session?.amount_total) || 0, // cents
             currency: String(session?.currency || "").toLowerCase(),
             items: Array.isArray(items) ? items : [],
 
             metadata: {
+                name : name_FullName,
+                email: name_FullName,
                 payment_id:session.payment_intent,
                 stripe_session_id: session?.id || "",
                 client_reference_id: session?.client_reference_id || "",
@@ -225,13 +217,6 @@ function mergeAddress(target, source = {}) {
         }
     }
 
-function hasAddress(address) {
-        if (!address) return false;
-        return ["line1", "line2", "city", "state", "postal_code", "country"].some((key) => {
-            const value = address[key];
-            return value != null && String(value).trim() !== "";
-        });
-    }
 
 function pickFirst(values = [], fallback = "") {
         for (const value of values) {

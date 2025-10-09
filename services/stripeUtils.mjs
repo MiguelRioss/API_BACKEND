@@ -3,10 +3,6 @@ import errors from "../errors/errors.mjs";
 const DEFAULT_SUCCESS_URL =
   `${process.env.PUBLIC_BASE_URL}/#/checkout/success?session_id={CHECKOUT_SESSION_ID}`;
 const DEFAULT_CANCEL_URL = `${process.env.PUBLIC_BASE_URL}/#/checkout/cancel`;
-const DEFAULT_ALLOWED_COUNTRIES = (process.env.STRIPE_ALLOWED_SHIP_COUNTRIES || "PT,ES,FR,DE,GB")
-  .split(",")
-  .map((code) => code.trim().toUpperCase())
-  .filter(Boolean);
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -57,27 +53,8 @@ const sanitizeAddress = (address = {}) => {
   };
 };
 
-const hasAddressCore = (address = EMPTY_ADDRESS) =>
-  Boolean(address.line1 || address.city || address.postal_code || address.country);
-
-const deriveAllowedCountries = (...addresses) => {
-  const codes = new Set();
-  for (const address of addresses) {
-    if (!address) continue;
-    const code = sanitizeString(address.country).toUpperCase();
-    if (code.length === 2) {
-      codes.add(code);
-    }
-  }
-
-  if (codes.size > 0) {
-    return [...codes];
-  }
-
-  return DEFAULT_ALLOWED_COUNTRIES;
-};
-
 const stringifyAddress = (address) => JSON.stringify(address ?? EMPTY_ADDRESS);
+const withoutPhone = (address = {}) => ({ ...address, phone: "" });
 
 function buildCheckoutMetadata({
   customer,
@@ -103,15 +80,19 @@ function buildCheckoutMetadata({
     return { error: errors.invalidData("Customer phone is required for checkout") };
   }
 
+  const metadataShipping = withoutPhone(shippingAddress);
+  const metadataBilling = withoutPhone(billingAddress);
+
   const metadata = {
     name,
+    full_name: name,
     email,
     phone,
     notes: sanitizeString(notes),
     billing_same_as_shipping: String(Boolean(billingSameAsShipping)),
     shipping_cost_cents: String(shippingCostCents),
-    shipping_address: stringifyAddress(shippingAddress),
-    billing_address: stringifyAddress(billingAddress),
+    shipping_address: stringifyAddress(metadataShipping),
+    billing_address: stringifyAddress(metadataBilling),
     client_reference_id: sanitizeString(clientReferenceId),
   };
 
@@ -144,11 +125,6 @@ export async function createUrlCheckoutSession({
     ? { ...cleanShipping }
     : sanitizeAddress(billingAddress);
 
-  const allowedCountries = deriveAllowedCountries(cleanShipping, cleanBilling);
-  const shippingCollection = allowedCountries.length
-    ? { allowed_countries: allowedCountries }
-    : undefined;
-
   const shippingCost = toInteger(shippingCostCents, 0);
 
   const metaResult = buildCheckoutMetadata({
@@ -172,7 +148,7 @@ export async function createUrlCheckoutSession({
       mode: "payment",
       line_items,
       billing_address_collection: "auto",
-      shipping_address_collection: shippingCollection,
+      // Do not prompt the user for shipping; we already captured it beforehand.
       phone_number_collection: { enabled: false },
       customer_creation: "always",
       customer_email: customerEmail || undefined,

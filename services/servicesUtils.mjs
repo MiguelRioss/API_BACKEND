@@ -217,11 +217,14 @@ function validateMetadata(meta) {
   const billing_address = normalizeAddress(meta.billing_address);
 
   // Validate core metadata fields (strict)
-  if (
-    typeof meta.full_name !== "string" ||
-    meta.full_name.trim().length === 0
-  ) {
-    throw errors.invalidData("Metadata must include a non-empty 'full_name'.");
+  const resolvedName =
+    typeof meta.full_name === "string" && meta.full_name.trim()
+      ? meta.full_name.trim()
+      : typeof meta.name === "string" && meta.name.trim()
+      ? meta.name.trim()
+      : "";
+  if (!resolvedName) {
+    throw errors.invalidData("Metadata must include a non-empty 'name'.");
   }
 
   if (typeof meta.email !== "string" || meta.email.trim().length === 0) {
@@ -236,7 +239,7 @@ function validateMetadata(meta) {
     throw errors.invalidData("Metadata must include a non-empty 'phone' number.");
   }
 
-  const full_name = meta.full_name.trim();
+  const full_name = resolvedName;
   const phone = meta.phone.trim();
   const notes = typeof meta.notes === "string" ? meta.notes.trim() : "";
   const billing_same_as_shipping = !!meta.billing_same_as_shipping;

@@ -36,6 +36,12 @@ export default function createStripeServices(stockServices) {
     }
 
     const byId = new Map(catalog.map((product) => [String(product.id), product]));
+    const normalizedShippingCents = (() => {
+      const num = Number(shippingCostCents);
+      if (!Number.isFinite(num)) return 0;
+      const int = Math.trunc(num);
+      return int > 0 ? int : 0;
+    })();
 
     const line_items = buildStripeLineItems({
       items,
@@ -48,6 +54,22 @@ export default function createStripeServices(stockServices) {
       return line_items;
     }
 
+    if (normalizedShippingCents > 0) {
+      line_items.push({
+        price_data: {
+          currency: "eur",
+          product_data: {
+            name: "Shipping",
+            metadata: {
+              productId: "__shipping__",
+            },
+          },
+          unit_amount: normalizedShippingCents,
+        },
+        quantity: 1,
+      });
+    }
+
     const sessionUrl = await createUrlCheckoutSession({
       stripe,
       line_items,
@@ -55,7 +77,7 @@ export default function createStripeServices(stockServices) {
       shippingAddress,
       billingAddress,
       billingSameAsShipping,
-      shippingCostCents,
+      shippingCostCents: normalizedShippingCents,
       clientReferenceId,
       notes,
     });

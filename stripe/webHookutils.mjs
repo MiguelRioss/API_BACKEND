@@ -112,6 +112,9 @@ const normalizeItem = (li) => {
     li?.price?.metadata?.productId ??
     li?.metadata?.productId ??
     null;
+  if (rawId === "__shipping__") {
+    return null;
+  }
   const idNum = Number(rawId);
   const id = Number.isInteger(idNum) && idNum >= 0 ? idNum : null;
 
@@ -126,7 +129,9 @@ const normalizeItem = (li) => {
 };
 
 export function normalizeLineItems(lineItems = []) {
-  return lineItems.map((li) => normalizeItem(li));
+  return lineItems
+    .map((li) => normalizeItem(li))
+    .filter(Boolean);
 }
 
 export function normalizeLineItemsWithCatalog(lineItems = [], catalog = []) {
@@ -172,6 +177,7 @@ export function buildOrderPayload({ session, items }) {
   }
 
   const name = firstNonEmpty(
+    meta.full_name,
     meta.name,
     session?.customer_details?.name,
     shippingAddress.name,
@@ -185,8 +191,6 @@ export function buildOrderPayload({ session, items }) {
   const phone = firstNonEmpty(
     meta.phone,
     session?.customer_details?.phone,
-    shippingAddress.phone,
-    billingAddress.phone,
   );
 
   if (!name) {

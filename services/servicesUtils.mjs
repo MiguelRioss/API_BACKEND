@@ -116,8 +116,8 @@ export function applyLimit(orders = [], limit) {
 function normalizeAddress(addr = {}) {
   if (typeof addr !== "object" || Array.isArray(addr)) return {};
   return {
-    name: (addr.name ).trim(),
-    phone: (addr.phone ).trim(),
+    name: (addr.name).trim(),
+    phone: (addr.phone).trim(),
     line1: (addr.line1).trim(),
     line2: (addr.line2 ?? "").trim(),
     city: (addr.city ?? "").trim(),
@@ -211,34 +211,6 @@ function validateMetadata(meta) {
   const shipping_address = normalizeAddress(meta.shipping_address);
   const billing_address = normalizeAddress(meta.billing_address);
 
-  // Validate core metadata fields (strict)
-  const resolvedName =
-    typeof meta.full_name === "string" && meta.full_name.trim()
-      ? meta.full_name.trim()
-      : typeof meta.name === "string" && meta.name.trim()
-      ? meta.name.trim()
-      : "";
-
-  if (!resolvedName) {
-    throw errors.invalidData("Metadata must include a non-empty 'name'.");
-  }
-
-  if (typeof meta.email !== "string" || meta.email.trim().length === 0) {
-    throw errors.invalidData("Metadata must include a non-empty 'email'.");
-  }
-  const email = meta.email.trim().toLowerCase();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    throw errors.invalidData("Metadata.email must be a valid email address.");
-  }
-
-  if (typeof meta.phone !== "string" || meta.phone.trim().length === 0) {
-    throw errors.invalidData("Metadata must include a non-empty 'phone' number.");
-  }
-
-  const full_name = resolvedName;
-  const phone = meta.phone.trim();
-  const billing_same_as_shipping = !!meta.billing_same_as_shipping;
-
   // Shipping cost validation
   const shipping_cost_cents = Number(meta.shipping_cost_cents);
   if (!Number.isInteger(shipping_cost_cents) || shipping_cost_cents < 0) {
@@ -246,9 +218,6 @@ function validateMetadata(meta) {
   }
 
   return {
-    full_name,
-    email,
-    phone,
     billing_same_as_shipping,
     shipping_cost_cents,
     shipping_address,
@@ -350,7 +319,7 @@ export async function validateAndPrepareOrder(order) {
   }
 
   const resolvedPaymentId = order.metadata.payment_id
-  if(!resolvedPaymentId)
+  if (!resolvedPaymentId)
     return Promise.reject(errors.invalidData("No payment ID"))
 
   // --- Validate items & metadata ---

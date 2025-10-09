@@ -40,7 +40,7 @@ async function main() {
       },
     };
 
-    await emailService.sendOrderInvoiceEmail({
+    await emailService.sendOrderEmails({
       order,
       orderId: "ORDER-TEST-001",
       live: false,

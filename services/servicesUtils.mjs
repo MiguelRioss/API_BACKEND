@@ -275,7 +275,7 @@ export async function validateAndPrepareOrder(order) {
     );
   }
 
-  const { name, email, amount_total, currency, items, metadata } = order;
+  const { name, email, phone, amount_total, currency, items, metadata } = order;
   const shippingCents =
     Number(order.shipping_cost_cents ??
       order.metadata?.shipping_cost_cents ??
@@ -287,6 +287,10 @@ export async function validateAndPrepareOrder(order) {
 
   if (typeof email !== "string" || email.trim() === "") {
     return Promise.reject(errors.invalidData("Missing or invalid customer email."));
+  }
+
+   if (typeof phone !== "string" || phone.trim() === "") {
+    return Promise.reject(errors.invalidData("Missing or invalid customer phone."));
   }
 
   const emailTrimmed = email.trim().toLowerCase();
@@ -338,6 +342,7 @@ export async function validateAndPrepareOrder(order) {
     payment_id: resolvedPaymentId,
     name: name.trim(),
     email: emailTrimmed,
+    phone : phone, 
     currency: currencyNorm,
     items: normItems,
     amount_total,

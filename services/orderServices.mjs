@@ -26,7 +26,9 @@ export default function createOrdersService(db, emailService) {
   }
 
   const mailer =
-    emailService && typeof emailService.sendOrderInvoiceEmail === "function"
+    emailService &&
+    (typeof emailService.sendOrderEmails === "function" ||
+      typeof emailService.sendOrderInvoiceEmail === "function")
       ? emailService
       : null;
 
@@ -65,7 +67,15 @@ export default function createOrdersService(db, emailService) {
 
     const live = process.env.NODE_ENV === "production";
     try {
-      await mailer.sendOrderInvoiceEmail({
+      const sendOrderEmails =
+        mailer.sendOrderEmails || mailer.sendOrderInvoiceEmail;
+
+      if (typeof sendOrderEmails !== "function") {
+        console.warn("[ordersService] No order email sender available on mailer.");
+        return saved;
+      }
+
+      await sendOrderEmails({
         order: saved,
         orderId: saved?.id,
         live,
@@ -86,7 +96,7 @@ export default function createOrdersService(db, emailService) {
 
       return flagged;
     } catch (err) {
-      console.error("[ordersService] Failed to send invoice email:", err?.message || err);
+      console.error("[ordersService] Failed to send order emails:", err?.message || err);
       return saved;
     }
   }

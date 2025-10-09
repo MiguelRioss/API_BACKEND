@@ -226,8 +226,6 @@ export function buildOrderPayload({ session, items }) {
     throw new Error("Unable to resolve product identifiers from Stripe session");
   }
 
-  shippingAddress.phone =  phone;
-  billingAddress.phone = billingAddress.phone || phone;
   return {
     name,
     email,
@@ -241,8 +239,8 @@ export function buildOrderPayload({ session, items }) {
       notes: sanitizeString(meta.notes),
       billing_same_as_shipping: billingSameAsShipping,
       shipping_cost_cents: shippingCost,
-      shipping_address: shippingAddress,
-      billing_address: billingAddress,
+      shipping_address: { ...shippingAddress, phone },
+      billing_address: { ...billingAddress, phone: billingAddress.phone || phone },
       stripe_session_id: sanitizeString(session?.id),
       client_reference_id:
         sanitizeString(session?.client_reference_id) || sanitizeString(meta.client_reference_id),

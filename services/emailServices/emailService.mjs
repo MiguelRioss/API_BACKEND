@@ -3,7 +3,9 @@ import fs from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 
-import { buildOrderInvoiceHtml, buildThankYouEmailHtml } from "./emailTemplates.mjs";
+import { buildOrderInvoiceHtml } from "./emailTemplates.mjs";
+import { buildThankTemplate } from "./thankTemplate.mjs";
+import { buildAdminNotificationTemplate } from "./adminTemplate.mjs";
 import { createPdfInvoice } from "./pdfInvoice.mjs";
 
 const DEFAULT_LOGO_PATH = process.env.INVOICE_LOGO_PATH || "./assets/logo.png";
@@ -18,21 +20,22 @@ export default function createEmailService({ transport } = {}) {
   }
 
   return {
-    sendOrderInvoiceEmail,
+    sendOrderEmails,
+    sendOrderInvoiceEmail: sendOrderEmails,
     sendContactEmail,
   };
 
   // ---------------------------------------------------------------------------
   // 1️⃣ Send Order Invoice Email
   // ---------------------------------------------------------------------------
-  async function sendOrderInvoiceEmail({
+  async function sendOrderEmails({
     order,
     orderId,
     live = false,
     logoPath = DEFAULT_LOGO_PATH,
   } = {}) {
     if (!order || typeof order !== "object") {
-      throw new Error("sendOrderInvoiceEmail requires an order object");
+      throw new Error("sendOrderEmails requires an order object");
     }
 
     const isTestRoute = !live && !!process.env.TEST_RECIPIENT;
@@ -49,31 +52,73 @@ export default function createEmailService({ transport } = {}) {
     const tempPdfPath = join(os.tmpdir(), `invoice-${randomUUID()}.pdf`);
 
     let pdfAbsolutePath = tempPdfPath;
+    let pdfBase64 = "";
     try {
       pdfAbsolutePath = await createPdfInvoice(invoiceHtml, logoPath, tempPdfPath);
+      const pdfBuffer = await fs.readFile(pdfAbsolutePath);
+      pdfBase64 = pdfBuffer.toString("base64");
+      console.log(
+        `[emailService] Generated PDF invoice at ${pdfAbsolutePath} (${pdfBuffer.length} bytes)`,
+      );
     } catch (err) {
       console.error("[emailService] Failed to generate PDF invoice:", err);
       throw err;
     }
 
-    const html = buildThankYouEmailHtml({ order, orderId });
-    const subject = buildSubject(orderId);
+    const { subject: customerSubject, html: customerHtml } = buildThankTemplate({
+      order,
+      orderId,
+      invoiceId: order?.metadata?.invoice_id,
+      orderDate: order?.createdAt || order?.created_at || order?.metadata?.order_date,
+    });
+
+    const { subject: adminSubject, html: adminHtml } = buildAdminNotificationTemplate({
+      order,
+      orderId,
+      invoiceId: order?.metadata?.invoice_id,
+      orderDate: order?.createdAt || order?.created_at || order?.metadata?.order_date,
+    });
+
+    const adminEmail = process.env.OWNER_EMAIL || "Info@ibogenics.com";
+    const techEmail = process.env.TECH_EMAIL || "miguelangelorios5f@gmail.com";
+
+    const pdfAttachment = {
+      filename: pdfFilename,
+      path: pdfAbsolutePath,
+      content: pdfBase64 || undefined,
+      contentType: "application/pdf",
+    };
 
     try {
       await transport.send({
         toEmail,
         toName,
-        subject,
-        html,
-        bcc: process.env.OWNER_EMAIL || undefined,
-        attachments: [
-          {
-            filename: pdfFilename,
-            path: pdfAbsolutePath,
-            contentType: "application/pdf",
-          },
-        ],
+        subject: customerSubject,
+        html: customerHtml,
+        attachments: [pdfAttachment],
       });
+
+      if (adminEmail) {
+        await transport.send({
+          toEmail: adminEmail,
+          toName: "Ibogenics Admin & Logistics Team",
+          subject: adminSubject,
+          html: adminHtml,
+          attachments: [pdfAttachment],
+        });
+      } else {
+        console.warn("[emailService] OWNER_EMAIL not configured; skipping admin notification.");
+      }
+
+      if (techEmail && techEmail !== adminEmail) {
+        await transport.send({
+          toEmail: techEmail,
+          toName: "Ibogenics Tech Support",
+          subject: adminSubject,
+          html: adminHtml,
+          attachments: [pdfAttachment],
+        });
+      }
     } finally {
       await fs.unlink(pdfAbsolutePath).catch(() => {});
     }
@@ -160,11 +205,6 @@ export default function createEmailService({ transport } = {}) {
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#39;");
-  }
-
-  function buildSubject(orderId) {
-    const suffix = orderId ? ` #${String(orderId).trim()}` : "";
-    return `Thank you for your order${suffix}`;
   }
 
   function safeSlug(value) {

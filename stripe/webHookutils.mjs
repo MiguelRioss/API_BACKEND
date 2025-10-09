@@ -234,9 +234,6 @@ export function buildOrderPayload({ session, items }) {
     items: normalizedItems,
     shipping_cost_cents: shippingCost,
     metadata: {
-      name,
-      email,
-      phone,
       notes: sanitizeString(meta.notes),
       billing_same_as_shipping: billingSameAsShipping,
       shipping_cost_cents: shippingCost,

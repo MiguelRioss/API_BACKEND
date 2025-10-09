@@ -211,6 +211,10 @@ function validateMetadata(meta) {
   const shipping_address = normalizeAddress(meta.shipping_address);
   const billing_address = normalizeAddress(meta.billing_address);
 
+  // Validate core metadata fields (strict
+
+  const billing_same_as_shipping = !!meta.billing_same_as_shipping;
+
   // Shipping cost validation
   const shipping_cost_cents = Number(meta.shipping_cost_cents);
   if (!Number.isInteger(shipping_cost_cents) || shipping_cost_cents < 0) {

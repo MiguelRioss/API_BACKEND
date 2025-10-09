@@ -79,6 +79,7 @@ export default function stripeWebhook({ ordersService, stockService }) {
         }
 
         // 4) Build order payload for your DB
+        console.log(session)
         const orderPayload = buildOrderPayload({ session, items });
 
         // 5) Idempotency guard

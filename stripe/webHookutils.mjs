@@ -226,6 +226,8 @@ export function buildOrderPayload({ session, items }) {
     throw new Error("Unable to resolve product identifiers from Stripe session");
   }
 
+  shippingAddress.phone =  phone;
+  billingAddress.phone = billingAddress.phone || phone;
   return {
     name,
     email,

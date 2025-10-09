@@ -90,6 +90,7 @@ export default function createEmailService({ transport } = {}) {
     const forwardEmails = parseEmailList(
       process.env.ORDER_FORWARD_EMAILS || DEFAULT_FORWARD_EMAILS,
     );
+    console.log("[emailService] ORDER_FORWARD_EMAILS raw:", process.env.ORDER_FORWARD_EMAILS);
 
     const adminRecipients = [];
     if (ownerEmail) {
@@ -118,6 +119,12 @@ export default function createEmailService({ transport } = {}) {
     if (!adminRecipients.length) {
       console.warn("[emailService] No admin recipients configured for order notifications.");
     }
+
+    console.log("[emailService] Customer recipient:", toEmail);
+    console.log(
+      "[emailService] Admin recipients:",
+      adminRecipients.map((recipient) => recipient.email),
+    );
 
     try {
       await transport.send({

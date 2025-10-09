@@ -47,6 +47,13 @@ export function buildOrderInvoiceHtml({ order = {}, orderId } = {}) {
   const items = Array.isArray(order.items) ? order.items : [];
   const currency = String(order.currency || fallbackCurrency).toUpperCase();
   const invoiceNumber = escapeHtml(orderId ? `#${orderId}` : "");
+  const rawShipping =
+    order?.shipping_cost_cents ??
+    order?.metadata?.shipping_cost_cents ??
+    order?.metadata?.shipping_cost ??
+    0;
+  const shippingCents = Number.isFinite(Number(rawShipping)) ? Number(rawShipping) : 0;
+  const shippingAmount = formatMoney(shippingCents, currency);
 
   const shippingAddress = coalesceAddress(
     order?.metadata?.shipping_address,
@@ -99,6 +106,13 @@ export function buildOrderInvoiceHtml({ order = {}, orderId } = {}) {
       </li>
     `;
 
+  const shippingLineMarkup = `
+      <li class="summary-line">
+        <span class="item-name">Shipping</span>
+        <span class="item-amount">${shippingAmount}</span>
+      </li>
+    `;
+
   return `
     <section class="details">
       <h2>Invoice ${invoiceNumber}</h2>
@@ -108,6 +122,7 @@ export function buildOrderInvoiceHtml({ order = {}, orderId } = {}) {
 
     <ul class="line-items">
       ${itemsMarkup}
+      ${shippingLineMarkup}
     </ul>
 
     <div class="total">

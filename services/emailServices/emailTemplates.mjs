@@ -117,38 +117,8 @@ export function buildOrderInvoiceHtml({ order = {}, orderId } = {}) {
   `;
 }
 
-/**
- * Build a short thank-you email body for order confirmation.
- * @param {object} params
- * @param {object} params.order - order payload
- */
-export function buildThankYouEmailHtml({ order = {} } = {}) {
-  const customerName = escapeHtml(order.name || "Customer");
-  const currency = String(order.currency || fallbackCurrency).toUpperCase();
-  const total = formatMoney(order.amount_total || 0, currency);
-
-  return `
-    <div style="font-family:Helvetica,Arial,sans-serif; line-height:1.6; color:#222; font-size:14px;">
-      <h2 style="color:#111;">Thank you for your order, ${customerName}!</h2>
-      <p>
-        We have received your order and it is now being processed.<br/>
-        You will find your invoice attached to this email.
-      </p>
-      <p style="margin-top:12px;">
-        <strong>Order total:</strong> ${total}
-      </p>
-      <p style="margin-top:20px;">
-        With gratitude,<br/>
-        <strong>The Ibogenics Team</strong><br/>
-        <a href="https://mesodose.com" style="color:#b87333; text-decoration:none;">www.mesodose.com</a>
-      </p>
-    </div>
-  `;
-}
-
 export default {
   buildOrderInvoiceHtml,
-  buildThankYouEmailHtml,
 };
 
 function buildAddressBlocks({ shipping, billing, fallback, customerName, billingSameFlag }) {

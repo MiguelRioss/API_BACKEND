@@ -21,7 +21,6 @@ export default function createEmailService({ transport } = {}) {
 
   return {
     sendOrderEmails,
-    sendOrderInvoiceEmail: sendOrderEmails,
     sendContactEmail,
   };
 

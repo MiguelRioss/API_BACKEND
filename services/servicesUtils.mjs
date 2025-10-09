@@ -322,7 +322,7 @@ export async function validateAndPrepareOrder(order) {
     return Promise.reject(errors.invalidData(`Unsupported currency: ${currencyNorm}`));
   }
 
-  const resolvedPaymentId = order.metadata.payment_id
+  const resolvedPaymentId = order.payment_id
   if (!resolvedPaymentId)
     return Promise.reject(errors.invalidData("No payment ID"))
 

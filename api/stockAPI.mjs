@@ -1,6 +1,8 @@
 import handlerFactory from "../utils/handleFactory.mjs";
 
 export default function createStocksAPI(stockService) {
+
+  
   if (!stockService) {
     throw "API dependency invalid";
   }

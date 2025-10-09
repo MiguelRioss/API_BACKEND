@@ -41,6 +41,12 @@ export function buildThankTemplate({
   );
 
   const orderTotal = formatMoney(order?.amount_total, order?.currency);
+  const shippingCents = Number.isFinite(
+    Number(order?.metadata?.shipping_cost_cents ?? order?.shipping_cost_cents)
+  )
+    ? Number(order?.metadata?.shipping_cost_cents ?? order?.shipping_cost_cents)
+    : 0;
+  const shippingCost = formatMoney(shippingCents, order?.currency);
   const formattedDate = formatOrderDate(
     orderDate || order?.metadata?.order_date || order?.created_at,
     locale,
@@ -49,6 +55,7 @@ export function buildThankTemplate({
   const items = Array.isArray(order?.items) ? order.items : [];
   const itemsHtml = renderItemsList(items);
   const shippingHtml = renderAddressHtml(shippingAddress);
+  const billingHtml = renderAddressHtml(billingAddress);
 
   const contactName =
     normalizeString(order?.name) ||
@@ -77,10 +84,12 @@ export function buildThankTemplate({
       "  </p>",
       `  <p style="margin:0 0 8px 0;"><strong>Order date:</strong> ${escapeHtml(formattedDate)}</p>`,
       `  <p style="margin:0 0 8px 0;"><strong>Order ID:</strong> ${escapeHtml(resolvedOrderId || "")}</p>`,
+      `  <p style="margin:0 0 8px 0;"><strong>Shipping:</strong> ${escapeHtml(shippingCost)}</p>`,
       `  <p style="margin:0 0 16px 0;"><strong>Order total:</strong> ${escapeHtml(orderTotal)}</p>`,
       '  <p style="margin:0 0 8px 0;"><strong>Items:</strong></p>',
       `  ${itemsHtml}`,
       `  <p style="margin:16px 0 8px 0;"><strong>Shipping to:</strong><br/>${shippingHtml}</p>`,
+      `  <p style="margin:16px 0 8px 0;"><strong>Billing address:</strong><br/>${billingHtml}</p>`,
       "  <p style=\"margin:16px 0;\">",
       `    <strong>Name:</strong> ${escapeHtml(contactName)}<br/>`,
       `    <strong>Telephone:</strong> ${escapeHtml(contactPhone)}<br/>`,

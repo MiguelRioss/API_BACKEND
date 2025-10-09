@@ -43,6 +43,10 @@ export function buildAdminNotificationTemplate({
     order?.metadata?.shipping_address,
     order?.shipping_address,
   );
+  const billingAddress = resolveAddress(
+    order?.metadata?.billing_address,
+    order?.billing_address,
+  );
 
   const contactPhone = firstNonEmpty(
     order?.phone,
@@ -61,6 +65,13 @@ export function buildAdminNotificationTemplate({
   const itemsHtml = renderPackedItemsList(order?.items, currency);
   const orderTotal = formatMoney(order?.amount_total, currency);
   const shippingHtml = renderAddressHtml(shippingAddress);
+  const billingHtml = renderAddressHtml(billingAddress);
+  const shippingCents = Number.isFinite(
+    Number(order?.metadata?.shipping_cost_cents ?? order?.shipping_cost_cents)
+  )
+    ? Number(order?.metadata?.shipping_cost_cents ?? order?.shipping_cost_cents)
+    : 0;
+  const shippingCost = formatMoney(shippingCents, currency);
 
   return {
     subject,
@@ -83,9 +94,12 @@ export function buildAdminNotificationTemplate({
       "  </table>",
       '  <p style="margin:24px 0 8px 0;"><strong>Shipping Address</strong></p>',
       `  <p style="margin:0 0 16px 0;">${shippingHtml}</p>`,
+      '  <p style="margin:24px 0 8px 0;"><strong>Billing Address</strong></p>',
+      `  <p style="margin:0 0 16px 0;">${billingHtml}</p>`,
       '  <p style="margin:24px 0 8px 0;"><strong>Products to pack</strong></p>',
       `  ${itemsHtml}`,
-      `  <p style="margin:16px 0;"><strong>Order total:</strong> ${escapeHtml(orderTotal)}</p>`,
+      `  <p style="margin:16px 0;"><strong>Shipping:</strong> ${escapeHtml(shippingCost)}</p>`,
+      `  <p style="margin:0 0 16px 0;"><strong>Order total:</strong> ${escapeHtml(orderTotal)}</p>`,
       "  <p style=\"margin:32px 0 0 0;\">With gratitude,<br/><strong>The Ibogenics Team</strong><br/>" +
         '<a href="https://mesodose.com" style="color:#b87333;text-decoration:none;">www.mesodose.com</a></p>',
       "</div>",

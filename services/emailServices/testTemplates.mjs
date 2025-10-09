@@ -40,13 +40,22 @@ export async function sendTemplatePreviews({
     orderDate: baseOrderDate,
   });
 
-  await brevoTransport.send({
-    toEmail,
-    toName: "Ibogenics Admin Preview",
-    subject: admin.subject,
-    html: admin.html,
-    bcc: live ? process.env.OWNER_EMAIL || undefined : undefined,
-  });
+  const forwardEmails = process.env.ORDER_FORWARD_EMAILS
+    ? process.env.ORDER_FORWARD_EMAILS.split(/[,;\s]+/).map((e) => e.trim()).filter(Boolean)
+    : [];
+  const adminRecipients = new Set(
+    [process.env.OWNER_EMAIL, ...forwardEmails].map((email) => (email || "").trim()).filter(Boolean),
+  );
+
+  for (const adminEmail of adminRecipients) {
+    await brevoTransport.send({
+      toEmail: adminEmail,
+      toName: adminEmail === process.env.OWNER_EMAIL ? "Ibogenics Admin Preview" : "Tech Preview",
+      subject: admin.subject,
+      html: admin.html,
+      bcc: live ? undefined : undefined,
+    });
+  }
 }
 
 async function main() {

@@ -115,14 +115,14 @@ export function buildOrderPayload({ session, items }) {
         const emailDetails =  session?.customer_email
         return {
             name: name_FullName,
-            email: name_FullName,
+            email: emailDetails,
             amount_total: Number(session?.amount_total) || 0, // cents
             currency: String(session?.currency || "").toLowerCase(),
             items: Array.isArray(items) ? items : [],
 
             metadata: {
                 name : name_FullName,
-                email: name_FullName,
+                email: emailDetails,
                 payment_id:session.payment_intent,
                 stripe_session_id: session?.id || "",
                 client_reference_id: session?.client_reference_id || "",

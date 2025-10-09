@@ -63,9 +63,7 @@ export default function stripeWebhook({ ordersService, stockService }) {
         let items = normalizeLineItems(lineItems);
 
         // 3) If any item.id is missing/invalid, try name-based fallback with local catalog
-        const anyMissing = items.some(
-          (it) => it.id === "" || it.id === "undefined" || Number.isNaN(it.id)
-        );
+        const anyMissing = items.some((it) => !Number.isInteger(it.id));
         if (anyMissing) {
           if (debug) console.log("[stripeWebhook] Missing productId metadata; attempting catalog fallback.");
           try {
@@ -74,6 +72,10 @@ export default function stripeWebhook({ ordersService, stockService }) {
           } catch (e) {
             console.warn("[stripeWebhook] Could not load catalog for fallback:", e?.message || e);
           }
+        }
+
+        if (items.some((it) => !Number.isInteger(it.id))) {
+          throw new Error("stripeWebhook could not resolve product ids for line items");
         }
 
         // 4) Build order payload for your DB

@@ -1,236 +1,247 @@
-    // utils/stripe/normalizeLineItems.mjs
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-    /**
-     * Convert Stripe Checkout line_items into your internal item shape.
-     * Expects line items from:
-     *   stripe.checkout.sessions.listLineItems(sessionId, { expand: ["data.price","data.price.product"] })
-     *
-     * Output shape:
-     *   { id: number|string, name: string, quantity: number, unit_amount: number }[]
-     *
-     * @param {Array<Object>} lineItems - Stripe line items (expanded)
-     * @returns {Array<Object>}
-     */
-    /**
-     * Convert Stripe Checkout line_items into your internal item shape.
-     * Expects:
-     *   stripe.checkout.sessions.listLineItems(sessionId, { expand: ["data.price","data.price.product"] })
-     */
-    export function normalizeLineItems(lineItems = []) {
-        return lineItems.map((li) => {
-            const qty = Number(li.quantity) || 1;
-            const lineTotal = Number(li.amount_total) || 0;
-            const unitAmount = Math.round(lineTotal / Math.max(qty, 1));
+const sanitizeString = (value) => (typeof value === "string" ? value.trim() : "");
 
-            // Prefer product metadata.productId, fallback to price metadata
-            const rawId =
-                li?.price?.product?.metadata?.productId ??
-                li?.price?.metadata?.productId;
+const firstNonEmpty = (...values) => {
+  for (const value of values) {
+    const trimmed = sanitizeString(value);
+    if (trimmed) {
+      return trimmed;
+    }
+  }
+  return "";
+};
 
-            // Only keep positive numeric IDs as numbers; otherwise preserve as empty string
-            const asNum = Number(rawId);
-            const internalId =
-                Number.isFinite(asNum) && asNum >= 0
-                    ? asNum
-                    : (rawId != null && String(rawId).trim() !== "" ? String(rawId) : "");
+const firstValidEmail = (...values) => {
+  for (const value of values) {
+    const candidate = sanitizeString(value).toLowerCase();
+    if (candidate && EMAIL_REGEX.test(candidate)) {
+      return candidate;
+    }
+  }
+  return "";
+};
 
-            return {
-                id: internalId, // number (positive) or "" if unknown
-                name: li?.description || li?.price?.product?.name || "Item",
-                quantity: qty,
-                unit_amount: unitAmount, // in cents
-            };
-        });
+const toBoolean = (value) => {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    return normalized === "true" || normalized === "1" || normalized === "yes";
+  }
+  return false;
+};
+
+const toInteger = (value, fallback = 0) => {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return fallback;
+  const int = Math.trunc(num);
+  return int < 0 ? fallback : int;
+};
+
+const EMPTY_ADDRESS = {
+  name: "",
+  line1: "",
+  line2: "",
+  city: "",
+  state: "",
+  postal_code: "",
+  country: "",
+  phone: "",
+};
+
+const sanitizeAddress = (address = {}) => {
+  if (!address || typeof address !== "object") {
+    return { ...EMPTY_ADDRESS };
+  }
+
+  const source = address.address ? extractStripeAddress(address) : address;
+
+  return {
+    name: sanitizeString(source?.name),
+    line1: sanitizeString(source?.line1),
+    line2: sanitizeString(source?.line2),
+    city: sanitizeString(source?.city),
+    state: sanitizeString(source?.state ?? source?.region ?? source?.province),
+    postal_code: sanitizeString(source?.postal_code ?? source?.postalCode ?? source?.zip),
+    country: sanitizeString(source?.country).toUpperCase(),
+    phone: sanitizeString(source?.phone),
+  };
+};
+
+const extractStripeAddress = (details = {}) => {
+  const addr = details?.address || {};
+  return {
+    name: details?.name ?? addr?.name ?? "",
+    line1: addr?.line1 ?? "",
+    line2: addr?.line2 ?? "",
+    city: addr?.city ?? "",
+    state: addr?.state ?? addr?.region ?? addr?.province ?? "",
+    postal_code: addr?.postal_code ?? addr?.postalCode ?? "",
+    country: addr?.country ?? "",
+    phone: details?.phone ?? addr?.phone ?? "",
+  };
+};
+
+const hasAddressData = (address = EMPTY_ADDRESS) =>
+  Boolean(address.line1 || address.city || address.postal_code || address.country);
+
+const parseAddressMeta = (value) => {
+  if (!value) return null;
+  if (typeof value === "string") {
+    try {
+      return JSON.parse(value);
+    } catch (err) {
+      return null;
+    }
+  }
+  if (typeof value === "object") {
+    return value;
+  }
+  return null;
+};
+
+const normalizeItem = (li) => {
+  const quantity = Math.max(1, Math.trunc(Number(li?.quantity) || 1));
+  const unitFromPrice = Number(li?.price?.unit_amount);
+  const unitAmount = Number.isInteger(unitFromPrice)
+    ? unitFromPrice
+    : Math.round((Number(li?.amount_total) || 0) / quantity);
+
+  const rawId =
+    li?.price?.product?.metadata?.productId ??
+    li?.price?.metadata?.productId ??
+    li?.metadata?.productId ??
+    null;
+  const idNum = Number(rawId);
+  const id = Number.isInteger(idNum) && idNum >= 0 ? idNum : null;
+
+  const name = sanitizeString(li?.description || li?.price?.product?.name || "");
+
+  return {
+    id,
+    name: name || "Item",
+    quantity,
+    unit_amount: Number.isInteger(unitAmount) ? unitAmount : 0,
+  };
+};
+
+export function normalizeLineItems(lineItems = []) {
+  return lineItems.map((li) => normalizeItem(li));
+}
+
+export function normalizeLineItemsWithCatalog(lineItems = [], catalog = []) {
+  const base = normalizeLineItems(lineItems);
+  if (!Array.isArray(catalog) || catalog.length === 0) {
+    return base;
+  }
+
+  const byName = new Map(
+    catalog.map((product) => [sanitizeString(product.title || product.name).toLowerCase(), product])
+  );
+
+  return base.map((item) => {
+    if (Number.isInteger(item.id)) {
+      return item;
     }
 
-    /**
-     * Optional: fallback by product name when metadata is missing (useful for Stripe CLI fixtures).
-     */
-    export function normalizeLineItemsWithCatalog(lineItems = [], catalog = []) {
-        const byName = new Map(
-            catalog.map((p) => [String(p.title || p.name || "").toLowerCase(), p])
-        );
-
-        return normalizeLineItems(lineItems).map((it) => {
-            const idIsMissing =
-                it.id === "" || it.id === "undefined" || Number.isNaN(it.id);
-            if (idIsMissing) {
-                const guess = byName.get(String(it.name || "").toLowerCase());
-                if (guess && Number.isFinite(Number(guess.id)) && Number(guess.id) >= 0) {
-                    it.id = Number(guess.id);
-                }
-            }
-            return it;
-        });
+    const guess = byName.get(item.name.toLowerCase());
+    if (guess) {
+      const guessId = Number(guess.id);
+      if (Number.isInteger(guessId) && guessId >= 0) {
+        return { ...item, id: guessId };
+      }
     }
+    return item;
+  });
+}
 
-
-    // utils/stripe/buildOrderPayload.mjs
-
-    /**
-     * Build your internal order payload from a Stripe Checkout Session + normalized items.
-     *
-     * @param {object} params
-     * @param {object} params.session - Stripe Checkout Session object
-     * @param {Array<{id:(number|string), name:string, quantity:number, unit_amount:number}>} params.items
-     * @returns {{
-     *   name:string,
-     *   email:string,
-     *   amount_total:number,
-     *   currency:string,
-     *   items:Array,
-     *   metadata:{
-     *     stripe_session_id:string,
-     *     client_reference_id:string,
-     *     payment_status:string,
-     *     phone:string,
-     *     notes:string,
-     *     address:{ line1:string, line2:string, city:string, postal_code:string, country:string }
-     *   }
-     * }}
-     */
-    /**
-     * Build your internal order payload from a Stripe Checkout Session + normalized items.
-     */
 export function buildOrderPayload({ session, items }) {
-        const meta = session?.metadata;
+  const meta = session?.metadata || {};
 
-        const shippingDetails = session?.shipping_details ;
-        const billingDetails = session?.customer_details ;
+  const shippingCandidate =
+    parseAddressMeta(meta.shipping_address) || extractStripeAddress(session?.shipping_details);
+  const billingCandidate =
+    parseAddressMeta(meta.billing_address) || extractStripeAddress(session?.customer_details);
 
-        const shippingAddress = normalizeAddress([
-            pickAddressFields(shippingDetails),
-            buildMetaAddress(meta, "ship"),
-            buildMetaAddress(meta, "addr"),
-        ]);
+  const shippingAddress = sanitizeAddress(shippingCandidate);
+  let billingAddress = sanitizeAddress(billingCandidate);
 
-        const billingAddress = normalizeAddress([
-            pickAddressFields(billingDetails),
-            buildMetaAddress(meta, "bill"),
-            buildMetaAddress(meta, "addr"),
-        ]);
+  const billingSameAsShipping = toBoolean(meta.billing_same_as_shipping);
+  if (billingSameAsShipping || !hasAddressData(billingAddress)) {
+    billingAddress = { ...shippingAddress };
+  }
 
-        const contactPhone =  meta?.phone
-        const name_FullName = meta?.full_name
-        const emailDetails =  session?.customer_email
-        return {
-            name: name_FullName,
-            email: emailDetails,
-            amount_total: Number(session?.amount_total) || 0, // cents
-            currency: String(session?.currency || "").toLowerCase(),
-            items: Array.isArray(items) ? items : [],
+  const name = firstNonEmpty(
+    meta.name,
+    session?.customer_details?.name,
+    shippingAddress.name,
+    billingAddress.name,
+  );
+  const email = firstValidEmail(
+    meta.email,
+    session?.customer_email,
+    session?.customer_details?.email,
+  );
+  const phone = firstNonEmpty(
+    meta.phone,
+    session?.customer_details?.phone,
+    shippingAddress.phone,
+    billingAddress.phone,
+  );
 
-            metadata: {
-                name : name_FullName,
-                email: emailDetails,
-                payment_id:session.payment_intent,
-                stripe_session_id: session?.id || "",
-                client_reference_id: session?.client_reference_id || "",
-                payment_status: session?.payment_status || "",
-                phone: contactPhone,
-                notes: meta?.notes || "",
-                billing_same_as_shipping: toBoolean(meta?.billing_same_as_shipping),
-                shipping_address: shippingAddress,
-                billing_address: billingAddress,
-            },
-        };
-    }
+  if (!name) {
+    throw new Error("Missing customer name in Stripe session metadata");
+  }
+  if (!email) {
+    throw new Error("Missing customer email in Stripe session metadata");
+  }
+  if (!phone) {
+    throw new Error("Missing customer phone in Stripe session metadata");
+  }
 
-function pickAddressFields(details = {}) {
-        const addr = details?.address || details;
-        return {
-            name: details?.name ?? addr?.name ?? "",
-            line1: addr?.line1 ?? "",
-            line2: addr?.line2 ?? "",
-            city: addr?.city ?? "",
-            state: addr?.state ?? addr?.province ?? addr?.region ?? "",
-            postal_code: addr?.postal_code ?? addr?.postalCode ?? "",
-            country: addr?.country ?? "",
-            phone: details?.phone ?? addr?.phone ?? "",
-        };
-    }
+  const shippingCost = toInteger(
+    meta.shipping_cost_cents,
+    Number(session?.total_details?.amount_shipping) || 0,
+  );
 
-function buildMetaAddress(meta = {}, prefix = "") {
-        const normalizeKey = (key) => key ? String(key).trim() : "";
-        const p = prefix ? `${prefix}_` : "";
-        return {
-            name: normalizeKey(meta[`${p}name`]),
-            line1: normalizeKey(meta[`${p}line1`]),
-            line2: normalizeKey(meta[`${p}line2`]),
-            city: normalizeKey(meta[`${p}city`]),
-            state: normalizeKey(meta[`${p}state`]),
-            postal_code: normalizeKey(meta[`${p}postal`]) || normalizeKey(meta[`${p}postal_code`]),
-            country: normalizeKey(meta[`${p}country`]),
-            phone: normalizeKey(meta[`${p}phone`]),
-        };
-    }
+  const normalizedItems = (Array.isArray(items) ? items : []).map((item) => {
+    const idNum = Number(item?.id);
+    return {
+      id: Number.isInteger(idNum) && idNum >= 0 ? idNum : NaN,
+      name: sanitizeString(item?.name) || "Item",
+      quantity: Math.max(1, Math.trunc(Number(item?.quantity) || 1)),
+      unit_amount: Math.max(0, Math.trunc(Number(item?.unit_amount) || 0)),
+    };
+  });
 
-function emptyAddress() {
-        return {
-            name: "",
-            line1: "",
-            line2: "",
-            city: "",
-            state: "",
-            postal_code: "",
-            country: "",
-            phone: "",
-        };
-    }
+  if (normalizedItems.length === 0) {
+    throw new Error("Stripe session returned no line items");
+  }
 
-function normalizeAddress(candidates = []) {
-        const result = emptyAddress();
-        for (const candidate of candidates) {
-            if (!candidate) continue;
+  if (normalizedItems.some((item) => !Number.isInteger(item.id))) {
+    throw new Error("Unable to resolve product identifiers from Stripe session");
+  }
 
-            const source = candidate.address ? pickAddressFields(candidate) : candidate;
-
-            mergeAddress(result, source);
-        }
-        return result;
-    }
-
-function mergeAddress(target, source = {}) {
-        if (!target || !source) return;
-
-        const map = {
-            name: ["name"],
-            line1: ["line1"],
-            line2: ["line2"],
-            city: ["city"],
-            state: ["state", "province", "region"],
-            postal_code: ["postal_code", "postalCode", "zip"],
-            country: ["country"],
-            phone: ["phone"],
-        };
-
-        for (const [key, aliases] of Object.entries(map)) {
-            if (target[key]) continue;
-
-            for (const alias of aliases) {
-                const value = source?.[alias];
-                if (value != null && String(value).trim() !== "") {
-                    target[key] = String(value).trim();
-                    break;
-                }
-            }
-        }
-    }
-
-
-function pickFirst(values = [], fallback = "") {
-        for (const value of values) {
-            if (value != null && String(value).trim() !== "") {
-                return String(value).trim();
-            }
-        }
-        return fallback;
-    }
-
-function toBoolean(value) {
-        if (typeof value === "boolean") return value;
-        if (typeof value === "string") {
-            return value.toLowerCase() === "true" || value === "1";
-        }
-        return false;
-    }
+  return {
+    name,
+    email,
+    amount_total: Number(session?.amount_total) || 0,
+    currency: sanitizeString(session?.currency).toLowerCase() || "eur",
+    items: normalizedItems,
+    shipping_cost_cents: shippingCost,
+    metadata: {
+      name,
+      email,
+      phone,
+      notes: sanitizeString(meta.notes),
+      billing_same_as_shipping: billingSameAsShipping,
+      shipping_cost_cents: shippingCost,
+      shipping_address: shippingAddress,
+      billing_address: billingAddress,
+      stripe_session_id: sanitizeString(session?.id),
+      client_reference_id:
+        sanitizeString(session?.client_reference_id) || sanitizeString(meta.client_reference_id),
+      payment_status: sanitizeString(session?.payment_status),
+    },
+  };
+}

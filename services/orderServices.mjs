@@ -8,8 +8,9 @@ import {
   validateAndPrepareOrder,
   mergeOrderChanges,
   validateAndNormalizeID,
-  normalizeId
+  
 } from "./servicesUtils.mjs";
+
 
 
 /**
@@ -24,8 +25,8 @@ import {
  *
  * Service throws domain errors for HTTP layer to map.
  */
-export default function createOrdersService(db) {
-  if (!db) {
+export default function createOrdersService(db,emailService) {
+  if (!db || !emailService) {
     throw "Services dependency invalid";
   }
 
@@ -84,6 +85,17 @@ export default function createOrdersService(db) {
    */
   async function createOrderServices(order) {
     const prepared = await validateAndPrepareOrder(order); // ← await needed here
+    // 7) Email (don't fail webhook on email errors)
+    try {
+      await emailService.sendOrderInvoiceEmail({
+        order: orderPayload,
+        orderId: saved?.id || session.id,
+        live: event.livemode,
+      });
+      if (debug) console.log("[stripeWebhook] Invoice email sent via Brevo.");
+    } catch (e) {
+      console.error("[stripeWebhook] Email send failed:", e?.message || e);
+    }
     return db.createOrderDB(prepared);
   }
 

@@ -8,14 +8,11 @@ import {
 } from "./webHookutils.mjs";
 
 // Inject stockService so we can do catalog fallback locally
-export default function stripeWebhook({ ordersService, emailService, stockService }) {
+export default function stripeWebhook({ ordersService, stockService }) {
   if (!process.env.STRIPE_SECRET_KEY) throw new Error("Missing STRIPE_SECRET_KEY");
   if (!process.env.STRIPE_WEBHOOK_SECRET) throw new Error("Missing STRIPE_WEBHOOK_SECRET");
   if (!ordersService || typeof ordersService.createOrderServices !== "function") {
     throw new Error("stripeWebhook requires ordersService.createOrderServices()");
-  }
-  if (!emailService || typeof emailService.sendOrderInvoiceEmail !== "function") {
-    throw new Error("stripeWebhook requires emailService.sendOrderInvoiceEmail()");
   }
 
   const router = express.Router();
@@ -97,17 +94,7 @@ export default function stripeWebhook({ ordersService, emailService, stockServic
         const saved = await ordersService.createOrderServices(orderPayload);
         if (debug) console.log("[stripeWebhook] Order persisted:", { id: saved?.id });
 
-        // 7) Email (don't fail webhook on email errors)
-        try {
-          await emailService.sendOrderInvoiceEmail({
-            order: orderPayload,
-            orderId: saved?.id || session.id,
-            live: event.livemode,
-          });
-          if (debug) console.log("[stripeWebhook] Invoice email sent via Brevo.");
-        } catch (e) {
-          console.error("[stripeWebhook] Email send failed:", e?.message || e);
-        }
+       
       }
 
       return res.sendStatus(200);

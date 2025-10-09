@@ -13,9 +13,9 @@ import createOrdersService from "./services/orderServices.mjs";
 import createStripeServices from "./services/stripeServices.mjs";
 
 import createStocksAPI from "./api/stockAPI.mjs";
-import createOrdersAPI from "./api/ordersApi.mjs";
+import createOrdersAPI from "./api/ordersAPI.mjs";
 import createStripeAPI from "./api/stripeAPI.mjs";
-import createEmailAPI from "./api/emailApi.mjs"; // --- New Contact API
+import createEmailAPI from "./api/emailAPI.mjs"; // --- New Contact API
 
 // --- Email (transport + service)
 import createEmailService from "./services/emailServices/emailService.mjs";
@@ -62,7 +62,7 @@ const db = await createDb({ type: process.env.DB_TYPE });
  * - stripeServices: create checkout sessions, etc. (uses stockService)
  */
 const stockService = createStockServices(db);
-const ordersService = createOrdersService(db);
+const ordersService = createOrdersService(db, emailService); // --- Pass emailService to ordersService
 
 // NOTE: Ensure the factory signature matches your import:
 // If your factory is `createStripeServices({ stockServices })`, pass an object.
@@ -90,7 +90,7 @@ const emailApi = createEmailAPI(emailService); // --- New Contact API
  * 2) The router itself uses `express.raw({ type: "application/json" })`.
  * 3) This endpoint is called by Stripe (server-to-server) after checkout completes.
  */
-app.use("/api/stripe/webhook", stripeWebhook({ ordersService, emailService, stockService }));
+app.use("/api/stripe/webhook", stripeWebhook({ ordersService, stockService }));
 // -----------------------------------------------------------------------------
 // Global JSON Parser (for normal JSON API routes)
 // -----------------------------------------------------------------------------

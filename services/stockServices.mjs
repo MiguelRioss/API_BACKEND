@@ -30,7 +30,6 @@ export default function createStockServices(db) {
   async function getProductById(id) {
     const product = await getAllProducts().then(products => products.find(p => {
       if(p.id==0) console.log(products)
-    console.log('Comparing', p.id, id);
       return p.id === id}));
 
     if (!product) {

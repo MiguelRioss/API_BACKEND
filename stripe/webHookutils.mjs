@@ -93,6 +93,7 @@
      * Build your internal order payload from a Stripe Checkout Session + normalized items.
      */
 export function buildOrderPayload({ session, items }) {
+    console.log("BUilding order session", session);
         const meta = session?.metadata || {};
 
         const shippingDetails = session?.shipping_details || {};
@@ -116,11 +117,6 @@ export function buildOrderPayload({ session, items }) {
             meta?.phone,
         ]);
 
-        const legacyAddress =
-            hasAddress(shippingAddress) ? shippingAddress :
-            hasAddress(billingAddress) ? billingAddress :
-            buildMetaAddress(meta, "addr");
-
         return {
             name: pickFirst([
                 billingDetails?.name,
@@ -135,6 +131,7 @@ export function buildOrderPayload({ session, items }) {
             items: Array.isArray(items) ? items : [],
 
             metadata: {
+                payment_id:session.payment_intent,
                 stripe_session_id: session?.id || "",
                 client_reference_id: session?.client_reference_id || "",
                 payment_status: session?.payment_status || "",

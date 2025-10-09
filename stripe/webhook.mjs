@@ -78,8 +78,6 @@ export default function stripeWebhook({ ordersService, stockService }) {
 
         // 4) Build order payload for your DB
         const orderPayload = buildOrderPayload({ session, items });
-        console.log("[stripeWebhook] 🚚 Shipping address:", orderPayload.metadata.shipping_address);
-        console.log("[stripeWebhook] 🧾 Billing address:", orderPayload.metadata.billing_address);
 
         // 5) Idempotency guard
         if (ordersService.getOrderByStripeSessionId) {

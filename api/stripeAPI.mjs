@@ -27,20 +27,6 @@ export default function createStripeAPI(stripeServices) {
       billingSameAsShipping = false,
     } = req.body || {};
 
-    // 👇 Add this to verify the frontend payload
-    console.log("📦 [StripeAPI] Checkout session request received:");
-    console.log(JSON.stringify(
-      {
-        items,
-        clientReferenceId,
-        customer,
-        address,
-        billingAddress,
-        billingSameAsShipping,
-      },
-      null,
-      2
-    ));
 
     // Forward everything downstream
     return stripeServices.createCheckoutSession({

@@ -278,7 +278,6 @@ export async function getStockByID(idStr) {
   if (useRealtimeDB()) {
     const db = getRealtimeDB();
     const id = String(idStr).trim();
-    console.log("[getStockByID] looking up stock ID:", id);
 
     const snap = await db.ref(`/stock/${id}`).once("value");
     const val = snap.val();

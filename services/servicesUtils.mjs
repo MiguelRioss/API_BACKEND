@@ -309,7 +309,6 @@ export async function validateAndPrepareOrder(order) {
     Number(order.shipping_cost_cents ??
       order.metadata?.shipping_cost_cents ??
       0);
-  console.log("Order received for validation:", order);
   // --- Basic fields ---
   if (typeof name !== "string" || name.trim() === "") {
     return Promise.reject(errors.invalidData("Missing or invalid customer name."));

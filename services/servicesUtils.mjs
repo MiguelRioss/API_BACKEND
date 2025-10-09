@@ -350,7 +350,7 @@ export async function validateAndPrepareOrder(order) {
   }
 
   const resolvedPaymentId = order.metadata.payment_id
-  if(!payment_id)
+  if(!resolvedPaymentId)
     return Promise.reject(errors.invalidData("No payment ID"))
 
   // --- Validate items & metadata ---

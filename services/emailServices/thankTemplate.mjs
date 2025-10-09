@@ -16,7 +16,6 @@ import {
 export function buildThankTemplate({
   order = {},
   orderId,
-  invoiceId,
   orderDate,
   locale = defaultLocale,
 } = {}) {
@@ -26,11 +25,6 @@ export function buildThankTemplate({
     normalizeString(order?.metadata?.order_id) ||
     normalizeString(order?.payment_id);
   const subject = buildThankTemplateSubject(resolvedOrderId);
-
-  const invoiceIdentifier =
-    normalizeString(invoiceId) ||
-    normalizeString(order?.metadata?.invoice_id) ||
-    resolvedOrderId;
 
   const customerName =
     normalizeString(order?.name) ||
@@ -83,7 +77,6 @@ export function buildThankTemplate({
       "  </p>",
       `  <p style="margin:0 0 8px 0;"><strong>Order date:</strong> ${escapeHtml(formattedDate)}</p>`,
       `  <p style="margin:0 0 8px 0;"><strong>Order ID:</strong> ${escapeHtml(resolvedOrderId || "")}</p>`,
-      `  <p style="margin:0 0 8px 0;"><strong>Invoice ID:</strong> ${escapeHtml(invoiceIdentifier || "")}</p>`,
       `  <p style="margin:0 0 16px 0;"><strong>Order total:</strong> ${escapeHtml(orderTotal)}</p>`,
       '  <p style="margin:0 0 8px 0;"><strong>Items:</strong></p>',
       `  ${itemsHtml}`,

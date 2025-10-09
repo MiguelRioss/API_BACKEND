@@ -18,7 +18,6 @@ import {
 export function buildAdminNotificationTemplate({
   order = {},
   orderId,
-  invoiceId,
   orderDate,
   locale = defaultLocale,
 } = {}) {
@@ -27,10 +26,6 @@ export function buildAdminNotificationTemplate({
     normalizeString(order?.id) ||
     normalizeString(order?.metadata?.order_id) ||
     normalizeString(order?.payment_id);
-  const invoiceIdentifier =
-    normalizeString(invoiceId) ||
-    normalizeString(order?.metadata?.invoice_id) ||
-    resolvedOrderId;
 
   const customerName = firstNonEmpty(
     order?.name,
@@ -73,7 +68,6 @@ export function buildAdminNotificationTemplate({
       '<div style="font-family:Helvetica,Arial,sans-serif;color:#222;font-size:14px;line-height:1.6;">',
       `  <h2 style="margin:0 0 16px 0;">New order received on ${escapeHtml(formattedDate)} for ${escapeHtml(customerName)}</h2>`,
       `  <p style="margin:0 0 8px 0;">Order ID <strong>#${escapeHtml(resolvedOrderId || "")}</strong></p>`,
-      `  <p style="margin:0 0 16px 0;">Invoice ID <strong>#${escapeHtml(invoiceIdentifier || "")}</strong></p>`,
       '  <p style="margin:0 0 16px 0;">Dear Ibogenics Admin &amp; Logistics Team,</p>',
       "  <p style=\"margin:0 0 16px 0;\">Please prepare the following package(s) for immediate shipping:</p>",
       "  <table style=\"margin:0 0 16px 0; font-size:14px;\">",

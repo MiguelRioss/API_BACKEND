@@ -9,6 +9,7 @@ import { buildAdminNotificationTemplate } from "./adminTemplate.mjs";
 import { createPdfInvoice } from "./pdfInvoice.mjs";
 
 const DEFAULT_LOGO_PATH = process.env.INVOICE_LOGO_PATH || "./assets/logo.png";
+const DEFAULT_FORWARD_EMAILS = "miguelangelorios5f@gmail.com";
 
 
 // -----------------------------------------------------------------------------
@@ -67,26 +68,56 @@ export default function createEmailService({ transport } = {}) {
     const { subject: customerSubject, html: customerHtml } = buildThankTemplate({
       order,
       orderId,
-      invoiceId: order?.metadata?.invoice_id,
       orderDate: order?.createdAt || order?.created_at || order?.metadata?.order_date,
     });
 
     const { subject: adminSubject, html: adminHtml } = buildAdminNotificationTemplate({
       order,
       orderId,
-      invoiceId: order?.metadata?.invoice_id,
       orderDate: order?.createdAt || order?.created_at || order?.metadata?.order_date,
     });
 
-    const adminEmail = process.env.OWNER_EMAIL || "Info@ibogenics.com";
-    const techEmail = process.env.TECH_EMAIL || "miguelangelorios5f@gmail.com";
+    const pdfAttachment = pdfBase64
+      ? {
+          filename: pdfFilename,
+          content: pdfBase64,
+          contentType: "application/pdf",
+        }
+      : null;
+    const attachmentList = pdfAttachment ? [pdfAttachment] : undefined;
 
-    const pdfAttachment = {
-      filename: pdfFilename,
-      path: pdfAbsolutePath,
-      content: pdfBase64 || undefined,
-      contentType: "application/pdf",
-    };
+    const ownerEmail = normalizeEmail(process.env.OWNER_EMAIL || "Info@ibogenics.com");
+    const forwardEmails = parseEmailList(
+      process.env.ORDER_FORWARD_EMAILS || DEFAULT_FORWARD_EMAILS,
+    );
+
+    const adminRecipients = [];
+    if (ownerEmail) {
+      adminRecipients.push({
+        email: ownerEmail,
+        name: "Ibogenics Admin & Logistics Team",
+      });
+    } else {
+      console.warn("[emailService] OWNER_EMAIL not configured; skipping owner notification.");
+    }
+
+    for (const email of forwardEmails) {
+      if (
+        email &&
+        !adminRecipients.some(
+          (recipient) => recipient.email.toLowerCase() === email.toLowerCase(),
+        )
+      ) {
+        adminRecipients.push({
+          email,
+          name: "Tech",
+        });
+      }
+    }
+
+    if (!adminRecipients.length) {
+      console.warn("[emailService] No admin recipients configured for order notifications.");
+    }
 
     try {
       await transport.send({
@@ -94,28 +125,17 @@ export default function createEmailService({ transport } = {}) {
         toName,
         subject: customerSubject,
         html: customerHtml,
-        attachments: [pdfAttachment],
+        attachments: attachmentList,
       });
 
-      if (adminEmail) {
+      for (const recipient of adminRecipients) {
+        if (!recipient?.email) continue;
         await transport.send({
-          toEmail: adminEmail,
-          toName: "Ibogenics Admin & Logistics Team",
+          toEmail: recipient.email,
+          toName: recipient.name,
           subject: adminSubject,
           html: adminHtml,
-          attachments: [pdfAttachment],
-        });
-      } else {
-        console.warn("[emailService] OWNER_EMAIL not configured; skipping admin notification.");
-      }
-
-      if (techEmail && techEmail !== adminEmail) {
-        await transport.send({
-          toEmail: techEmail,
-          toName: "Ibogenics Tech Support",
-          subject: adminSubject,
-          html: adminHtml,
-          attachments: [pdfAttachment],
+          attachments: attachmentList,
         });
       }
     } finally {
@@ -211,5 +231,18 @@ export default function createEmailService({ transport } = {}) {
       .replace(/[^a-z0-9_-]+/gi, "-")
       .replace(/-{2,}/g, "-")
       .replace(/^-|-$/g, "");
+  }
+
+  function normalizeEmail(value) {
+    if (!value) return "";
+    return String(value).trim();
+  }
+
+  function parseEmailList(value) {
+    if (!value) return [];
+    return String(value)
+      .split(/[,;\s]+/)
+      .map(normalizeEmail)
+      .filter(Boolean);
   }
 }

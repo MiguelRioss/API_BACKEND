@@ -14,7 +14,6 @@ export async function sendTemplatePreviews({
   order = orderFixture,
   toEmail = DEFAULT_RECIPIENT,
   orderId = "ORDER-PREVIEW-001",
-  invoiceId = "INV-PREVIEW-001",
   live = false,
 } = {}) {
   if (!toEmail) throw new Error("Recipient email is required for template preview");
@@ -24,7 +23,6 @@ export async function sendTemplatePreviews({
   const thankYou = buildThankTemplate({
     order,
     orderId,
-    invoiceId,
     orderDate: baseOrderDate,
   });
 
@@ -39,7 +37,6 @@ export async function sendTemplatePreviews({
   const admin = buildAdminNotificationTemplate({
     order,
     orderId,
-    invoiceId,
     orderDate: baseOrderDate,
   });
 

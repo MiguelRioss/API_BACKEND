@@ -297,6 +297,7 @@ export function updateOrderStatus(currentStatus, key, { status, date = null, tim
  * Includes shipping cost validation and full metadata checks.
  */
 export async function validateAndPrepareOrder(order) {
+  console.log("Validating and preparing order:", order);
 
   if (!order || typeof order !== "object" || Array.isArray(order)) {
     return Promise.reject(

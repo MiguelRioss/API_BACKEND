@@ -1,6 +1,6 @@
 import handlerFactory from "../utils/handleFactory.mjs";
 
-// api/ordersAPI.mjs
+// api/ordersApi.mjs
 export default function createOrdersAPI(ordersService) {
     if (!ordersService || typeof ordersService.getOrdersServices !== "function") {
        throw "API dependency invalid";
@@ -20,7 +20,7 @@ export default function createOrdersAPI(ordersService) {
                 orders => rsp.json(orders)
             );
     }
-    // in api/ordersAPI.mjs
+    // in api/ordersApi.mjs
     async function internalGetOrderByID(req, rsp) {
         const id = req.params.id;
         return ordersService.getOrderByIdServices(id)

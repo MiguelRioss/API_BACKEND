@@ -232,6 +232,7 @@ export function buildOrderPayload({ session, items }) {
     amount_total: Number(session?.amount_total) || 0,
     currency: sanitizeString(session?.currency).toLowerCase() || "eur",
     items: normalizedItems,
+    payment_id: sanitizeString(session?.payment_intent),
     shipping_cost_cents: shippingCost,
     metadata: {
       notes: sanitizeString(meta.notes),

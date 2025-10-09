@@ -116,7 +116,10 @@ export function applyLimit(orders = [], limit) {
 function normalizeAddress(addr = {}) {
   if (typeof addr !== "object" || Array.isArray(addr)) return {};
   return {
-    line1: (addr.line1 ?? "").trim(),
+    name: (addr.name ).trim(),
+    phone: (addr.phone ).trim(),
+    line1: (addr.line1).trim(),
+    line2: (addr.line2 ?? "").trim(),
     city: (addr.city ?? "").trim(),
     postal_code: (addr.postal_code ?? "").trim(),
     country: (addr.country ?? "").trim().toUpperCase(),
@@ -204,14 +207,6 @@ function validateMetadata(meta) {
     );
   }
 
-  // Reject legacy flat keys
-  const legacyKeys = Object.keys(meta).filter((k) => k.startsWith("addr_"));
-  if (legacyKeys.length > 0) {
-    throw errors.invalidData(
-      `Legacy metadata keys are not allowed: ${legacyKeys.join(", ")}`
-    );
-  }
-
   // Normalize and validate addresses
   const shipping_address = normalizeAddress(meta.shipping_address);
   const billing_address = normalizeAddress(meta.billing_address);
@@ -223,6 +218,7 @@ function validateMetadata(meta) {
       : typeof meta.name === "string" && meta.name.trim()
       ? meta.name.trim()
       : "";
+
   if (!resolvedName) {
     throw errors.invalidData("Metadata must include a non-empty 'name'.");
   }
@@ -241,7 +237,6 @@ function validateMetadata(meta) {
 
   const full_name = resolvedName;
   const phone = meta.phone.trim();
-  const notes = typeof meta.notes === "string" ? meta.notes.trim() : "";
   const billing_same_as_shipping = !!meta.billing_same_as_shipping;
 
   // Shipping cost validation
@@ -254,7 +249,6 @@ function validateMetadata(meta) {
     full_name,
     email,
     phone,
-    notes,
     billing_same_as_shipping,
     shipping_cost_cents,
     shipping_address,
@@ -355,6 +349,10 @@ export async function validateAndPrepareOrder(order) {
     return Promise.reject(errors.invalidData(`Unsupported currency: ${currencyNorm}`));
   }
 
+  const resolvedPaymentId = order.metadata.payment_id
+  if(!payment_id)
+    return Promise.reject(errors.invalidData("No payment ID"))
+
   // --- Validate items & metadata ---
   const normItems = validateItemsArray(items, amount_total, shippingCents);
   const normMetadata = validateMetadata(metadata);
@@ -364,6 +362,7 @@ export async function validateAndPrepareOrder(order) {
   const prepared = {
     id: randomUUID(),
     event_id: randomUUID(),
+    payment_id: resolvedPaymentId,
     name: name.trim(),
     email: emailTrimmed,
     currency: currencyNorm,
@@ -372,11 +371,8 @@ export async function validateAndPrepareOrder(order) {
     shipping_cost_cents: shippingCents,
     metadata: {
       ...normMetadata,
-      shipping_cost_cents: shippingCents,
     },
     status: initialStatus,
-    fulfilled: false,
-    email_sent: false,
     track_url: "",
     written_at: new Date().toISOString(),
   };

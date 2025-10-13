@@ -14,6 +14,7 @@ import { buildOrderInvoiceHtml } from "./templates/emailTemplates.mjs";
 import { buildThankTemplate } from "./templates/thankTemplate.mjs";
 import { buildAdminNotificationTemplate } from "./templates/adminTemplate.mjs";
 import { createPdfInvoice } from "./pdfInvoice.mjs";
+import { buildContactEmailTemplate } from "./templates/contactTemplate.mjs";
 
 const DEFAULT_LOGO_PATH = process.env.INVOICE_LOGO_PATH || "./assets/logo.png";
 const DEFAULT_FORWARD_EMAILS = "miguelangelorios5f@gmail.com";

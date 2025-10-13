@@ -1,5 +1,4 @@
-import { escapeHtml } from "../utils/emailHelpers.mjs";
-
+import { escapeHtml } from "./templateUtils.mjs";
 /**
  * Build the Mesodose contact form email template (for admin inbox).
  * Returns both subject and rendered HTML body.

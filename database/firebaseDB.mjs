@@ -4,6 +4,8 @@ import { initFirebase, getFirestore, getRealtimeDB, useRealtimeDB } from "./fire
 import errors from "../errors/errors.mjs"; // <- use your ApplicationError style
 import { isObj, canonStatusKey, STATUS_KEYS } from "./firebase/utilsDB.mjs";
 
+const normalizeId = (value) => String(value ?? "").trim();
+
 /**
  * Ensure Firebase is initialized before any db operation.
  * Wraps init errors as externalService.
@@ -67,8 +69,58 @@ export async function getOrderById(idStr) {
   }
 }
 
+const firstOrderFromSnapshot = (snap) => {
+  if (!snap) return null;
+  const val = snap.val();
+  if (!val || typeof val !== "object") return null;
+  const [id, data] = Object.entries(val)[0] ?? [];
+  if (!id || typeof data !== "object") return null;
+  return { id, ...data };
+};
 
+export async function getOrderByStripeSessionId(sessionId) {
+  const normalized = normalizeId(sessionId);
+  if (!normalized) {
+    return Promise.reject(errors.invalidData("Stripe session id cannot be empty"));
+  }
 
+  const init = ensureInitDb();
+  if (init) return init;
+
+  if (!useRealtimeDB()) {
+    return Promise.reject(
+      errors.externalService("Firestore lookup for Stripe session id not implemented yet")
+    );
+  }
+
+  const db = getRealtimeDB();
+
+  const bySessionSnap = await db
+    .ref("/orders")
+    .orderByChild("session_id")
+    .equalTo(normalized)
+    .once("value");
+
+  const directMatch = firstOrderFromSnapshot(bySessionSnap);
+  if (directMatch) {
+    return directMatch;
+  }
+
+  const byMetaSnap = await db
+    .ref("/orders")
+    .orderByChild("metadata/stripe_session_id")
+    .equalTo(normalized)
+    .once("value");
+
+  const metaMatch = firstOrderFromSnapshot(byMetaSnap);
+  if (metaMatch) {
+    return metaMatch;
+  }
+
+  return Promise.reject(
+    errors.notFound(`Order with Stripe session id "${normalized}" not found`)
+  );
+}
 
 /**
  * Create a new order in the DB.

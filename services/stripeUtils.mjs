@@ -159,11 +159,15 @@ export async function createUrlCheckoutSession({
       metadata,
     });
 
-    if (!session?.url) {
+    if (!session?.url || !session?.id) {
       return errors.externalService("Stripe session created without URL");
     }
 
-    return session.url;
+    return {
+      url: session.url,
+      sessionId: session.id,
+      paymentIntentId: session.payment_intent || null,
+    };
   } catch (stripeError) {
     if (stripeError?.type === "StripeCardError") {
       return errors.stripeCardError(stripeError.message, {

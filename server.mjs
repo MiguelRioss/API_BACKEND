@@ -113,6 +113,7 @@ app.use(express.json());
  * for admin or system integrations if needed.
  */
 app.get("/api/orders", ordersApi.getOrdersAPI);
+app.get("/api/orders/session/:sessionId", ordersApi.getOrderBySessionIdAPI);
 app.get("/api/orders/:id", ordersApi.getOrderByIdAPI);
 app.post("/api/orders", ordersApi.createOrderAPI);
 app.patch("/api/orders/:id", ordersApi.updateOrderAPI); 

@@ -70,7 +70,7 @@ export default function createStripeServices(stockServices) {
       });
     }
 
-    const sessionUrl = await createUrlCheckoutSession({
+    const sessionResult = await createUrlCheckoutSession({
       stripe,
       line_items,
       customer,
@@ -82,10 +82,18 @@ export default function createStripeServices(stockServices) {
       notes,
     });
 
-    if (typeof sessionUrl !== "string") {
-      return sessionUrl;
+    if (
+      !sessionResult ||
+      typeof sessionResult !== "object" ||
+      typeof sessionResult.url !== "string"
+    ) {
+      return sessionResult;
     }
 
-    return { url: sessionUrl };
+    return {
+      url: sessionResult.url,
+      sessionId: sessionResult.sessionId,
+      paymentIntentId: sessionResult.paymentIntentId,
+    };
   }
 }

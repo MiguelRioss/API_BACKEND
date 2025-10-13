@@ -208,6 +208,12 @@ export function buildOrderPayload({ session, items }) {
     Number(session?.total_details?.amount_shipping) || 0,
   );
 
+  const normalizedClientReferenceId =
+    sanitizeString(session?.client_reference_id) || sanitizeString(meta.client_reference_id);
+  const normalizedOrderId =
+    sanitizeString(meta.order_id) || normalizedClientReferenceId;
+  const normalizedSessionId = sanitizeString(session?.id);
+
   const normalizedItems = (Array.isArray(items) ? items : []).map((item) => {
     const idNum = Number(item?.id);
     return {
@@ -234,17 +240,29 @@ export function buildOrderPayload({ session, items }) {
     currency: sanitizeString(session?.currency).toLowerCase() || "eur",
     items: normalizedItems,
     payment_id: sanitizeString(session?.payment_intent),
+    session_id: normalizedSessionId,
     shipping_cost_cents: shippingCost,
-    metadata: {
+    metadata: buildMetadata(),
+  };
+
+  function buildMetadata() {
+    const metadata = {
       notes: sanitizeString(meta.notes),
       billing_same_as_shipping: billingSameAsShipping,
       shipping_cost_cents: shippingCost,
       shipping_address: { ...shippingAddress, phone },
       billing_address: { ...billingAddress, phone: billingAddress.phone || phone },
-      stripe_session_id: sanitizeString(session?.id),
-      client_reference_id:
-        sanitizeString(session?.client_reference_id) || sanitizeString(meta.client_reference_id),
+      stripe_session_id: normalizedSessionId,
       payment_status: sanitizeString(session?.payment_status),
-    },
-  };
+    };
+
+    if (normalizedClientReferenceId) {
+      metadata.client_reference_id = normalizedClientReferenceId;
+    }
+    if (normalizedOrderId) {
+      metadata.order_id = normalizedOrderId;
+    }
+
+    return metadata;
+  }
 }

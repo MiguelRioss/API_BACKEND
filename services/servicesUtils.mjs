@@ -54,6 +54,7 @@ export function orderMatchesId(order, needle) {
     order.event_id,
     order.id,
     order.session_id,
+    order.metadata?.stripe_session_id,
     order.metadata?.order_id,
     order.metadata?.tracking_id,
   ];
@@ -64,6 +65,20 @@ export function findOrderById(ordersArray, id) {
   const needle = normalizeId(id);
   if (!Array.isArray(ordersArray) || ordersArray.length === 0) return null;
   return ordersArray.find((o) => orderMatchesId(o, needle)) || null;
+}
+
+export function findOrderBySessionId(ordersArray, sessionId) {
+  const needle = normalizeId(sessionId);
+  if (!needle || !Array.isArray(ordersArray) || ordersArray.length === 0) {
+    return null;
+  }
+
+  return (
+    ordersArray.find((order) =>
+      candidateMatches(order?.session_id, needle) ||
+      candidateMatches(order?.metadata?.stripe_session_id, needle)
+    ) || null
+  );
 }
 
 export function filterByStatus(orders = [], status) {
@@ -226,9 +241,15 @@ function validateMetadata(meta) {
     shipping_cost_cents,
     shipping_address,
     billing_address,
-    stripe_session_id: meta.stripe_session_id ?? "",
-    client_reference_id: meta.client_reference_id ?? "",
-    payment_status: meta.payment_status ?? "",
+    stripe_session_id:
+      typeof meta.stripe_session_id === "string" || typeof meta.stripe_session_id === "number"
+        ? normalizeId(meta.stripe_session_id)
+        : "",
+    client_reference_id:
+      typeof meta.client_reference_id === "string" || typeof meta.client_reference_id === "number"
+        ? normalizeId(meta.client_reference_id)
+        : "",
+    payment_status: typeof meta.payment_status === "string" ? meta.payment_status.trim() : "",
   };
 }
 
@@ -334,6 +355,12 @@ export async function validateAndPrepareOrder(order) {
   const normItems = validateItemsArray(items, amount_total, shippingCents);
   const normMetadata = validateMetadata(metadata);
   const initialStatus = makeDefaultStatus();
+  const rawSessionId =
+    typeof order.session_id !== "undefined" ? order.session_id : normMetadata.stripe_session_id;
+  const normalizedSessionId =
+    rawSessionId === null
+      ? ""
+      : normalizeId(typeof rawSessionId === "string" || typeof rawSessionId === "number" ? rawSessionId : "");
 
   // --- Build final normalized order ---
   const prepared = {
@@ -347,6 +374,7 @@ export async function validateAndPrepareOrder(order) {
     items: normItems,
     amount_total,
     shipping_cost_cents: shippingCents,
+    session_id: normalizedSessionId || "",
     metadata: {
       ...normMetadata,
     },

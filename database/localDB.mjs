@@ -115,6 +115,26 @@ export async function createOrderDB(orderObject) {
 }
 
 const isPlainObject = (v) => v && typeof v === "object" && !Array.isArray(v);
+const normalizeId = (value) => String(value ?? "").trim();
+
+const sessionMatches = (candidate, needle) => {
+  if (candidate === null || typeof candidate === "undefined") return false;
+  const normalized = normalizeId(candidate);
+  if (!normalized) return false;
+  if (normalized === needle) return true;
+
+  const candNum = Number(normalized);
+  const needleNum = Number(needle);
+  return !Number.isNaN(candNum) && !Number.isNaN(needleNum) && candNum === needleNum;
+};
+
+const orderMatchesSession = (order, needle) => {
+  if (!order || !needle) return false;
+  return (
+    sessionMatches(order.session_id, needle) ||
+    sessionMatches(order?.metadata?.stripe_session_id, needle)
+  );
+};
 
 /**
  * Update an order by replacing with a new version.
@@ -139,6 +159,33 @@ export async function updateOrderDB(id, updatedOrder) {
   writeFileAtomic(DB_FILE, map);
 
   return { id: key, ...updatedOrder };
+}
+
+/**
+ * Lookup an order by Stripe checkout session id.
+ *
+ * @param {string|number} sessionId
+ * @returns {Promise<Object>} Matching order.
+ */
+export async function getOrderByStripeSessionId(sessionId) {
+  const normalized = normalizeId(sessionId);
+  if (!normalized) {
+    return Promise.reject(errors.invalidData("Stripe session id cannot be empty"));
+  }
+
+  const map = readFileSafe(DB_FILE) || {};
+  const bucket = isPlainObject(map.orders) ? map.orders : map;
+
+  const orders = Object.values(bucket);
+  const found = orders.find((order) => orderMatchesSession(order, normalized));
+
+  if (!found) {
+    return Promise.reject(
+      errors.notFound(`Order with Stripe session id "${normalized}" not found`)
+    );
+  }
+
+  return found;
 }
 
 /**

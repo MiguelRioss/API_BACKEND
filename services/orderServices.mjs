@@ -1,5 +1,6 @@
 ﻿// api/services/ordersServiceFactory.mjs
 
+import errors from "../errors/errors.mjs";
 import {
   filterByStatus,
   filterByQuery,
@@ -8,6 +9,8 @@ import {
   validateAndPrepareOrder,
   mergeOrderChanges,
   validateAndNormalizeID,
+  normalizeId,
+  findOrderBySessionId,
 } from "./servicesUtils.mjs";
 
 /**
@@ -37,6 +40,7 @@ export default function createOrdersService(db, emailService) {
   return {
     getOrdersServices,
     getOrderByIdServices,
+    getOrderByStripeSessionId,
     createOrderServices,
     updateOrderServices,
   };
@@ -53,6 +57,41 @@ export default function createOrdersService(db, emailService) {
   async function getOrderByIdServices(id) {
     const normalizedID = await validateAndNormalizeID(id);
     return db.getOrderById(normalizedID);
+  }
+
+  async function getOrderByStripeSessionId(sessionId) {
+    if (sessionId === null || typeof sessionId === "undefined") {
+      return Promise.reject(
+        errors.invalidData("You must provide a Stripe session id.")
+      );
+    }
+
+    const normalized = normalizeId(sessionId);
+    if (!normalized) {
+      return Promise.reject(
+        errors.invalidData("Stripe session id cannot be empty.")
+      );
+    }
+
+    if (typeof db.getOrderByStripeSessionId === "function") {
+      return db.getOrderByStripeSessionId(normalized);
+    }
+
+    const orders = await db.getAllOrders();
+    if (!Array.isArray(orders)) {
+      return Promise.reject(
+        errors.internalError("Orders lookup failed: data store did not return an array.")
+      );
+    }
+
+    const found = findOrderBySessionId(orders, normalized);
+    if (!found) {
+      return Promise.reject(
+        errors.notFound(`Order with Stripe session id "${normalized}" not found.`)
+      );
+    }
+
+    return found;
   }
 
   async function createOrderServices(order) {

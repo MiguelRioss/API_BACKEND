@@ -9,6 +9,7 @@ export default function createOrdersAPI(ordersService) {
     return {
         getOrdersAPI: handlerFactory(interalGetOrders),
         getOrderByIdAPI: handlerFactory(internalGetOrderByID),
+        getOrderBySessionIdAPI: handlerFactory(internalGetOrderBySessionId),
         createOrderAPI: handlerFactory(internalCreateOrder),
         updateOrderAPI: handlerFactory(internalUpdateOrder)
     };
@@ -25,6 +26,11 @@ export default function createOrdersAPI(ordersService) {
         const id = req.params.id;
         return ordersService.getOrderByIdServices(id)
             .then(order => rsp.json(order)); // will throw NotFoundError if missing
+    }
+
+    async function internalGetOrderBySessionId(req) {
+        const sessionId = req.params.sessionId ?? req.params.id;
+        return ordersService.getOrderByStripeSessionId(sessionId);
     }
 
     async function internalCreateOrder(req, rsp) {

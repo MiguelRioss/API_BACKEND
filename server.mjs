@@ -21,6 +21,8 @@ import createEmailAPI from "./api/emailAPI.mjs"; // --- New Contact API
 // --- Email (transport + service)
 import createEmailService from "./services/emailServices/emailService.mjs";
 import brevoTransport from "./services/emailServices/brevoTransports.mjs";
+import createSubscribeAPI from "./api/subscribeAPI.mjs";
+
 
 // --- Stripe webhook router (must use raw body; mount before express.json())
 import stripeWebhook from "./stripe/webhook.mjs";
@@ -81,6 +83,7 @@ const stockApi = createStocksAPI(stockService);
 const ordersApi = createOrdersAPI(ordersService);
 const stripeAPi = createStripeAPI(stripeServices);
 const emailApi = createEmailAPI(emailService); // --- New Contact API
+const subscribeApi = createSubscribeAPI();  // --- New Subscribe API
 
 // -----------------------------------------------------------------------------
 // Stripe Webhook
@@ -112,7 +115,7 @@ app.use(express.json());
 app.get("/api/orders", ordersApi.getOrdersAPI);
 app.get("/api/orders/:id", ordersApi.getOrderByIdAPI);
 app.post("/api/orders", ordersApi.createOrderAPI);
-app.patch("/api/orders/:id", ordersApi.updateOrderAPI);
+app.patch("/api/orders/:id", ordersApi.updateOrderAPI); 
 
 // -----------------------------------------------------------------------------
 // Stock API
@@ -156,6 +159,16 @@ app.post("/api/checkout-sessions", stripeAPi.handleCheckoutSession);
  * You can expand later to use Brevo or another mailer.
  */
 app.post("/api/contactUs",emailApi.handleContactForm); // --- New Contact API
+
+// -----------------------------------------------------------------------------
+// Brevo for subscrivers
+// -----------------------------------------------------------------------------
+/**
+ * Handles frontend contact form submissions from /api/contactUs.
+ * You can expand later to use Brevo or another mailer.
+ */
+
+app.post("/api/subscribe", subscribeApi.handleSubscribe); // --- New Subscribe API
 
 // -----------------------------------------------------------------------------
 // Server Boot

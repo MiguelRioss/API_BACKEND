@@ -107,3 +107,45 @@ export async function buildInlineImage(filePath, cid = "inline-logo") {
     return null;
   }
 }
+
+/**
+ * Escapes HTML special characters to prevent injection.
+ * Used when injecting dynamic user data into email templates.
+ */
+export function escapeHtml(value = "") {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+/**
+ * Creates a filesystem-safe slug (e.g. for filenames).
+ */
+export function safeSlug(value) {
+  return String(value || "order")
+    .replace(/[^a-z0-9_-]+/gi, "-")
+    .replace(/-{2,}/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+/**
+ * Normalizes an email by trimming whitespace.
+ */
+export function normalizeEmail(value) {
+  if (!value) return "";
+  return String(value).trim();
+}
+
+/**
+ * Parses a comma, semicolon, or space-separated list of emails into an array.
+ */
+export function parseEmailList(value) {
+  if (!value) return [];
+  return String(value)
+    .split(/[,;\s]+/)
+    .map(normalizeEmail)
+    .filter(Boolean);
+}

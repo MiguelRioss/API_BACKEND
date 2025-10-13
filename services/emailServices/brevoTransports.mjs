@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import Brevo from "sib-api-v3-sdk";
+import dotenv from "dotenv";
 
 const client = Brevo.ApiClient.instance;
 client.authentications["api-key"].apiKey = process.env.BREVO_API_KEY;

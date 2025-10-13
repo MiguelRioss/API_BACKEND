@@ -1,6 +1,6 @@
 // services/emailServices/testSendEmail.mjs
-import brevoTransport from "./brevoTransports.mjs";
-import createEmailService from "./emailService.mjs";
+import brevoTransport from "../brevoTransports.mjs";
+import createEmailService from "../emailService.mjs";
 
 const emailService = createEmailService({ transport: brevoTransport });
 

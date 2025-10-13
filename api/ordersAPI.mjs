@@ -3,11 +3,11 @@ import handlerFactory from "../utils/handleFactory.mjs";
 // api/ordersApi.mjs
 export default function createOrdersAPI(ordersService) {
     if (!ordersService || typeof ordersService.getOrdersServices !== "function") {
-       throw "API dependency invalid";
+        throw "API dependency invalid";
     }
 
     return {
-       getOrdersAPI : handlerFactory(interalGetOrders),
+        getOrdersAPI: handlerFactory(interalGetOrders),
         getOrderByIdAPI: handlerFactory(internalGetOrderByID),
         createOrderAPI: handlerFactory(internalCreateOrder),
         updateOrderAPI: handlerFactory(internalUpdateOrder)
@@ -41,12 +41,23 @@ export default function createOrdersAPI(ordersService) {
 
     async function internalUpdateOrder(req, rsp) {
         const orderID = req.params.id;
-        const orderChanges = req.body.changes
-        // The handler does not catch errors; createHandler wrapper sends errors to central error handler.
-        return ordersService.updateOrderServices(orderID, orderChanges).then(
-            order => rsp.json({
-                message: `Order with id ${order.id} updated`
-            })
-        )
+        const orderChanges = req.body.changes;
+
+        try {
+            const updatedOrder = await ordersService.updateOrderServices(orderID, orderChanges);
+
+            // ✅ Return the full updated object instead of just a message
+            return rsp.status(200).json({
+                message: `Order with id ${updatedOrder.id} updated successfully`,
+                ...updatedOrder,
+            });
+        } catch (error) {
+            console.error("❌ Error updating order:", error);
+            return rsp.status(500).json({
+                message: "Failed to update order",
+                error: error.message,
+            });
+        }
     }
+
 }

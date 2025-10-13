@@ -1,8 +1,8 @@
 import "dotenv/config";
-import brevoTransport from "./brevoTransports.mjs";
+import brevoTransport from "../brevoTransports.mjs";
 import { buildThankTemplate } from "./thankTemplate.mjs";
 import { buildAdminNotificationTemplate } from "./adminTemplate.mjs";
-import orderFixture from "../emailObjectAfterValidationMapper.js";
+import orderFixture from "../../emailObjectAfterValidationMapper.js";
 
 const DEFAULT_RECIPIENT = "miguelangelorios5f@gmail.com";
 

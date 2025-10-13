@@ -1,8 +1,9 @@
 import errors from "../errors/errors.mjs";
 
 const DEFAULT_SUCCESS_URL =
-  `${process.env.PUBLIC_BASE_URL}/#/checkout/success?session_id={CHECKOUT_SESSION_ID}`;
-const DEFAULT_CANCEL_URL = `${process.env.PUBLIC_BASE_URL}/#/checkout/cancel`;
+  `${process.env.PUBLIC_BASE_URL}/checkout/success/{CHECKOUT_SESSION_ID}`;
+
+const DEFAULT_CANCEL_URL = `${process.env.PUBLIC_BASE_URL}/checkout/cancel`;
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 

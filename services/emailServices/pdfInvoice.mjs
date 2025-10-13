@@ -2,7 +2,7 @@ import puppeteer from "puppeteer-core";
 import chromium from "@sparticuz/chromium";
 
 import path from "node:path";
-import { buildLogoSrc } from "./utils.mjs";
+import { buildLogoSrc } from "./utils/utils.mjs";
 
 const DEFAULT_INVOICE_LOGO_PATH = process.env.INVOICE_LOGO_PATH || "./assets/logo.png";
 

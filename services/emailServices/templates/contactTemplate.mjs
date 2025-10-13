@@ -31,7 +31,7 @@ export function buildContactEmailTemplate({
                   box-shadow:0 2px 10px rgba(0,0,0,0.06);overflow:hidden;">
       <tr>
         <td style="background:${brandColor};text-align:center;padding:24px;">
-          <img src="https://mesodose.com/logo.png" alt="Mesodose" width="160" style="display:block;margin:0 auto;"/>
+          <img src="https://mesodose.com/logo.png" alt="Mesodose" width="450" style="display:block;margin:0 auto;"/>
         </td>
       </tr>
 

@@ -16,6 +16,7 @@ import { buildThankTemplate } from "./templates/thankTemplate.mjs";
 import { buildAdminNotificationTemplate } from "./templates/adminTemplate.mjs";
 import { createPdfInvoice } from "./pdfInvoice.mjs";
 import { buildContactEmailTemplate } from "./templates/contactTemplate.mjs";
+import { buildShippingNotificationTemplate } from "./templates/shippingTemplate.mjs";
 
 const moduleDir = path.dirname(fileURLToPath(import.meta.url));
 const fallbackLogoPath = path.resolve(moduleDir, "./assets/logo.png");
@@ -198,10 +199,45 @@ export default function createEmailService({ transport } = {}) {
 
 
   // ---------------------------------------------------------------------------
-  // 3 Send Shipping  Email
+  // 3. Send Shipping Notification Email
   // ---------------------------------------------------------------------------
-  async function sendShippingEmail({ order }) {
+  async function sendShippingEmail({
+    order,
+    orderId,
+    orderDate,
+    invoiceId,
+    trackingNumber,
+    trackingUrl,
+    locale,
+    live = false,
+  } = {}) {
+    if (!order || typeof order !== "object") {
+      throw new Error("sendShippingEmail requires an order object");
+    }
 
+    const isTestRoute = !live && !!process.env.TEST_RECIPIENT;
+    const toEmail = isTestRoute ? process.env.TEST_RECIPIENT : order?.email;
+    const toName = isTestRoute ? "Test Recipient" : order?.name || "";
 
+    if (!toEmail) {
+      throw new Error("sendShippingEmail requires a recipient email address");
+    }
+
+    const { subject, html } = buildShippingNotificationTemplate({
+      order,
+      orderId,
+      orderDate,
+      invoiceId,
+      trackingNumber,
+      trackingUrl,
+      locale,
+    });
+
+    await transport.send({
+      toEmail,
+      toName,
+      subject,
+      html,
+    });
   }
 }

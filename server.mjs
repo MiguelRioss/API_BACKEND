@@ -159,7 +159,9 @@ app.post("/api/checkout-sessions", stripeAPi.handleCheckoutSession);
  * Handles frontend contact form submissions from /api/contactUs.
  * You can expand later to use Brevo or another mailer.
  */
-app.post("/api/contactUs",emailApi.handleContactForm); // --- New Contact API
+app.post("/api/email/invoice", emailApi.handleInvoiceEmail);
+app.post("/api/email/shipping", emailApi.handleShippingEmail);
+app.post("/api/contactUs", emailApi.handleContactForm); // --- New Contact API
 
 // -----------------------------------------------------------------------------
 // Brevo for subscrivers

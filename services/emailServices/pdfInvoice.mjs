@@ -2,9 +2,20 @@ import puppeteer from "puppeteer-core";
 import chromium from "@sparticuz/chromium";
 
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { buildLogoSrc } from "./utils/utils.mjs";
 
-const DEFAULT_INVOICE_LOGO_PATH = process.env.INVOICE_LOGO_PATH || "./assets/logo.png";
+const moduleDir = path.dirname(fileURLToPath(import.meta.url));
+const fallbackLogoPath = path.resolve(moduleDir, "./assets/logo.png");
+const envLogoPath = (process.env.INVOICE_LOGO_PATH || "").trim();
+
+const DEFAULT_INVOICE_LOGO_PATH = envLogoPath
+  ? /^https?:\/\//i.test(envLogoPath)
+    ? envLogoPath
+    : path.isAbsolute(envLogoPath)
+    ? envLogoPath
+    : path.resolve(process.cwd(), envLogoPath)
+  : fallbackLogoPath;
 
 /**
  * Create a styled PDF invoice from HTML and company logo (Ibogenics theme)

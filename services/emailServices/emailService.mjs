@@ -1,7 +1,8 @@
 import os from "node:os";
 import fs from "node:fs/promises";
 import { randomUUID } from "node:crypto";
-import { join } from "node:path";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import {
   escapeHtml,
@@ -16,7 +17,16 @@ import { buildAdminNotificationTemplate } from "./templates/adminTemplate.mjs";
 import { createPdfInvoice } from "./pdfInvoice.mjs";
 import { buildContactEmailTemplate } from "./templates/contactTemplate.mjs";
 
-const DEFAULT_LOGO_PATH = process.env.INVOICE_LOGO_PATH || "./assets/logo.png";
+const moduleDir = path.dirname(fileURLToPath(import.meta.url));
+const fallbackLogoPath = path.resolve(moduleDir, "./assets/logo.png");
+const envLogoPath = (process.env.INVOICE_LOGO_PATH || "").trim();
+const DEFAULT_LOGO_PATH = envLogoPath
+  ? /^https?:\/\//i.test(envLogoPath)
+    ? envLogoPath
+    : path.isAbsolute(envLogoPath)
+    ? envLogoPath
+    : path.resolve(process.cwd(), envLogoPath)
+  : fallbackLogoPath;
 const DEFAULT_FORWARD_EMAILS = "miguelangelorios5f@gmail.com";
 
 
@@ -58,7 +68,7 @@ export default function createEmailService({ transport } = {}) {
 
       const invoiceHtml = buildOrderInvoiceHtml({ order, orderId });
       const pdfFilename = `Invoice-${safeSlug(orderId || new Date().toISOString())}.pdf`;
-      const tempPdfPath = join(os.tmpdir(), `invoice-${randomUUID()}.pdf`);
+      const tempPdfPath = path.join(os.tmpdir(), `invoice-${randomUUID()}.pdf`);
 
       let pdfAbsolutePath = tempPdfPath;
       let pdfBase64 = "";

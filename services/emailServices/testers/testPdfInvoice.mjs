@@ -1,6 +1,6 @@
 import path from "path";
 import { fileURLToPath } from "url";
-import { buildOrderInvoiceHtml } from "./emailTemplates.mjs";
+import { buildOrderInvoiceHtml } from "../templates/emailTemplates.mjs";
 import { createPdfInvoice } from "../pdfInvoice.mjs";
 
 const order = {

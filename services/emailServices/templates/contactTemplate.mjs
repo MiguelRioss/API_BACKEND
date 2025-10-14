@@ -32,10 +32,14 @@ export function buildContactEmailTemplate({
       <tr>
         <td style="background:${brandColor};text-align:center;padding:24px;">
 <<<<<<< HEAD
+<<<<<<< HEAD
           <img src="https://mesodose.com/logoEmail.png" alt="Mesodose" width="450" style="display:block;margin:0 auto;"/>
 =======
           <img src="https://mesodose.com/logo.png" alt="Mesodose" width="160" style="display:block;margin:0 auto;"/>
 >>>>>>> parent of 3d30a0f (logo size)
+=======
+          <img src="https://mesodose.com/logo.png" alt="Mesodose" width="450" style="display:block;margin:0 auto;"/>
+>>>>>>> parent of 283818e (/LogoEmail)
         </td>
       </tr>
 

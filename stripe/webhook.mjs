@@ -79,12 +79,20 @@ export default function stripeWebhook({ ordersService, stockService }) {
         }
 
         // 4) Build order payload for your DB
-        console.log(session)
         const orderPayload = buildOrderPayload({ session, items });
 
         // 5) Idempotency guard
         if (ordersService.getOrderByStripeSessionId) {
-          const exists = await ordersService.getOrderByStripeSessionId(session.id);
+          let exists = null;
+          try {
+            exists = await ordersService.getOrderByStripeSessionId(session.id);
+          } catch (lookupErr) {
+            const isNotFound =
+              lookupErr?.code === "NOT_FOUND" || lookupErr?.httpStatus === 404;
+            if (!isNotFound) {
+              throw lookupErr;
+            }
+          }
           if (exists) {
             if (debug) console.log("[stripeWebhook] Order already processed, skipping.");
             return res.sendStatus(200);

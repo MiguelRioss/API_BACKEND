@@ -34,7 +34,7 @@ export default function createSubscribeAPI() {
             LASTNAME: fullName?.split(" ").slice(1).join(" ") || "",
             PHONE: phone || "",
           },
-          listIds: [Number(process.env.BREVO_LIST_ID) || 5],
+          listIds: [Number(process.env.BREVO_LIST_ID)],
           updateEnabled: true,
           tags: ["checkout_optin"],
         }),

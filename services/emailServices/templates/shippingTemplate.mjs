@@ -97,7 +97,6 @@ export function buildShippingNotificationTemplate({
       '<div style="font-family:Helvetica,Arial,sans-serif;color:#222;font-size:14px;line-height:1.6;">',
       `  <p style="margin:0 0 8px 0;"><strong>Order date:</strong> ${escapeHtml(formattedDate)}</p>`,
       `  <p style="margin:0 0 8px 0;"><strong>Order ID:</strong> ${escapeHtml(resolvedOrderId || "")}</p>`,
-      `  <p style="margin:0 0 16px 0;"><strong>Invoice ID:</strong> ${escapeHtml(resolvedInvoiceId || "Pending")}</p>`,
       `  <p style="margin:0 0 16px 0;">Dear ${escapeHtml(customerName)},</p>`,
       "  <p style=\"margin:0 0 16px 0;\">Once again thank you for your order with Mesodose. To recap...</p>",
       '  <p style="margin:16px 0 8px 0;"><strong>Items you have ordered:</strong></p>',

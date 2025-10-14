@@ -1,7 +1,12 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import Brevo from "sib-api-v3-sdk";
 import dotenv from "dotenv";
+
+const moduleDir = path.dirname(fileURLToPath(import.meta.url));
+const envPath = path.resolve(moduleDir, "../../.env");
+dotenv.config({ path: envPath });
 
 const client = Brevo.ApiClient.instance;
 client.authentications["api-key"].apiKey = process.env.BREVO_API_KEY;

@@ -161,8 +161,8 @@ function validateItemsArray(items, amount_total, shippingCents = 0) {
     }
 
     const { id, name, quantity, unit_amount } = it;
-
-    if (!Number.isInteger(id) || id < 0) {
+    let normalizedID = Number(id)
+    if (!Number.isInteger(normalizedID) ) {
       throw errors.invalidData(`Order.items[${idx}].id must be a positive integer.`);
     }
     if (typeof name !== "string" || name.trim() === "") {
@@ -179,7 +179,7 @@ function validateItemsArray(items, amount_total, shippingCents = 0) {
 
     computedTotal += quantity * unit_amount;
 
-    return { id, name: name.trim(), quantity, unit_amount };
+    return { id: normalizedID, name: name.trim(), quantity, unit_amount };
   });
 
   const expectedTotal = computedTotal + shippingCents;

@@ -7,6 +7,9 @@ import {
   resolveAddress,
 } from "./templateUtils.mjs";
 
+
+import dotenv from "dotenv";
+
 /**
  * Build the customer-facing shipping confirmation email template.
  * Returns both the subject and rendered HTML body.

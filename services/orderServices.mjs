@@ -80,6 +80,7 @@ export default function createOrdersService(db, emailService) {
 
   async function createOrderServices(order) {
     const prepared = await validateAndPrepareOrder(order);
+    console.log(prepared)
     const saved = await db.createOrderDB(prepared);
 
     if (!mailer) {

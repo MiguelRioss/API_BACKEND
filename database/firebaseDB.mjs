@@ -73,7 +73,7 @@ export async function getOrderById(idStr) {
 export async function getOrderByStripeSessionId(sessionId) {
   const orders = await getAllOrders();
 
-  const order = orders.find((o, i) => {return  o.session_id === sessionId });
+  const order = orders.find((o, i) => { return o.session_id === sessionId });
   if (order) {
     return order;
   }
@@ -314,11 +314,14 @@ export async function getStockByID(idStr) {
 export async function findStockAndDecrement(stockSnapshot, orderData) {
   if (!orderData?.items || !Array.isArray(orderData.items)) return [];
   const applied = [];
+  console.log(stockSnapshot)
 
   for (const item of orderData.items) {
     const stockId = Number(item.id);
+
     const qty = Number(item.quantity);
     const found = stockSnapshot.find(s => Number(s.id) === stockId);
+    console.log(found)
     if (!found) throw new Error(`STOCK_notFound:${stockId}`);
 
     const newVal = Number(found.stockValue) - qty;

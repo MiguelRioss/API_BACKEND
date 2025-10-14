@@ -72,6 +72,7 @@ export function findOrderBySessionId(ordersArray, sessionId) {
   if (!needle || !Array.isArray(ordersArray) || ordersArray.length === 0) {
     return null;
   }
+  console.log("Orders Array" ,ordersArray)
 
   return (
     ordersArray.find((order) =>

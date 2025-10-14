@@ -69,57 +69,15 @@ export async function getOrderById(idStr) {
   }
 }
 
-const firstOrderFromSnapshot = (snap) => {
-  if (!snap) return null;
-  const val = snap.val();
-  if (!val || typeof val !== "object") return null;
-  const [id, data] = Object.entries(val)[0] ?? [];
-  if (!id || typeof data !== "object") return null;
-  return { id, ...data };
-};
 
 export async function getOrderByStripeSessionId(sessionId) {
-  const normalized = normalizeId(sessionId);
-  if (!normalized) {
-    return Promise.reject(errors.invalidData("Stripe session id cannot be empty"));
+  const orders = await getAllOrders();
+
+  const order = orders.find((o, i) => {return  o.session_id === sessionId });
+  if (order) {
+    return order;
   }
-
-  const init = ensureInitDb();
-  if (init) return init;
-
-  if (!useRealtimeDB()) {
-    return Promise.reject(
-      errors.externalService("Firestore lookup for Stripe session id not implemented yet")
-    );
-  }
-
-  const db = getRealtimeDB();
-
-  const bySessionSnap = await db
-    .ref("/orders")
-    .orderByChild("session_id")
-    .equalTo(normalized)
-    .once("value");
-
-  const directMatch = firstOrderFromSnapshot(bySessionSnap);
-  if (directMatch) {
-    return directMatch;
-  }
-
-  const byMetaSnap = await db
-    .ref("/orders")
-    .orderByChild("metadata/stripe_session_id")
-    .equalTo(normalized)
-    .once("value");
-
-  const metaMatch = firstOrderFromSnapshot(byMetaSnap);
-  if (metaMatch) {
-    return metaMatch;
-  }
-
-  return Promise.reject(
-    errors.notFound(`Order with Stripe session id "${normalized}" not found`)
-  );
+  throw errors.notFound(`Order with session_id "${sessionId}" not found`);
 }
 
 /**
@@ -244,7 +202,7 @@ export async function getStocks() {
       .ref("/stock")
       .once("value")
       .then((snap) => snap.val() || {})
-      .then((val) => Object.entries(val).map(([id, data]) => ({ id: Number(id), name: data.title, stockValue: data.stockValue , price: data.priceInEuros })))
+      .then((val) => Object.entries(val).map(([id, data]) => ({ id: Number(id), name: data.title, stockValue: data.stockValue, price: data.priceInEuros })))
       .catch((err) =>
         Promise.reject(errors.externalService("Failed to read orders from DB", { original: err }))
       );

@@ -76,22 +76,6 @@ export default function createOrdersService(db, emailService) {
     if (typeof db.getOrderByStripeSessionId === "function") {
       return db.getOrderByStripeSessionId(normalized);
     }
-
-    const orders = await db.getAllOrders();
-    if (!Array.isArray(orders)) {
-      return Promise.reject(
-        errors.internalError("Orders lookup failed: data store did not return an array.")
-      );
-    }
-
-    const found = findOrderBySessionId(orders, normalized);
-    if (!found) {
-      return Promise.reject(
-        errors.notFound(`Order with Stripe session id "${normalized}" not found.`)
-      );
-    }
-
-    return found;
   }
 
   async function createOrderServices(order) {

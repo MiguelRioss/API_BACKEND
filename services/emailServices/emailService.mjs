@@ -137,7 +137,7 @@ export default function createEmailService({ transport } = {}) {
         }
       }
       
-      if(adminRecipients.length < 0)
+      if(adminRecipients.length <= 0)
         return Promise.reject(errors.internalError("Bad conversion on admin "))
       
       //Transport Should be the one to try catch
@@ -208,7 +208,7 @@ export default function createEmailService({ transport } = {}) {
     locale,
   } = {}) {
     if (!order || typeof order !== "object") {
-      Promise.reject(errors.invalidData("sendShippingEmail requires an order object"))
+     return  Promise.reject(errors.invalidData("sendShippingEmail requires an order object"))
     }
 
     const toEmail = process.env.TEST_RECIPIENT 

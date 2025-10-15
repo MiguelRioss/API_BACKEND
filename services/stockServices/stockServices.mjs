@@ -2,7 +2,7 @@ import errors from '../../errors/errors.mjs'
 
 export default function createStockServices(db) {
   if (!db) {
-    throw "Services dependency invalid";
+    throw errors.internalError("Services dependency invalid");
   }
 
   return {
@@ -48,7 +48,7 @@ export default function createStockServices(db) {
   }
 
   async function getStockServices() {
-    return Promise.reject(db.getStocks());
+    return db.getStocks();
   }
 
   /**
@@ -61,7 +61,7 @@ export default function createStockServices(db) {
 
     const existing = await db.getStockByID(id);
     const updated = { ...existing, ...changes, updatedAt: new Date().toISOString() };
-    return Promise.reject(db.updateStock(id, updated))
+    return db.updateStock(id, updated)
   }
 
   async function adjustStock(stockID, delta = 0) {

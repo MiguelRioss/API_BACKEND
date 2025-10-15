@@ -1,10 +1,11 @@
+import errors from "../errors/errors.mjs";
 import handlerFactory from "../utils/handleFactory.mjs";
 
 export default function createStocksAPI(stockService) {
 
   
   if (!stockService) {
-    throw "API dependency invalid";
+    return errors.internalError("API dependency invalid");
   }
 
   return {

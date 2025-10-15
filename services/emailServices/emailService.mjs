@@ -18,7 +18,6 @@ import { createPdfInvoice } from "./pdfInvoice.mjs";
 import { buildContactEmailTemplate } from "./templates/contactTemplate.mjs";
 import { buildShippingNotificationTemplate } from "./templates/shippingTemplate.mjs";
 import errors from "../../errors/errors.mjs";
-import handlerFactory from "../../utils/handleFactory.mjs";
 
 const moduleDir = path.dirname(fileURLToPath(import.meta.url));
 const fallbackLogoPath = path.resolve(moduleDir, "./assets/logo.png");
@@ -41,9 +40,9 @@ export default function createEmailService({ transport } = {}) {
   }
 
   return {
-    sendOrderEmails : handlerFactory(sendOrderEmails),
-    sendContactEmail : handlerFactory(sendContactEmail),
-    sendShippingEmail : handlerFactory(sendShippingEmail)
+    sendOrderEmails,
+    sendContactEmail,
+    sendShippingEmail
   };
 
     // ---------------------------------------------------------------------------
@@ -55,14 +54,14 @@ export default function createEmailService({ transport } = {}) {
       logoPath = DEFAULT_LOGO_PATH,
     } = {}) {
       if (!order || typeof order !== "object") {
-       Promise.reject(errors.invalidData("sendOrderEmails requires an order object"));
+       return Promise.reject(errors.invalidData("sendOrderEmails requires an order object"));
       }
 
       const toEmail = order.email;
       const toName = order.name;
 
       if (!toEmail) {
-       Promise.reject(errors.invalidData("No email to send the order"))
+       return Promise.reject(errors.invalidData("No email to send the order"))
       }
 
       const invoiceHtml = buildOrderInvoiceHtml({ order, orderId });
@@ -113,11 +112,11 @@ export default function createEmailService({ transport } = {}) {
       const adminRecipients = [];
 
       if(!ownerEmail){
-        Promise.reject(errors.invalidData(`No emails on the owner = ${ownerEmail}` ))
+        return Promise.reject(errors.invalidData(`No emails on the owner = ${ownerEmail}` ))
       }
 
       if(!forwardEmails){
-        Promise.reject(errors.invalidData(`No emails on the forward =${forwardEmails}` ))
+        return Promise.reject(errors.invalidData(`No emails on the forward =${forwardEmails}` ))
       }
         adminRecipients.push({
           email: ownerEmail,
@@ -138,8 +137,8 @@ export default function createEmailService({ transport } = {}) {
         }
       }
       
-
-      Promise.reject(errors.internalError("Bad conversion on admin "))
+      if(adminRecipients.length < 0)
+        return Promise.reject(errors.internalError("Bad conversion on admin "))
       
       //Transport Should be the one to try catch
       try {
@@ -173,7 +172,7 @@ export default function createEmailService({ transport } = {}) {
     const toEmail = process.env.OWNER_EMAIL;
 
     if (!toEmail)
-      Promise.reject(errors.invalidData("OWNER_EMAIL not configured"));
+      return Promise.reject(errors.invalidData("OWNER_EMAIL not configured"));
 
     const { subject: subjectLine, html } = buildContactEmailTemplate({
       name,
@@ -216,7 +215,7 @@ export default function createEmailService({ transport } = {}) {
     const toName =  order.name
 
     if (!toEmail) {
-     Promise.reject(errors.invalidData("sendShippingEmail requires a recipient email address"))
+     return Promise.reject(errors.invalidData("sendShippingEmail requires a recipient email address"))
     }
 
     const { subject, html } = buildShippingNotificationTemplate({

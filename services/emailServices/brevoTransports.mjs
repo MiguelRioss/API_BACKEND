@@ -50,7 +50,7 @@ export default {
         }
 
         if (!contentBase64) {
-          Promise.reject(errors.internalError(`Attachment missing content: ${att.filename || att.name}`));
+          return Promise.reject(errors.internalError(`Attachment missing content: ${att.filename || att.name}`));
         }
 
         // Determine MIME type

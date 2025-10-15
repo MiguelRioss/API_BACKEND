@@ -1,5 +1,4 @@
 import errors from '../../errors/errors.mjs'
-import handlerFactory from '../../utils/handleFactory.mjs';
 
 export default function createStockServices(db) {
   if (!db) {
@@ -7,11 +6,11 @@ export default function createStockServices(db) {
   }
 
   return {
-    getStockServices:  handlerFactory(getStockServices),
-    updateStock: handlerFactory(updateStock) ,
-    adjustStock : handlerFactory(adjustStock) ,
-    getAllProducts : handlerFactory(getAllProducts),
-    getProductById: handlerFactory(getProductById) 
+    getStockServices,
+    updateStock,
+    adjustStock,
+    getAllProducts,
+    getProductById
   };
   /**
    * Get all products with business logic (fewTag / soldOut)
@@ -30,11 +29,12 @@ export default function createStockServices(db) {
   }
   async function getProductById(id) {
     const product = await getAllProducts().then(products => products.find(p => {
-      if(p.id==0) console.log(products)
-      return p.id === id}));
+      if (p.id == 0) console.log(products)
+      return p.id === id
+    }));
 
     if (!product) {
-      Promise.reject(errors.notFound(`Product ${id} not found`))
+      return Promise.reject(errors.notFound(`Product ${id} not found`))
     }
 
     const stockValue = product.stockValue ?? 0;
@@ -48,7 +48,7 @@ export default function createStockServices(db) {
   }
 
   async function getStockServices() {
-     Promise.reject(db.getStocks());
+    return Promise.reject(db.getStocks());
   }
 
   /**
@@ -61,16 +61,16 @@ export default function createStockServices(db) {
 
     const existing = await db.getStockByID(id);
     const updated = { ...existing, ...changes, updatedAt: new Date().toISOString() };
-     Promise.reject(db.updateStock(id, updated))
+    return Promise.reject(db.updateStock(id, updated))
   }
 
   async function adjustStock(stockID, delta = 0) {
     const id = String(stockID || '').trim();
-    if (!id) Promise.reject(errors.invalidData("Not a valid Id"));
+    if (!id) return Promise.reject(errors.invalidData("Not a valid Id"));
 
     const n = Number(delta);
     if (isNaN(n) || n === 0) {
-      Promise.reject(errors.invalidData("Delta must be a non-zero number"))
+      return Promise.reject(errors.invalidData("Delta must be a non-zero number"))
     }
 
     const target = await db.getStockByID(id);

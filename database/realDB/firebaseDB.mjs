@@ -317,11 +317,11 @@ export async function findStockAndDecrement(stockSnapshot, orderData) {
 
     const found = stockSnapshot.find(s => Number(s.id) === stockId);
     if (!found) 
-      Promise.reject(errors.invalidData(`STOCK with id :${stockId} notFound`));
+      return Promise.reject(errors.invalidData(`STOCK with id :${stockId} notFound`));
 
     const newVal = Number(found.stockValue) - qty;
     if (!Number.isFinite(newVal) || newVal < 0) 
-      Promise.reject(errors.badRequest(`INSUFFICIENT_STOCK for id:${stockId}`));
+      return Promise.reject(errors.badRequest(`INSUFFICIENT_STOCK for id:${stockId}`));
 
     await updateStockValue(stockId, newVal);          // <-- only field-level update
     applied.push({ stockId, prev: Number(found.stockValue) });

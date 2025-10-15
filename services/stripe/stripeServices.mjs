@@ -1,6 +1,6 @@
 // services/stripeServices.mjs
 import Stripe from "stripe";
-import errors from "../errors/errors.mjs";
+import errors from "../../errors/errors.mjs";
 import { createUrlCheckoutSession, buildStripeLineItems } from "./stripeUtils.mjs";
 
 export default function createStripeServices(stockServices) {
@@ -20,19 +20,19 @@ export default function createStripeServices(stockServices) {
     notes,
   }) {
     if (!Array.isArray(items) || items.length === 0) {
-      return errors.invalidData("No items in payload");
+      return Promise.reject(errors.invalidData("No items in payload"));
     }
 
     const catalog = await stockServices.getAllProducts();
     if (!Array.isArray(catalog)) {
       if (catalog && typeof catalog === "object" && catalog.httpStatus) {
-        return catalog;
+        return Promise.reject(catalog);
       }
-      return errors.internalError("Catalog fetch failed (not an array)");
+      return Promise.reject(errors.internalError("Catalog fetch failed (not an array)"));
     }
 
     if (!stripe) {
-      return errors.forbidden("STRIPE_SECRET_KEY missing");
+      return Promise.reject(errors.forbidden("STRIPE_SECRET_KEY missing"));
     }
 
     const byId = new Map(catalog.map((product) => [String(product.id), product]));
@@ -51,7 +51,7 @@ export default function createStripeServices(stockServices) {
     });
 
     if (!Array.isArray(line_items)) {
-      return line_items;
+      return Promise.reject(line_items);
     }
 
     if (normalizedShippingCents > 0) {
@@ -87,7 +87,7 @@ export default function createStripeServices(stockServices) {
       typeof sessionResult !== "object" ||
       typeof sessionResult.url !== "string"
     ) {
-      return sessionResult;
+      return Promise.reject(sessionResult);
     }
 
     return {

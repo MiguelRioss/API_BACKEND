@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import Brevo from "sib-api-v3-sdk";
 import dotenv from "dotenv";
+import errors from "../../errors/errors.mjs";
 
 const moduleDir = path.dirname(fileURLToPath(import.meta.url));
 const envPath = path.resolve(moduleDir, "../../.env");
@@ -31,9 +32,9 @@ export default {
     // ------------------------------------------------------------
     // 1️⃣ Basic validation
     // ------------------------------------------------------------
-    if (!process.env.BREVO_API_KEY) throw new Error("BREVO_API_KEY missing");
-    if (!process.env.FROM_EMAIL) throw new Error("FROM_EMAIL missing");
-    if (!toEmail) throw new Error("No recipient email provided");
+    if (!process.env.BREVO_API_KEY) Promise.reject(errors.forbidden("BREVO_API_KEY missing"));
+    if (!process.env.FROM_EMAIL) Promise.reject(errors.forbidden("FROM_EMAIL missing"));
+    if (!toEmail) Promise.reject(errors.forbidden("No recipient email provided"));
 
     // ------------------------------------------------------------
     // 2️⃣ Convert attachments to Brevo-friendly format
@@ -49,7 +50,7 @@ export default {
         }
 
         if (!contentBase64) {
-          throw new Error(`Attachment missing content: ${att.filename || att.name}`);
+          Promise.reject(errors.internalError(`Attachment missing content: ${att.filename || att.name}`));
         }
 
         // Determine MIME type

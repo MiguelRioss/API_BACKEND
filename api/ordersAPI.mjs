@@ -49,21 +49,12 @@ export default function createOrdersAPI(ordersService) {
         const orderID = req.params.id;
         const orderChanges = req.body.changes;
 
-        try {
-            const updatedOrder = await ordersService.updateOrderServices(orderID, orderChanges);
+        const updatedOrder = await ordersService.updateOrderServices(orderID, orderChanges);
 
-            // ✅ Return the full updated object instead of just a message
-            return rsp.status(200).json({
-                message: `Order with id ${updatedOrder.id} updated successfully`,
-                ...updatedOrder,
-            });
-        } catch (error) {
-            console.error("❌ Error updating order:", error);
-            return rsp.status(500).json({
-                message: "Failed to update order",
-                error: error.message,
-            });
-        }
+        return rsp.status(200).json({
+            message: `Order with id ${updatedOrder.id} updated successfully`,
+            ...updatedOrder,
+        })
     }
 
 }

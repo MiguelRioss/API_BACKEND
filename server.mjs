@@ -8,9 +8,9 @@ import { createDb } from "./database/databaseFactory.mjs";
 
 import createCorsMiddleware from "./middleware/cors.mjs";
 
-import createStockServices from "./services/stockServices.mjs";
-import createOrdersService from "./services/orderServices.mjs";
-import createStripeServices from "./services/stripeServices.mjs";
+import createStockServices from "./services/stockServices/stockServices.mjs";
+import createOrdersService from "./services/orderServices/orderServices.mjs";
+import createStripeServices from "./services/stripe/stripeServices.mjs";
 
 import createStocksAPI from "./api/stockAPI.mjs";
 import createOrdersAPI from "./api/ordersAPI.mjs";

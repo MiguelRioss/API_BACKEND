@@ -1,4 +1,4 @@
-import errors from '../errors/errors.mjs'
+import errors from '../../errors/errors.mjs'
 
 export default function createStockServices(db) {
   if (!db) {
@@ -33,7 +33,7 @@ export default function createStockServices(db) {
       return p.id === id}));
 
     if (!product) {
-      return errors.notFound(`Product ${id} not found`);
+      Promise.reject(errors.notFound(`Product ${id} not found`))
     }
 
     const stockValue = product.stockValue ?? 0;
@@ -47,7 +47,7 @@ export default function createStockServices(db) {
   }
 
   async function getStockServices() {
-    return db.getStocks();
+     Promise.reject(db.getStocks());
   }
 
   /**
@@ -60,16 +60,16 @@ export default function createStockServices(db) {
 
     const existing = await db.getStockByID(id);
     const updated = { ...existing, ...changes, updatedAt: new Date().toISOString() };
-    return db.updateStock(id, updated);
+     Promise.reject(db.updateStock(id, updated))
   }
 
   async function adjustStock(stockID, delta = 0) {
     const id = String(stockID || '').trim();
-    if (!id) return errors.invalidData("Not a valid Id");
+    if (!id) Promise.reject(errors.invalidData("Not a valid Id"));
 
     const n = Number(delta);
     if (isNaN(n) || n === 0) {
-      return errors.invalidData("Delta must be a non-zero number");
+      Promise.reject(errors.invalidData("Delta must be a non-zero number"))
     }
 
     const target = await db.getStockByID(id);
@@ -77,7 +77,7 @@ export default function createStockServices(db) {
     const next = current + n;
 
     if (next < 0) {
-      return errors.invalidData(`Not enough stock for ${id}`);
+      return Promise.reject(errors.invalidData(`Not enough stock for ${id}`))
     }
 
     const updated = { ...target, stockValue: next, updatedAt: new Date().toISOString() };

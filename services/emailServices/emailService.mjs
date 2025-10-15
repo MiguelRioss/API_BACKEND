@@ -17,6 +17,8 @@ import { buildAdminNotificationTemplate } from "./templates/adminTemplate.mjs";
 import { createPdfInvoice } from "./pdfInvoice.mjs";
 import { buildContactEmailTemplate } from "./templates/contactTemplate.mjs";
 import { buildShippingNotificationTemplate } from "./templates/shippingTemplate.mjs";
+import errors from "../../errors/errors.mjs";
+import handlerFactory from "../../utils/handleFactory.mjs";
 
 const moduleDir = path.dirname(fileURLToPath(import.meta.url));
 const fallbackLogoPath = path.resolve(moduleDir, "./assets/logo.png");
@@ -28,7 +30,6 @@ const DEFAULT_LOGO_PATH = envLogoPath
     ? envLogoPath
     : path.resolve(process.cwd(), envLogoPath)
   : fallbackLogoPath;
-const DEFAULT_FORWARD_EMAILS = "miguelangelorios5f@gmail.com";
 
 
 // -----------------------------------------------------------------------------
@@ -40,9 +41,9 @@ export default function createEmailService({ transport } = {}) {
   }
 
   return {
-    sendOrderEmails,
-    sendContactEmail,
-    sendShippingEmail
+    sendOrderEmails : handlerFactory(sendOrderEmails),
+    sendContactEmail : handlerFactory(sendContactEmail),
+    sendShippingEmail : handlerFactory(sendShippingEmail)
   };
 
     // ---------------------------------------------------------------------------
@@ -51,20 +52,17 @@ export default function createEmailService({ transport } = {}) {
     async function sendOrderEmails({
       order,
       orderId,
-      live = false,
       logoPath = DEFAULT_LOGO_PATH,
     } = {}) {
       if (!order || typeof order !== "object") {
-        throw new Error("sendOrderEmails requires an order object");
+       Promise.reject(errors.invalidData("sendOrderEmails requires an order object"));
       }
 
-      const isTestRoute = !live && !!process.env.TEST_RECIPIENT;
-      const toEmail = isTestRoute ? process.env.TEST_RECIPIENT : order?.email;
-      const toName = isTestRoute ? "Test Recipient" : order?.name || "";
+      const toEmail = order.email;
+      const toName = order.name;
 
       if (!toEmail) {
-        console.warn("[emailService] Skipping email send, no recipient available.");
-        return;
+       Promise.reject(errors.invalidData("No email to send the order"))
       }
 
       const invoiceHtml = buildOrderInvoiceHtml({ order, orderId });
@@ -73,6 +71,8 @@ export default function createEmailService({ transport } = {}) {
 
       let pdfAbsolutePath = tempPdfPath;
       let pdfBase64 = "";
+
+      //Create PdfINvoice should do this try catch 
       try {
         pdfAbsolutePath = await createPdfInvoice(invoiceHtml, logoPath, tempPdfPath);
         const pdfBuffer = await fs.readFile(pdfAbsolutePath);
@@ -106,21 +106,23 @@ export default function createEmailService({ transport } = {}) {
         : null;
       const attachmentList = pdfAttachment ? [pdfAttachment] : undefined;
 
-      const ownerEmail = normalizeEmail(process.env.OWNER_EMAIL || "Info@ibogenics.com");
-      const forwardEmails = parseEmailList(
-        process.env.ORDER_FORWARD_EMAILS || DEFAULT_FORWARD_EMAILS,
-      );
+      const ownerEmail = normalizeEmail(process.env.OWNER_EMAIL);
+      const forwardEmails = parseEmailList( process.env.ORDER_FORWARD_EMAILS);
       console.log("[emailService] ORDER_FORWARD_EMAILS raw:", process.env.ORDER_FORWARD_EMAILS);
 
       const adminRecipients = [];
-      if (ownerEmail) {
+
+      if(!ownerEmail){
+        Promise.reject(errors.invalidData(`No emails on the owner = ${ownerEmail}` ))
+      }
+
+      if(!forwardEmails){
+        Promise.reject(errors.invalidData(`No emails on the forward =${forwardEmails}` ))
+      }
         adminRecipients.push({
           email: ownerEmail,
           name: "Ibogenics Admin & Logistics Team",
         });
-      } else {
-        console.warn("[emailService] OWNER_EMAIL not configured; skipping owner notification.");
-      }
 
       for (const email of forwardEmails) {
         if (
@@ -135,17 +137,11 @@ export default function createEmailService({ transport } = {}) {
           });
         }
       }
+      
 
-      if (!adminRecipients.length) {
-        console.warn("[emailService] No admin recipients configured for order notifications.");
-      }
-
-      console.log("[emailService] Customer recipient:", toEmail);
-      console.log(
-        "[emailService] Admin recipients:",
-        adminRecipients.map((recipient) => recipient.email),
-      );
-
+      Promise.reject(errors.internalError("Bad conversion on admin "))
+      
+      //Transport Should be the one to try catch
       try {
         await transport.send({
           toEmail,
@@ -175,7 +171,9 @@ export default function createEmailService({ transport } = {}) {
   // ---------------------------------------------------------------------------
   async function sendContactEmail({ name, email, subject, message, orderId, country }) {
     const toEmail = process.env.OWNER_EMAIL;
-    if (!toEmail) throw new Error("OWNER_EMAIL not configured");
+
+    if (!toEmail)
+      Promise.reject(errors.invalidData("OWNER_EMAIL not configured"));
 
     const { subject: subjectLine, html } = buildContactEmailTemplate({
       name,
@@ -209,18 +207,16 @@ export default function createEmailService({ transport } = {}) {
     trackingNumber,
     trackingUrl,
     locale,
-    live = false,
   } = {}) {
     if (!order || typeof order !== "object") {
-      throw new Error("sendShippingEmail requires an order object");
+      Promise.reject(errors.invalidData("sendShippingEmail requires an order object"))
     }
 
-    const isTestRoute = !live && !!process.env.TEST_RECIPIENT;
-    const toEmail = isTestRoute ? process.env.TEST_RECIPIENT : order?.email;
-    const toName = isTestRoute ? "Test Recipient" : order?.name || "";
+    const toEmail = process.env.TEST_RECIPIENT 
+    const toName =  order.name
 
     if (!toEmail) {
-      throw new Error("sendShippingEmail requires a recipient email address");
+     Promise.reject(errors.invalidData("sendShippingEmail requires a recipient email address"))
     }
 
     const { subject, html } = buildShippingNotificationTemplate({

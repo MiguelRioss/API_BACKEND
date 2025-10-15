@@ -1,6 +1,6 @@
 ﻿// api/services/ordersServiceFactory.mjs
 
-import errors from "../errors/errors.mjs";
+import errors from "../../errors/errors.mjs";
 import {
   filterByStatus,
   filterByQuery,
@@ -11,7 +11,7 @@ import {
   validateAndNormalizeID,
   normalizeId,
   findOrderBySessionId,
-} from "./servicesUtils.mjs";
+} from "../servicesUtils.mjs";
 
 /**
  * createOrdersService(db, emailService)

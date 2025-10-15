@@ -1,4 +1,4 @@
-import errors from "../errors/errors.mjs";
+import errors from "../../errors/errors.mjs";
 
 const DEFAULT_SUCCESS_URL =
   `${process.env.PUBLIC_BASE_URL}/checkout/success/{CHECKOUT_SESSION_ID}`;

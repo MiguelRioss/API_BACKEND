@@ -1,15 +1,11 @@
 // api/services/servicesUtils.mjs
 import { randomUUID } from "node:crypto";
 import errors from "../errors/errors.mjs";
+import { STATUS_KEYS, makeDefaultStatus, assertValidStatusKey } from "./orderServices/orderStatus.mjs";
+
 
 const allowedCurrencies = new Set(["eur", "usd", "gbp"]);
-const STATUS_KEYS = [
-  "delivered",
-  "acceptedInCtt",
-  "accepted",
-  "in_transit",
-  "waitingToBeDelivered",
-];
+
 
 /*───────────────────────────────────────────────*/
 /*  BASIC UTILITIES                              */
@@ -72,7 +68,7 @@ export function findOrderBySessionId(ordersArray, sessionId) {
   if (!needle || !Array.isArray(ordersArray) || ordersArray.length === 0) {
     return null;
   }
-  console.log("Orders Array" ,ordersArray)
+
 
   return (
     ordersArray.find((order) =>
@@ -260,17 +256,8 @@ function validateMetadata(meta) {
 /*  STATUS MANAGEMENT                            */
 /*───────────────────────────────────────────────*/
 
-function makeDefaultStatus() {
-  const template = { status: false, date: null, time: null };
-  return Object.fromEntries(STATUS_KEYS.map((k) => [k, { ...template }]));
-}
-
 export function updateOrderStatus(currentStatus, key, { status, date = null, time = null }) {
-  if (!STATUS_KEYS.includes(key)) {
-    throw errors.invalidData(
-      `Unknown status step "${key}". Allowed: ${STATUS_KEYS.join(", ")}`
-    );
-  }
+  assertValidStatusKey(key);
   if (typeof status !== "boolean") {
     throw errors.invalidData("status must be boolean");
   }
@@ -279,6 +266,7 @@ export function updateOrderStatus(currentStatus, key, { status, date = null, tim
     [key]: { status, date, time },
   };
 }
+
 
 /*───────────────────────────────────────────────*/
 /*  MAIN ORDER VALIDATOR                         */
@@ -289,7 +277,6 @@ export function updateOrderStatus(currentStatus, key, { status, date = null, tim
  * Includes shipping cost validation and full metadata checks.
  */
 export async function validateAndPrepareOrder(order) {
-  console.log("Validating and preparing order:", order);
 
   if (!order || typeof order !== "object" || Array.isArray(order)) {
     return Promise.reject(
@@ -349,6 +336,7 @@ export async function validateAndPrepareOrder(order) {
   }
 
   const resolvedPaymentId = order.payment_id
+  console.log("PaymentId :", order.name)
   if (!resolvedPaymentId)
     return Promise.reject(errors.invalidData("No payment ID"))
 
@@ -356,6 +344,7 @@ export async function validateAndPrepareOrder(order) {
   const normItems = validateItemsArray(items, amount_total, shippingCents);
   const normMetadata = validateMetadata(metadata);
   const initialStatus = makeDefaultStatus();
+  const initalSentShipEmailStatus = false
   const rawSessionId =
     typeof order.session_id !== "undefined" ? order.session_id : normMetadata.stripe_session_id;
   const normalizedSessionId =
@@ -380,6 +369,7 @@ export async function validateAndPrepareOrder(order) {
       ...normMetadata,
     },
     status: initialStatus,
+    sentShippingEmail:initalSentShipEmailStatus,
     track_url: "",
     written_at: new Date().toISOString(),
   };

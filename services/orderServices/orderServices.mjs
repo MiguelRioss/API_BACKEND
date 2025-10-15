@@ -87,12 +87,10 @@ export default function createOrdersService(db, emailService) {
       return saved;
     }
 
-    const live = process.env.NODE_ENV === "production";
     try {
       await mailer.sendOrderEmails({
         order: saved,
         orderId: saved?.id,
-        live,
       });
       
       

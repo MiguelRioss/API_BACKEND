@@ -4,7 +4,7 @@ import express from "express";
 import "dotenv/config"; // Load environment variables ASAP
 
 // --- Services & APIs (domain/application layers)
-import { createDb } from "./database/databaseFactory.mjs";
+import { createDb } from "./database/factoryDB/databaseFactory.mjs";
 
 import createCorsMiddleware from "./middleware/cors.mjs";
 

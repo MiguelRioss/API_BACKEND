@@ -1,10 +1,8 @@
 ﻿// database/firebaseDB.mjs
 import "dotenv/config"; // dotenv is idempotent
-import { initFirebase, getFirestore, getRealtimeDB, useRealtimeDB } from "./firebase/firebaseInit.mjs";
-import errors from "../errors/errors.mjs"; // <- use your ApplicationError style
-import { isObj, canonStatusKey, STATUS_KEYS } from "./firebase/utilsDB.mjs";
+import { initFirebase, getRealtimeDB, useRealtimeDB } from "../firebase/firebaseInit.mjs";
+import errors from "../../errors/errors.mjs"; // <- use your ApplicationError style
 
-const normalizeId = (value) => String(value ?? "").trim();
 
 /**
  * Ensure Firebase is initialized before any db operation.
@@ -74,10 +72,11 @@ export async function getOrderByStripeSessionId(sessionId) {
   const orders = await getAllOrders();
 
   const order = orders.find((o, i) => { return o.session_id === sessionId });
-  if (order) {
-    return order;
+  if (!order) {
+    return Promise.reject(errors.notFound(`Order with session_id "${sessionId}" not found`))
   }
-  throw errors.notFound(`Order with session_id "${sessionId}" not found`);
+  
+  return order;
 }
 
 /**
@@ -104,8 +103,8 @@ export async function createOrderDB(orderData = {}) {
     const db = getRealtimeDB();
 
     // 1) Take a snapshot and decrement stock (using your working updateStock-based helper)
+    //If not enough stock it will rollback
     const stockSnapshot = await getStocks();
-    console.log("[createOrderDB] calling findStockAndDecrement");
     applied = (await findStockAndDecrement(stockSnapshot, orderData)) || [];
 
     // 2) Write order
@@ -134,7 +133,6 @@ export async function createOrderDB(orderData = {}) {
         }
       }
     }
-
     return Promise.reject(
       errors.externalService("Failed to write order to DB", { original: err })
     );
@@ -308,24 +306,22 @@ export async function getStockByID(idStr) {
  * @param {Object} orderData       - The order data (expects .items with {id, quantity})
  * @returns {Promise<Object[]>} Applied decrements { stockId, qty }
  */
-// database/firebaseDB.mjs
-
-// database/firebaseDB.mjs
 export async function findStockAndDecrement(stockSnapshot, orderData) {
   if (!orderData?.items || !Array.isArray(orderData.items)) return [];
   const applied = [];
-  console.log(stockSnapshot)
 
   for (const item of orderData.items) {
     const stockId = Number(item.id);
 
     const qty = Number(item.quantity);
+
     const found = stockSnapshot.find(s => Number(s.id) === stockId);
-    console.log(found)
-    if (!found) throw new Error(`STOCK_notFound:${stockId}`);
+    if (!found) 
+      Promise.reject(errors.invalidData(`STOCK with id :${stockId} notFound`));
 
     const newVal = Number(found.stockValue) - qty;
-    if (!Number.isFinite(newVal) || newVal < 0) throw new Error(`INSUFFICIENT_STOCK:${stockId}`);
+    if (!Number.isFinite(newVal) || newVal < 0) 
+      Promise.reject(errors.badRequest(`INSUFFICIENT_STOCK for id:${stockId}`));
 
     await updateStockValue(stockId, newVal);          // <-- only field-level update
     applied.push({ stockId, prev: Number(found.stockValue) });

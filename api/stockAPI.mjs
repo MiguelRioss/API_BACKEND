@@ -39,7 +39,7 @@ export default function createStocksAPI(stockService) {
 async function internalGetProducts(req, rsp) {
   const includeSamples = req.query.samples === "true";
   const products = await stockService.getAllProducts(includeSamples);
-  return rsp.json(filteredProducts);
+  return rsp.json(products);
 }
   async function internalGetProductById(req, rsp) {
     const productID = req.params.id;

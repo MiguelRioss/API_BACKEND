@@ -1,6 +1,7 @@
 ﻿// api/services/ordersServiceFactory.mjs
 
 import errors from "../../errors/errors.mjs";
+import handlerFactory from "../../utils/handleFactory.mjs";
 import {
   filterByStatus,
   filterByQuery,
@@ -38,11 +39,11 @@ export default function createOrdersService(db, emailService) {
   }
 
   return {
-    getOrdersServices,
-    getOrderByIdServices,
-    getOrderByStripeSessionId,
-    createOrderServices,
-    updateOrderServices,
+    getOrdersServices: handlerFactory(getOrdersServices),
+    getOrderByIdServices : handlerFactory(getOrderByIdServices),
+    getOrderByStripeSessionId : handlerFactory(getOrderByStripeSessionId),
+    createOrderServices : handlerFactory(createOrderServices),
+    updateOrderServices : handlerFactory(updateOrderServices),
   };
 
   async function getOrdersServices({ limit, status, q } = {}) {

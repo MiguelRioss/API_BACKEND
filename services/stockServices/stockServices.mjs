@@ -1,4 +1,5 @@
 import errors from '../../errors/errors.mjs'
+import handlerFactory from '../../utils/handleFactory.mjs';
 
 export default function createStockServices(db) {
   if (!db) {
@@ -6,11 +7,11 @@ export default function createStockServices(db) {
   }
 
   return {
-    getStockServices,
-    updateStock,
-    adjustStock,
-    getAllProducts,
-    getProductById
+    getStockServices:  handlerFactory(getStockServices),
+    updateStock: handlerFactory(updateStock) ,
+    adjustStock : handlerFactory(adjustStock) ,
+    getAllProducts : handlerFactory(getAllProducts),
+    getProductById: handlerFactory(getProductById) 
   };
   /**
    * Get all products with business logic (fewTag / soldOut)

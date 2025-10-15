@@ -35,11 +35,12 @@ export default function createStocksAPI(stockService) {
     const updated = await stockService.adjustStock(stockID, delta);
     return rsp.json(updated);
   }
-  async function internalGetProducts(req, rsp) {
-    const products = await stockService.getAllProducts();
-    return rsp.json(products);
-  }
-
+// routes/products.js  (or wherever your internalGetProducts lives)
+async function internalGetProducts(req, rsp) {
+  const includeSamples = req.query.samples === "true";
+  const products = await stockService.getAllProducts(includeSamples);
+  return rsp.json(filteredProducts);
+}
   async function internalGetProductById(req, rsp) {
     const productID = req.params.id;
     const product = await stockService.getProductById(productID);

@@ -14,10 +14,18 @@ export default function createStockServices(db) {
   };
   /**
    * Get all products with business logic (fewTag / soldOut)
+   * @param {boolean} includeSamples - whether to include sample products (default: true)
    */
-  async function getAllProducts() {
+  async function getAllProducts(includeSamples = true) {
     const raw = await db.getProducts();
-    return raw.map((p) => {
+
+    // Optional filtering step
+    const filtered = includeSamples
+      ? raw
+      : raw.filter((p) => !p.isSample);
+
+    // Add computed business fields
+    return filtered.map((p) => {
       const stockValue = p.stockValue ?? 0;
       return {
         ...p,
@@ -27,6 +35,7 @@ export default function createStockServices(db) {
       };
     });
   }
+
   async function getProductById(id) {
     const product = await getAllProducts().then(products => products.find(p => {
       if (p.id == 0) console.log(products)

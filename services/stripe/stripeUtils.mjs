@@ -114,11 +114,11 @@ export async function createUrlCheckoutSession({
   cancelUrl = DEFAULT_CANCEL_URL,
 }) {
   if (!stripe) {
-    throw errors.internalError("Stripe client is required");
+    return errors.internalError("Stripe client is required");
   }
 
   if (!Array.isArray(line_items) || line_items.length === 0) {
-    throw errors.invalidData("line_items must be a non-empty array");
+    return errors.invalidData("line_items must be a non-empty array");
   }
 
   const cleanShipping = sanitizeAddress(shippingAddress);
@@ -139,7 +139,7 @@ export async function createUrlCheckoutSession({
   });
 
   if (metaResult.error) {
-    throw metaResult.error;
+    return metaResult.error;
   }
 
   const { metadata, customerEmail } = metaResult;
@@ -149,6 +149,7 @@ export async function createUrlCheckoutSession({
       mode: "payment",
       line_items,
       billing_address_collection: "auto",
+      // Do not prompt the user for shipping; we already captured it beforehand.
       phone_number_collection: { enabled: false },
       customer_creation: "always",
       customer_email: customerEmail || undefined,
@@ -159,7 +160,7 @@ export async function createUrlCheckoutSession({
     });
 
     if (!session?.url || !session?.id) {
-      throw errors.externalService("Stripe session created without URL");
+      return errors.externalService("Stripe session created without URL");
     }
 
     return {
@@ -169,25 +170,24 @@ export async function createUrlCheckoutSession({
     };
   } catch (stripeError) {
     if (stripeError?.type === "StripeCardError") {
-      throw errors.stripeCardError(stripeError.message, {
+      return errors.stripeCardError(stripeError.message, {
         stripeCode: stripeError.code,
       });
     }
 
     if (stripeError?.type === "StripeAuthenticationError") {
-      throw errors.stripeAuthFailed(stripeError.message);
+      return errors.stripeAuthFailed(stripeError.message);
     }
 
     if (stripeError?.type === "StripeRateLimitError") {
-      throw errors.stripeRateLimited(stripeError.message);
+      return errors.stripeRateLimited(stripeError.message);
     }
 
-    throw errors.externalService("Stripe session creation failed", {
+    return errors.externalService("Stripe session creation failed", {
       reason: stripeError?.message || "Unknown error",
     });
   }
 }
-
 
 export function buildStripeLineItems({
   items,
@@ -195,33 +195,44 @@ export function buildStripeLineItems({
   currency = "eur",
   errorFactory,
 }) {
-  const err = (msg, details) =>
-    errorFactory ? errorFactory(msg, details) : errors.invalidData(msg, details);
+  // ⚙️ Create & THROW the error directly instead of returning it
+  const err = (reason, ctx = {}) => {
+    const e = errorFactory
+      ? errorFactory(reason, ctx)
+      : errors.invalidData(ctx.msg || reason);
+    throw e; // <-- critical change
+  };
 
   if (!Array.isArray(items) || items.length === 0) {
-    throw err("No items in payload");
+    err("MALFORMED_INPUT", { msg: "No items in payload" });
   }
+
   if (!(byId instanceof Map)) {
-    throw err("byId must be a Map(productId -> product)");
+    err("MALFORMED_INPUT", { msg: "byId must be a Map(productId -> product)" });
   }
 
   const line_items = [];
 
   for (const { id, qty } of items) {
-    const product = byId.get(String(id));
-    if (!product) throw err(`Product not found for id ${id}`);
+    const key = String(id);
+    const product = byId.get(key);
+    if (!product)
+      err("UNKNOWN_PRODUCT", { msg: `Product not found for id ${id}` });
 
     const priceEuros = Number(product.priceInEuros);
-    if (!Number.isFinite(priceEuros) || priceEuros <= 0) {
-      throw err(`Invalid price for product ${id}`);
-    }
+    if (!Number.isFinite(priceEuros) || priceEuros <= 0)
+      err("PRICE_MISMATCH", { msg: `Invalid price for product ${id}` });
 
     const quantity = Math.max(1, Math.trunc(Number(qty) || 1));
-    if (product.soldOut) throw err(`${product.name || product.title} is sold out`);
+
+    if (product.soldOut)
+      err("OUT_OF_STOCK", { msg: `${product.name || product.title} is sold out` });
+
     const stockValueNum = Number(product.stockValue);
-    if (Number.isFinite(stockValueNum) && stockValueNum < quantity) {
-      throw err(`Not enough stock for ${product.name || product.title}`);
-    }
+    if (Number.isFinite(stockValueNum) && stockValueNum < quantity)
+      err("OUT_OF_STOCK", { msg: `Not enough stock for ${product.name || product.title}` });
+
+    const unit_amount = Math.round(priceEuros * 100);
 
     line_items.push({
       price_data: {
@@ -230,7 +241,7 @@ export function buildStripeLineItems({
           name: product.title || product.name,
           metadata: { productId: String(product.id) },
         },
-        unit_amount: Math.round(priceEuros * 100),
+        unit_amount,
       },
       quantity,
     });
@@ -238,3 +249,4 @@ export function buildStripeLineItems({
 
   return line_items;
 }
+

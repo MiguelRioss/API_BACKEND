@@ -1,5 +1,5 @@
 // utils/prepareStripeCheckoutOrder.mjs
-export default function prepareStripeCheckoutOrder(body = {}) {
+export default function prepareCheckOut(body = {}) {
   const items = Array.isArray(body.items) ? body.items : [];
 
   const customer =

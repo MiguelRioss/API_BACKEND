@@ -1,6 +1,6 @@
 // api/stripeAPI.mjs
 import handlerFactory from "../utils/handleFactory.mjs";
-import prepareStripeCheckoutOrder from "../utils/prepareStripeCheckoutOrder.mjs";
+import prepareCheckOut from "./prepareCheckOut.mjs";
 
 export default function createStripeAPI(stripeServices) {
   return {
@@ -9,7 +9,7 @@ export default function createStripeAPI(stripeServices) {
 
   async function handleCheckoutSession(req, rsp) {
     const body = req.body ?? {};
-    const orderData = prepareStripeCheckoutOrder(body);
+    const orderData = prepareCheckOut(body);
     return stripeServices.createCheckoutSession(orderData);
   }
 }

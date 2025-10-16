@@ -23,9 +23,12 @@ import {
  *
  * Service throws domain errors for HTTP layer to map.
  */
-export default function createOrdersService(db, emailService) {
+export default function createOrdersService(db, stripeServices, emailService) {
   if (!db || typeof db.createOrderDB !== "function") {
     throw new Error("OrdersService requires a db with createOrderDB()");
+  }
+  if (!stripeServices) {
+    throw new Error("OrdersService requires a stripeServices");
   }
 
   const mailer =
@@ -43,8 +46,45 @@ export default function createOrdersService(db, emailService) {
     getOrderByStripeSessionId,
     createOrderServices,
     updateOrderServices,
+    createCheckoutSession
   };
 
+  // ──────────────────────────────
+  // STEP 1: Decide Stripe vs Manual
+  // ──────────────────────────────
+  async function createCheckoutSession(orderData) {
+    const {
+      shippingAddress = {},
+      billingAddress = {},
+      customer = {},
+    } = orderData;
+    const country =
+      shippingAddress.country?.toUpperCase?.() ||
+      billingAddress.country?.toUpperCase?.() ||
+      customer.country?.toUpperCase?.();
+
+    if (!country) {
+      throw errors.invalidData("Country is required to process checkout");
+    }
+
+    // Countries that use Stripe checkout
+    const stripeAllowed = ["PT", "DE", "NL", "MX", "CA", "AU", "NZ", "ZA"];
+
+    // 🧾 Always create DB order first
+    console.log("Stripe Here:", orderData)
+
+    if (stripeAllowed.includes(country)) {
+
+      // Stripe route
+      return stripeServices.createCheckoutSession(orderData);
+    }
+
+    const savedOrder = await createOrderServices(orderData);
+
+    // Manual (Wise / Revolut) route
+    const manualUrl = `mesodose.com/checkout/orderSuccess/${savedOrder.id}`;
+    return { redirectUrl: manualUrl };
+  }
   async function getOrdersServices({ limit, status, q } = {}) {
     return db
       .getAllOrders()
@@ -79,8 +119,8 @@ export default function createOrdersService(db, emailService) {
   }
 
   async function createOrderServices(order) {
+    console.log("OnServices",order)
     const prepared = await validateAndPrepareOrder(order);
-    console.log(prepared)
     const saved = await db.createOrderDB(prepared);
 
     if (!mailer) {
@@ -92,8 +132,8 @@ export default function createOrdersService(db, emailService) {
         order: saved,
         orderId: saved?.id,
       });
-      
-      
+
+
       const flagged = { ...saved, email_sent_Order: true };
       if (typeof db.updateOrderDB === "function" && saved?.id) {
         try {

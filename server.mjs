@@ -65,12 +65,11 @@ const db = await createDb({ type: process.env.DB_TYPE });
  * - stripeServices: create checkout sessions, etc. (uses stockService)
  */
 const stockService = createStockServices(db);
-const ordersService = createOrdersService(db, emailService); // --- Pass emailService to ordersService
-
 // NOTE: Ensure the factory signature matches your import:
 // If your factory is `createStripeServices({ stockServices })`, pass an object.
 // If it's positional `createStripeServices(stockService)`, keep as-is.
 const stripeServices = createStripeServices(stockService);
+const ordersService = createOrdersService( db,stripeServices,emailService); // --- Pass emailService to ordersService
 
 // -----------------------------------------------------------------------------
 // API Layer (controllers)
@@ -111,12 +110,18 @@ app.use(express.json());
  * Basic CRUD for orders (if your business logic allows).
  * Typically, creation is handled by the webhook; but you expose endpoints
  * for admin or system integrations if needed.
+ * 
+ * 
+ * Also a handleChekoutSessionThat will see wich checkout, the inquiry or the handle checkout
  */
 app.get("/api/orders", ordersApi.getOrdersAPI);
 app.get("/api/orders/session/:sessionId", ordersApi.getOrderBySessionIdAPI);
 app.get("/api/orders/:id", ordersApi.getOrderByIdAPI);
 app.post("/api/orders", ordersApi.createOrderAPI);
 app.patch("/api/orders/:id", ordersApi.updateOrderAPI); 
+app.post("/api/checkout-sessionsv1", stripeAPi.handleCheckoutSession);
+app.post("/api/checkout-sessions", ordersApi.handleCheckoutSession);
+
 
 // -----------------------------------------------------------------------------
 // Stock API
@@ -140,15 +145,7 @@ app.patch("/api/stock/:id/adjust", stockApi.adjustStockAPI);
 app.get("/api/products", stockApi.getProductsAPI);
 app.get("/api/products/:id", stockApi.getProductByIdAPI);
 
-// -----------------------------------------------------------------------------
-// Stripe Checkout Session API
-// -----------------------------------------------------------------------------
-/**
- * This route is called by your frontend to start a Stripe Checkout Session.
- * The controller delegates to stripeServices.createCheckoutSession(),
- * which validates items, builds line_items, and returns a Checkout URL.
- */
-app.post("/api/checkout-sessions", stripeAPi.handleCheckoutSession);
+
 
 
 

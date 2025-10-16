@@ -1,4 +1,5 @@
 import handlerFactory from "../utils/handleFactory.mjs";
+import prepareCheckOut from "./prepareCheckOut.mjs";
 
 // api/ordersApi.mjs
 export default function createOrdersAPI(ordersService) {
@@ -11,8 +12,14 @@ export default function createOrdersAPI(ordersService) {
         getOrderByIdAPI: handlerFactory(internalGetOrderByID),
         getOrderBySessionIdAPI: handlerFactory(internalGetOrderBySessionId),
         createOrderAPI: handlerFactory(internalCreateOrder),
-        updateOrderAPI: handlerFactory(internalUpdateOrder)
+        updateOrderAPI: handlerFactory(internalUpdateOrder),
+        handleCheckoutSession: handlerFactory(handleCheckoutSession),
     };
+    async function handleCheckoutSession(req, rsp) {
+        const body = req.body ?? {};
+        const orderData = prepareCheckOut(body);
+        return ordersService.createCheckoutSession(orderData);
+    }
 
     async function interalGetOrders(req, rsp) {
         // await the async service method!

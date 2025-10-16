@@ -36,12 +36,7 @@ export function buildShippingNotificationTemplate({
     locale,
   );
 
-  const resolvedInvoiceId = firstNonEmpty(
-    invoiceId,
-    order?.invoice_id,
-    order?.metadata?.invoice_id,
-    order?.metadata?.invoice_number,
-  );
+  
 
   const customerName = firstNonEmpty(
     order?.name,

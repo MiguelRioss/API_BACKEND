@@ -1,6 +1,6 @@
 import express from "express";
 import Stripe from "stripe";
-import errors from "../../errors/errors.mjs";
+import errors from "../errors/errors.mjs";
 import handlerFactory from "../utils/handleFactory.mjs"
 import {
   normalizeLineItems,

@@ -14,6 +14,7 @@ import {
 import { buildOrderInvoiceHtml } from "./templates/emailTemplates.mjs";
 import { buildThankTemplate } from "./templates/thankTemplate.mjs";
 import { buildAdminNotificationTemplate } from "./templates/adminTemplate.mjs";
+import { buildOtherCountrysTemplateEmail } from "./templates/otherCountrysTemplateEmail.mjs";
 import { createPdfInvoice } from "./pdfInvoice.mjs";
 import { buildContactEmailTemplate } from "./templates/contactTemplate.mjs";
 import { buildShippingNotificationTemplate } from "./templates/shippingTemplate.mjs";
@@ -42,7 +43,8 @@ export default function createEmailService({ transport } = {}) {
   return {
     sendOrderEmails,
     sendContactEmail,
-    sendShippingEmail
+    sendShippingEmail,
+    sendOtherCountryEmails,
   };
 
     // ---------------------------------------------------------------------------
@@ -233,6 +235,59 @@ export default function createEmailService({ transport } = {}) {
       toName,
       subject,
       html,
+    });
+  }
+
+
+  // ---------------------------------------------------------------------------
+  // 4��?��� Send Alternative Payment Instructions Email
+  // ---------------------------------------------------------------------------
+  async function sendOtherCountryEmails({
+    order,
+    orderId,
+    live = false,
+  } = {}) {
+    if (!order || typeof order !== "object") {
+      return Promise.reject(
+        errors.invalidData("sendOtherCountryEmails requires an order object"),
+      );
+    }
+
+    const normalizedLive = Boolean(live);
+    const orderEmail = normalizeEmail(order?.email || order?.metadata?.email);
+    const toEmail = normalizedLive
+      ? orderEmail
+      : normalizeEmail(process.env.TEST_RECIPIENT) || orderEmail;
+
+    if (!toEmail) {
+      return Promise.reject(
+        errors.invalidData(
+          "sendOtherCountryEmails requires a recipient email address",
+        ),
+      );
+    }
+
+    const toName = normalizedLive
+      ? order?.name ||
+        order?.metadata?.shipping_address?.name ||
+        "Customer"
+      : "Ibogenics Template Preview";
+
+    const { subject, html } = buildOtherCountrysTemplateEmail({
+      order,
+      orderId,
+    });
+
+    const bccEmail = normalizedLive
+      ? normalizeEmail(process.env.OWNER_EMAIL)
+      : undefined;
+
+    await transport.send({
+      toEmail,
+      toName,
+      subject,
+      html,
+      bcc: bccEmail || undefined,
     });
   }
 }

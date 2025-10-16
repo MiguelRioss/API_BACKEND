@@ -47,11 +47,19 @@ export default function createStripeServices(stockServices) {
       items,
       byId,
       currency: "eur",
-      errorFactory: (msg) => errors.badRequest(msg),
+      errorFactory: (reason, ctx) => {
+        switch (reason) {
+          case "MALFORMED_INPUT": return errors.badRequest(ctx.msg);           // 400
+          case "UNKNOWN_PRODUCT": return errors.notFound(ctx.msg);             // 404
+          case "OUT_OF_STOCK": return errors.conflict(ctx.msg);             // 409
+          case "PRICE_MISMATCH": return errors.unprocessableEntity(ctx.msg);  // 422
+          default: return errors.internal(ctx.msg);             // 500
+        }
+      },
     });
 
     if (!Array.isArray(line_items)) {
-      return Promise.reject(line_items);
+      return Promise.reject(errors.invalidData(line_items));
     }
 
     if (normalizedShippingCents > 0) {
@@ -87,7 +95,7 @@ export default function createStripeServices(stockServices) {
       typeof sessionResult !== "object" ||
       typeof sessionResult.url !== "string"
     ) {
-      return Promise.reject(sessionResult);
+      return Promise.reject(errors.internalError("Stripe Problem with Payment", sessionResult));
     }
 
     return {

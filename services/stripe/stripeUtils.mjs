@@ -114,11 +114,11 @@ export async function createUrlCheckoutSession({
   cancelUrl = DEFAULT_CANCEL_URL,
 }) {
   if (!stripe) {
-    return errors.internalError("Stripe client is required");
+    throw errors.internalError("Stripe client is required");
   }
 
   if (!Array.isArray(line_items) || line_items.length === 0) {
-    return errors.invalidData("line_items must be a non-empty array");
+    throw errors.invalidData("line_items must be a non-empty array");
   }
 
   const cleanShipping = sanitizeAddress(shippingAddress);
@@ -139,7 +139,7 @@ export async function createUrlCheckoutSession({
   });
 
   if (metaResult.error) {
-    return metaResult.error;
+    throw metaResult.error;
   }
 
   const { metadata, customerEmail } = metaResult;
@@ -149,7 +149,6 @@ export async function createUrlCheckoutSession({
       mode: "payment",
       line_items,
       billing_address_collection: "auto",
-      // Do not prompt the user for shipping; we already captured it beforehand.
       phone_number_collection: { enabled: false },
       customer_creation: "always",
       customer_email: customerEmail || undefined,
@@ -160,7 +159,7 @@ export async function createUrlCheckoutSession({
     });
 
     if (!session?.url || !session?.id) {
-      return errors.externalService("Stripe session created without URL");
+      throw errors.externalService("Stripe session created without URL");
     }
 
     return {
@@ -170,24 +169,25 @@ export async function createUrlCheckoutSession({
     };
   } catch (stripeError) {
     if (stripeError?.type === "StripeCardError") {
-      return errors.stripeCardError(stripeError.message, {
+      throw errors.stripeCardError(stripeError.message, {
         stripeCode: stripeError.code,
       });
     }
 
     if (stripeError?.type === "StripeAuthenticationError") {
-      return errors.stripeAuthFailed(stripeError.message);
+      throw errors.stripeAuthFailed(stripeError.message);
     }
 
     if (stripeError?.type === "StripeRateLimitError") {
-      return errors.stripeRateLimited(stripeError.message);
+      throw errors.stripeRateLimited(stripeError.message);
     }
 
-    return errors.externalService("Stripe session creation failed", {
+    throw errors.externalService("Stripe session creation failed", {
       reason: stripeError?.message || "Unknown error",
     });
   }
 }
+
 
 export function buildStripeLineItems({
   items,
@@ -199,35 +199,29 @@ export function buildStripeLineItems({
     errorFactory ? errorFactory(msg, details) : errors.invalidData(msg, details);
 
   if (!Array.isArray(items) || items.length === 0) {
-    return err("No items in payload");
+    throw err("No items in payload");
   }
   if (!(byId instanceof Map)) {
-    return err("byId must be a Map(productId -> product)");
+    throw err("byId must be a Map(productId -> product)");
   }
 
   const line_items = [];
 
   for (const { id, qty } of items) {
-    const key = String(id);
-    const product = byId.get(key);
-    if (!product) return err(`Product not found for id ${id}`);
+    const product = byId.get(String(id));
+    if (!product) throw err(`Product not found for id ${id}`);
 
     const priceEuros = Number(product.priceInEuros);
     if (!Number.isFinite(priceEuros) || priceEuros <= 0) {
-      return err(`Invalid price for product ${id}`);
+      throw err(`Invalid price for product ${id}`);
     }
 
     const quantity = Math.max(1, Math.trunc(Number(qty) || 1));
-
-    if (product.soldOut) {
-      return err(`${product.name || product.title} is sold out`);
-    }
+    if (product.soldOut) throw err(`${product.name || product.title} is sold out`);
     const stockValueNum = Number(product.stockValue);
     if (Number.isFinite(stockValueNum) && stockValueNum < quantity) {
-      return err(`Not enough stock for ${product.name || product.title}`);
+      throw err(`Not enough stock for ${product.name || product.title}`);
     }
-
-    const unit_amount = Math.round(priceEuros * 100);
 
     line_items.push({
       price_data: {
@@ -236,7 +230,7 @@ export function buildStripeLineItems({
           name: product.title || product.name,
           metadata: { productId: String(product.id) },
         },
-        unit_amount,
+        unit_amount: Math.round(priceEuros * 100),
       },
       quantity,
     });

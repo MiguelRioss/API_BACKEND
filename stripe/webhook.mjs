@@ -1,18 +1,21 @@
 import express from "express";
 import Stripe from "stripe";
-
+import errors from "../../errors/errors.mjs";
+import handlerFactory from "../utils/handleFactory.mjs"
 import {
   normalizeLineItems,
   normalizeLineItemsWithCatalog,
   buildOrderPayload,
 } from "./webHookutils.mjs";
 
-// Inject stockService so we can do catalog fallback locally
+// Use your unified handler utilities
+const { isAppError, sendError } = handlerFactory;
+
 export default function stripeWebhook({ ordersService, stockService }) {
   if (!process.env.STRIPE_SECRET_KEY) throw new Error("Missing STRIPE_SECRET_KEY");
   if (!process.env.STRIPE_WEBHOOK_SECRET) throw new Error("Missing STRIPE_WEBHOOK_SECRET");
   if (!ordersService || typeof ordersService.createOrderServices !== "function") {
-    throw new Error("stripeWebhook requires ordersService.createOrderServices()");
+    throw errors.internalError("stripeWebhook requires ordersService.createOrderServices()");
   }
 
   const router = express.Router();
@@ -42,27 +45,30 @@ export default function stripeWebhook({ ordersService, stockService }) {
       if (event.type === "checkout.session.completed") {
         const session = event.data.object;
 
-        // 1) Fetch line items with expansions so metadata/product name are available
+        // 1️⃣ Fetch line items
         const { data: lineItems } = await stripe.checkout.sessions.listLineItems(session.id, {
           limit: 100,
           expand: ["data.price", "data.price.product"],
         });
 
         if (debug) {
-          console.log("[stripeWebhook] Line item preview:", lineItems.map((li) => ({
-            id: li.id,
-            description: li.description,
-            priceId: li.price?.id,
-            productId: li.price?.product?.id,
-            productMeta: li.price?.product?.metadata,
-            priceMeta: li.price?.metadata,
-          })));
+          console.log(
+            "[stripeWebhook] Line item preview:",
+            lineItems.map((li) => ({
+              id: li.id,
+              description: li.description,
+              priceId: li.price?.id,
+              productId: li.price?.product?.id,
+              productMeta: li.price?.product?.metadata,
+              priceMeta: li.price?.metadata,
+            }))
+          );
         }
 
-        // 2) Strict normalization first (requires productId metadata)
+        // 2️⃣ Normalize
         let items = normalizeLineItems(lineItems);
 
-        // 3) If any item.id is missing/invalid, try name-based fallback with local catalog
+        // 3️⃣ Fallback if product IDs are missing
         const anyMissing = items.some((it) => !Number.isInteger(it.id));
         if (anyMissing) {
           if (debug) console.log("[stripeWebhook] Missing productId metadata; attempting catalog fallback.");
@@ -75,13 +81,13 @@ export default function stripeWebhook({ ordersService, stockService }) {
         }
 
         if (items.some((it) => !Number.isInteger(it.id))) {
-          throw new Error("stripeWebhook could not resolve product ids for line items");
+          throw errors.externalService("Could not resolve product IDs for line items");
         }
 
-        // 4) Build order payload for your DB
+        // 4️⃣ Build order payload
         const orderPayload = buildOrderPayload({ session, items });
 
-        // 5) Idempotency guard
+        // 5️⃣ Idempotency check
         if (ordersService.getOrderByStripeSessionId) {
           let exists = null;
           try {
@@ -89,9 +95,7 @@ export default function stripeWebhook({ ordersService, stockService }) {
           } catch (lookupErr) {
             const isNotFound =
               lookupErr?.code === "NOT_FOUND" || lookupErr?.httpStatus === 404;
-            if (!isNotFound) {
-              throw lookupErr;
-            }
+            if (!isNotFound) throw lookupErr;
           }
           if (exists) {
             if (debug) console.log("[stripeWebhook] Order already processed, skipping.");
@@ -99,18 +103,39 @@ export default function stripeWebhook({ ordersService, stockService }) {
           }
         }
 
-        // 6) Persist
+        // 6️⃣ Persist
         const saved = await ordersService.createOrderServices(orderPayload);
         if (debug) console.log("[stripeWebhook] Order persisted:", { id: saved?.id });
-
-       
       }
 
+      // ✅ Always acknowledge receipt to Stripe when processing succeeded
       return res.sendStatus(200);
     } catch (err) {
       console.error("[stripeWebhook] Handler error:", err);
-      // Stripe should retry on 500s. Return 200 if you want to swallow the error instead.
-      return res.sendStatus(200);
+
+      // Known AppError (from errors.mjs)
+      if (isAppError && isAppError(err)) {
+        // 4xx → non-retryable
+        if (err.httpStatus >= 400 && err.httpStatus < 500) {
+          if (debug) sendError(res, err); // show JSON when debugging
+          else return res.sendStatus(200);
+        }
+        // 5xx → retryable
+        else {
+          if (debug) sendError(res, err);
+          else return res.sendStatus(500);
+        }
+        return;
+      }
+
+      // Unknown / unexpected error
+      console.error("[stripeWebhook] Unexpected error type:", err);
+      if (debug) {
+        return sendError(res, errors.internalError("Unexpected error in webhook", { reason: err.message }));
+      }
+
+      // Return 500 so Stripe retries
+      return res.sendStatus(500);
     }
   });
 

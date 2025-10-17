@@ -275,7 +275,9 @@ export function updateOrderStatus(currentStatus, key, { status, date = null, tim
  * Validates and prepares an order payload before writing to the database.
  * Includes shipping cost validation and full metadata checks.
  */
-export async function validateAndPrepareOrder(order) {
+export async function validateAndPrepareOrder(order, options = {}) {
+
+    const { isRequestedOrderForOtherCountries = false } = options;
 
   if (!order || typeof order !== "object" || Array.isArray(order)) {
     return Promise.reject(
@@ -339,32 +341,7 @@ export async function validateAndPrepareOrder(order) {
   if (!resolvedPaymentId)
     return Promise.reject(errors.invalidData("No payment ID"))
 
-    const paymentStatusNormalized = (() => {
-      if (typeof payment_status === "boolean") {
-        return payment_status;
-      }
-      if (typeof payment_status === "string") {
-        const normalized = payment_status.trim().toLowerCase();
-        if (["true", "paid", "1", "yes"].includes(normalized)) return true;
-        if (["false", "unpaid", "0", "no"].includes(normalized)) return false;
-      }
-      if (typeof payment_status === "number") {
-        return payment_status === 1;
-      }
-      const legacy = metadata?.payment_status;
-      if (typeof legacy === "boolean") {
-        return legacy;
-      }
-      if (typeof legacy === "string") {
-        const normalized = legacy.trim().toLowerCase();
-        if (["true", "paid", "1", "yes"].includes(normalized)) return true;
-        if (["false", "unpaid", "0", "no"].includes(normalized)) return false;
-      }
-      if (typeof legacy === "number") {
-        return legacy === 1;
-      }
-      return undefined;
-    })();
+  const paymentStatusNormalized = isRequestedOrderForOtherCountries ? false : true;
 
     if (typeof paymentStatusNormalized !== "boolean") {
       return Promise.reject(errors.invalidData("Missing or invalid payment status."));

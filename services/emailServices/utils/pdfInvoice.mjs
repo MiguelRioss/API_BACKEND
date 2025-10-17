@@ -3,7 +3,7 @@ import chromium from "@sparticuz/chromium";
 
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildLogoSrc } from "./utils/utils.mjs";
+import { buildLogoSrc } from "./utils.mjs";
 
 const moduleDir = path.dirname(fileURLToPath(import.meta.url));
 const fallbackLogoPath = path.resolve(moduleDir, "./assets/logo.png");

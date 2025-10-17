@@ -133,6 +133,9 @@ export async function createOrderDB(orderData = {}) {
         }
       }
     }
+    if (err && typeof err === "object" && Number.isFinite(Number(err.httpStatus))) {
+      return Promise.reject(err);
+    }
     return Promise.reject(
       errors.externalService("Failed to write order to DB", { original: err })
     );

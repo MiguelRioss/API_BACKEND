@@ -1,4 +1,6 @@
 ﻿// api/services/ordersServiceFactory.mjs
+const DEFAULT_SUCCESS_URL =
+  `${process.env.PUBLIC_BASE_URL}/checkout/orderSuccess`;
 
 import errors from "../../errors/errors.mjs";
 import {
@@ -10,8 +12,8 @@ import {
   mergeOrderChanges,
   validateAndNormalizeID,
   normalizeId,
-  findOrderBySessionId,
 } from "../servicesUtils.mjs";
+import buildManualOrderFromCart from "./orderServicesUtils.mjs";
 
 /**
  * createOrdersService(db, emailService)
@@ -23,21 +25,16 @@ import {
  *
  * Service throws domain errors for HTTP layer to map.
  */
-export default function createOrdersService(db, stripeServices, emailService) {
+export default function createOrdersService(db, stripeServices, emailService, stockServices) {
   if (!db || typeof db.createOrderDB !== "function") {
-    throw new Error("OrdersService requires a db with createOrderDB()");
+    return errors.externalService("OrdersService requires a db with createOrderDB()");
   }
   if (!stripeServices) {
-    throw new Error("OrdersService requires a stripeServices");
+    return errors.internalError("OrdersService requires a stripeServices");
   }
 
-  const mailer =
-    emailService && typeof emailService.sendOrderEmails === "function"
-      ? emailService
-      : null;
-
-  if (!mailer) {
-    console.warn("[ordersService] emailService missing or invalid; invoice emails disabled.");
+  if (!emailService) {
+    return errors.internalError("[ordersService] emailService missing or invalid; invoice emails disabled.");
   }
 
   return {
@@ -49,42 +46,6 @@ export default function createOrdersService(db, stripeServices, emailService) {
     createCheckoutSession
   };
 
-  // ──────────────────────────────
-  // STEP 1: Decide Stripe vs Manual
-  // ──────────────────────────────
-  async function createCheckoutSession(orderData) {
-    const {
-      shippingAddress = {},
-      billingAddress = {},
-      customer = {},
-    } = orderData;
-    const country =
-      shippingAddress.country?.toUpperCase?.() ||
-      billingAddress.country?.toUpperCase?.() ||
-      customer.country?.toUpperCase?.();
-
-    if (!country) {
-      throw errors.invalidData("Country is required to process checkout");
-    }
-
-    // Countries that use Stripe checkout
-    const stripeAllowed = ["PT", "DE", "NL", "MX", "CA", "AU", "NZ", "ZA"];
-
-    // 🧾 Always create DB order first
-    console.log("Stripe Here:", orderData)
-
-    if (stripeAllowed.includes(country)) {
-
-      // Stripe route
-      return stripeServices.createCheckoutSession(orderData);
-    }
-
-    const savedOrder = await createOrderServices(orderData);
-
-    // Manual (Wise / Revolut) route
-    const manualUrl = `mesodose.com/checkout/orderSuccess/${savedOrder.id}`;
-    return { redirectUrl: manualUrl };
-  }
   async function getOrdersServices({ limit, status, q } = {}) {
     return db
       .getAllOrders()
@@ -118,31 +79,102 @@ export default function createOrdersService(db, stripeServices, emailService) {
     }
   }
 
-  async function createOrderServices(order) {
-    console.log("OnServices",order)
+
+  // ──────────────────────────────
+  // STEP 1: Decide Stripe vs Manual
+  // ──────────────────────────────
+  async function createCheckoutSession(orderData) {
+    const {
+      shippingAddress = {},
+      billingAddress = {},
+      customer = {},
+    } = orderData;
+    const country =
+      shippingAddress.country?.toUpperCase?.() ||
+      billingAddress.country?.toUpperCase?.() ||
+      customer.country?.toUpperCase?.();
+
+    if (!country) {
+      throw errors.invalidData("Country is required to process checkout");
+    }
+
+    // Countries that use Stripe checkout
+    const stripeAllowed = ["PT", "DE", "NL", "MX", "CA", "AU", "NZ", "ZA"];
+
+    // 🧾 Always create DB order first
+    console.log("[ordersService] Checkout initiated for", country);
+
+    if (stripeAllowed.includes(country)) {
+      // Stripe route
+      return stripeServices.createCheckoutSession(orderData);
+    }
+
+    // 🪙 Manual payment route (Wise/Revolut)
+    const catalog = await stockServices.getAllProducts();
+    const manualOrderPayload = await buildManualOrderFromCart({
+      ...orderData,
+      currency: orderData.currency || "eur",
+      paymentId: orderData.paymentId,
+      catalog,
+    });
+
+    // Create the manual order directly in DB
+    const savedOrder = await createOrderServices(manualOrderPayload, { manual: true });
+
+    return { url: `${DEFAULT_SUCCESS_URL}/${savedOrder.id}` };
+  }
+
+
+
+  // ──────────────────────────────
+  // STEP 2: Create Order + Emails
+  // ──────────────────────────────
+  async function createOrderServices(order, options = {}) {
+    const { manual = false } = options;
+    console.log("[ordersService] Creating order:", order, "Manual:", manual);
+
     const prepared = await validateAndPrepareOrder(order);
     const saved = await db.createOrderDB(prepared);
 
-    if (!mailer) {
+    if (!emailService) {
+      console.warn("[ordersService] No email service available, skipping emails.");
       return saved;
     }
-
+    let flagged
     try {
-      await mailer.sendOrderEmails({
-        order: saved,
-        orderId: saved?.id,
-      });
+      let flagged = {};
 
+      if (manual) {
+        // 🪙 Manual payment email flow (non-Stripe, unpaid until confirmed)
+        await emailService.sendOtherCountryEmail({ order: saved, orderId: saved.id });
+        await emailService.sendAdminNotificationEmail({
+          order: saved,
+          orderId: saved.id,
+          manual: true,
+        });
 
-      const flagged = { ...saved, email_sent_Order: true };
+        flagged = {
+          ...saved,
+          email_Sent_ThankYou_Admin: false,
+          payment_status: false, // ❌ Manual orders start unpaid
+        };
+      } else {
+        // 💳 Stripe / standard checkout flow (immediate payment)
+        await emailService.sendOrderBundleEmails({ order: saved, orderId: saved.id });
+
+        flagged = {
+          ...saved,
+          email_Sent_ThankYou_Admin: true,
+          payment_status: true, // ✅ Stripe orders are paid
+        };
+      }
+
+      // Persist flags in DB
       if (typeof db.updateOrderDB === "function" && saved?.id) {
         try {
           await db.updateOrderDB(saved.id, flagged);
         } catch (updateErr) {
-          console.warn(
-            "[ordersService] Failed to persist email_sent flag:",
-            updateErr?.message || updateErr
-          );
+          console.warn("[ordersService] Failed to persist flag updates:", updateErr?.message || updateErr);
         }
       }
 
@@ -151,7 +183,9 @@ export default function createOrdersService(db, stripeServices, emailService) {
       console.error("[ordersService] Failed to send order emails:", err?.message || err);
       return saved;
     }
+
   }
+
 
   async function updateOrderServices(orderID, orderChanges = {}) {
     return validateAndNormalizeID(orderID).then((normalizedId) =>

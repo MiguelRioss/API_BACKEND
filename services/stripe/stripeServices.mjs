@@ -1,6 +1,9 @@
 import Stripe from "stripe";
 import errors from "../../errors/errors.mjs";
-import { createUrlCheckoutSession, buildStripeLineItems } from "./stripeUtils.mjs";
+import {
+  createUrlCheckoutSession,
+  buildStripeLineItems,
+} from "./stripeUtils.mjs";
 
 export default function createStripeServices(stockServices) {
   const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
@@ -95,4 +98,6 @@ export default function createStripeServices(stockServices) {
       paymentIntentId: sessionResult.paymentIntentId,
     };
   }
+
+
 }

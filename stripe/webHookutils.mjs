@@ -242,6 +242,7 @@ export function buildOrderPayload({ session, items }) {
     payment_id: sanitizeString(session?.payment_intent),
     session_id: normalizedSessionId,
     shipping_cost_cents: shippingCost,
+    payment_status: sanitizeString(session?.payment_status).toLowerCase() === "paid",
     metadata: buildMetadata(),
   };
 
@@ -253,7 +254,6 @@ export function buildOrderPayload({ session, items }) {
       shipping_address: { ...shippingAddress, phone },
       billing_address: { ...billingAddress, phone: billingAddress.phone || phone },
       stripe_session_id: normalizedSessionId,
-      payment_status: sanitizeString(session?.payment_status),
     };
 
     if (normalizedClientReferenceId) {

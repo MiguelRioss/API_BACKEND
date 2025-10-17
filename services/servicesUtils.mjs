@@ -246,7 +246,6 @@ function validateMetadata(meta) {
       typeof meta.client_reference_id === "string" || typeof meta.client_reference_id === "number"
         ? normalizeId(meta.client_reference_id)
         : "",
-    payment_status: typeof meta.payment_status === "string" ? meta.payment_status.trim() : "",
   };
 }
 
@@ -284,7 +283,7 @@ export async function validateAndPrepareOrder(order) {
     );
   }
 
-  const { name, email, phone, amount_total, currency, items, metadata } = order;
+    const { name, email, phone, amount_total, currency, items, metadata, payment_status } = order;
   const shippingCents =
     Number(order.shipping_cost_cents ??
       order.metadata?.shipping_cost_cents ??
@@ -340,9 +339,40 @@ export async function validateAndPrepareOrder(order) {
   if (!resolvedPaymentId)
     return Promise.reject(errors.invalidData("No payment ID"))
 
-  // --- Validate items & metadata ---
-  const normItems = validateItemsArray(items, amount_total, shippingCents);
-  const normMetadata = validateMetadata(metadata);
+    const paymentStatusNormalized = (() => {
+      if (typeof payment_status === "boolean") {
+        return payment_status;
+      }
+      if (typeof payment_status === "string") {
+        const normalized = payment_status.trim().toLowerCase();
+        if (["true", "paid", "1", "yes"].includes(normalized)) return true;
+        if (["false", "unpaid", "0", "no"].includes(normalized)) return false;
+      }
+      if (typeof payment_status === "number") {
+        return payment_status === 1;
+      }
+      const legacy = metadata?.payment_status;
+      if (typeof legacy === "boolean") {
+        return legacy;
+      }
+      if (typeof legacy === "string") {
+        const normalized = legacy.trim().toLowerCase();
+        if (["true", "paid", "1", "yes"].includes(normalized)) return true;
+        if (["false", "unpaid", "0", "no"].includes(normalized)) return false;
+      }
+      if (typeof legacy === "number") {
+        return legacy === 1;
+      }
+      return undefined;
+    })();
+
+    if (typeof paymentStatusNormalized !== "boolean") {
+      return Promise.reject(errors.invalidData("Missing or invalid payment status."));
+    }
+
+    // --- Validate items & metadata ---
+    const normItems = validateItemsArray(items, amount_total, shippingCents);
+    const normMetadata = validateMetadata(metadata);
   const initialStatus = makeDefaultStatus();
   const initalSentShipEmailStatus = false
   const rawSessionId =
@@ -360,14 +390,15 @@ export async function validateAndPrepareOrder(order) {
     name: name.trim(),
     email: emailTrimmed,
     phone : phone, 
-    currency: currencyNorm,
-    items: normItems,
-    amount_total,
-    shipping_cost_cents: shippingCents,
-    session_id: normalizedSessionId || "",
-    metadata: {
-      ...normMetadata,
-    },
+      currency: currencyNorm,
+      items: normItems,
+      amount_total,
+      shipping_cost_cents: shippingCents,
+      session_id: normalizedSessionId || "",
+      payment_status: paymentStatusNormalized,
+      metadata: {
+        ...normMetadata,
+      },
     status: initialStatus,
     sentShippingEmail:initalSentShipEmailStatus,
     track_url: "",

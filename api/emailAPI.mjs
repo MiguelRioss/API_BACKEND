@@ -1,18 +1,20 @@
 // api/emailAPI.mjs
+import errors from "../errors/errors.mjs";
 import handlerFactory from "../utils/handleFactory.mjs";
 
 export default function createEmailAPI(emailService) {
   const hasContact = emailService && typeof emailService.sendContactEmail === "function";
-  const hasOrderEmails = emailService && typeof emailService.sendOrderEmails === "function";
+  const hasOrderEmails = emailService && typeof emailService.sendOrderBundleEmails === "function";
   const hasShipping = emailService && typeof emailService.sendShippingEmail === "function";
+  const otherCountries = emailService && typeof emailService.sendOtherCountryEmail === "function";
 
-  if (!hasContact || !hasOrderEmails || !hasShipping) {
+  if (!hasContact || !hasOrderEmails || !hasShipping || !otherCountries) {
     throw "API dependency invalid";
   }
 
   return {
     handleContactForm: handlerFactory(internalHandleContactForm),
-    handleInvoiceEmail: handlerFactory(internalHandleInvoiceEmail),
+    handleSendThankYouAndAdmin: handlerFactory(internalSendThankYouAndAdmin),
     handleShippingEmail: handlerFactory(internalHandleShippingEmail),
   };
 
@@ -38,22 +40,22 @@ export default function createEmailAPI(emailService) {
     });
   }
 
-  async function internalHandleInvoiceEmail(req, res) {
+  async function internalSendThankYouAndAdmin(req, res) {
     const { order, orderId, logoPath, live } = req.body || {};
 
     if (!order || typeof order !== "object") {
-      return res.status(400).json({ error: "Missing order payload" });
+      return errors.badRequest("Missing order payload" );
     }
 
     const resolvedOrderId = orderId || order?.id;
     if (!resolvedOrderId) {
-      return res.status(400).json({ error: "Order id is required" });
+      return errors.badRequest( "Order id is required" );
     }
 
     const normalizedLive =
       typeof live === "string" ? live.toLowerCase() === "true" : Boolean(live);
 
-    await emailService.sendOrderEmails({
+    await emailService.sendOrderBundleEmails({
       order,
       orderId: resolvedOrderId,
       logoPath,

@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import Brevo from "sib-api-v3-sdk";
 import dotenv from "dotenv";
-import errors from "../../errors/errors.mjs";
+import errors from "../../../errors/errors.mjs";
 
 const moduleDir = path.dirname(fileURLToPath(import.meta.url));
 const envPath = path.resolve(moduleDir, "../../.env");

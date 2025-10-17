@@ -3,6 +3,8 @@ import {
   firstNonEmpty,
   formatMoney,
   normalizeString,
+  renderAddressHtml,
+  resolveAddress,
 } from "./templateUtils.mjs";
 
 /**
@@ -62,6 +64,92 @@ export function buildOtherCountrysTemplateEmail({
   const safeWiseUrl = escapeHtml(firstNonEmpty(wiseUrl, ""));
   const safeRevolutUrl = escapeHtml(firstNonEmpty(revolutUrl, ""));
 
+  const shippingAddress = resolveAddress(
+    order?.metadata?.shipping_address,
+    order?.shipping_address,
+    order?.address,
+    order?.shippingAddress,
+    order?.metadata?.address,
+    order?.customer?.shipping_address,
+    order?.customer?.shippingAddress,
+  );
+
+  const fullNameValue = firstNonEmpty(shippingAddress.name, plainName, "Customer");
+  const safeFullName = escapeHtml(fullNameValue || "Customer");
+
+  const hasAddressDetails = Boolean(
+    shippingAddress.line1 ||
+      shippingAddress.line2 ||
+      shippingAddress.city ||
+      shippingAddress.state ||
+      shippingAddress.postal_code ||
+      shippingAddress.country,
+  );
+
+  const fullAddressHtml = hasAddressDetails
+    ? renderAddressHtml(shippingAddress)
+    : escapeHtml("Not provided");
+  const fullAddressText = hasAddressDetails ? renderAddressPlain(shippingAddress) : "Not provided";
+
+  const countryValue = firstNonEmpty(
+    shippingAddress.country,
+    order?.metadata?.country,
+    order?.country,
+    order?.customer?.country,
+    "Not provided",
+  );
+  const safeCountry = escapeHtml(countryValue || "Not provided");
+
+  const phoneValue = firstNonEmpty(
+    order?.phone,
+    shippingAddress.phone,
+    order?.metadata?.billing_address?.phone,
+    order?.customer?.phone,
+    "Not provided",
+  );
+  const safePhone = escapeHtml(phoneValue || "Not provided");
+
+  const emailValue = firstNonEmpty(
+    order?.email,
+    shippingAddress.email,
+    order?.metadata?.billing_address?.email,
+    order?.customer?.email,
+    "Not provided",
+  );
+  const safeEmail = escapeHtml(emailValue || "Not provided");
+
+  const detailItemsHtml = [];
+  const detailItemsText = [];
+
+  if (normalizedOrderId) {
+    detailItemsHtml.push(
+      `    <li><strong>Order ID:</strong> ${escapeHtml(normalizedOrderId)}</li>`,
+    );
+    detailItemsText.push(`- Order ID: ${normalizedOrderId}`);
+  }
+
+  detailItemsHtml.push(`    <li><strong>Full name:</strong> ${safeFullName}</li>`);
+  detailItemsText.push(`- Full name: ${fullNameValue}`);
+
+  detailItemsHtml.push(`    <li><strong>Full address:</strong><br/>${fullAddressHtml}</li>`);
+  detailItemsText.push(`- Full address: ${fullAddressText}`);
+
+  detailItemsHtml.push(`    <li><strong>Country:</strong> ${safeCountry}</li>`);
+  detailItemsText.push(`- Country: ${countryValue}`);
+
+  detailItemsHtml.push(`    <li><strong>Phone number:</strong> ${safePhone}</li>`);
+  detailItemsText.push(`- Phone number: ${phoneValue}`);
+
+  detailItemsHtml.push(`    <li><strong>Email address:</strong> ${safeEmail}</li>`);
+  detailItemsText.push(`- Email address: ${emailValue}`);
+
+  detailItemsHtml.push(
+    "    <li><strong>Payment receipt:</strong> attach your confirmation (Wise transaction # or Revolut @tag)</li>",
+  );
+  detailItemsText.push(
+    "- Payment receipt: attach your confirmation (Wise transaction # or Revolut @tag)",
+  );
+
   const subject = normalizedOrderId
     ? `Ibotincture Order & Payment Instructions (Order ${escapeSubject(normalizedOrderId)})`
     : "Ibotincture Order & Payment Instructions";
@@ -103,14 +191,9 @@ export function buildOtherCountrysTemplateEmail({
       ? `    <li>Revolut: <a href="${safeRevolutUrl}" style="color:#b87333;text-decoration:none;">${safeRevolutUrl}</a></li>`
       : "    <li>Revolut payment link available upon request.</li>",
     "  </ul>",
-    '  <p style="margin:16px 0;">Important: When you send your payment, please also email us the details below (even if supplied before):</p>',
+    '  <p style="margin:16px 0;">Important: Once you have paid, please send us the payment confirmation (Wise transaction # or Revolut @tag) together with the details below:</p>',
     '  <ul style="margin:0 0 16px 20px;padding:0;">',
-    "    <li>Full name</li>",
-    "    <li>Full address</li>",
-    "    <li>Country</li>",
-    "    <li>Phone number</li>",
-    "    <li>Email address</li>",
-    "    <li>Copy of the payment receipt</li>",
+    ...detailItemsHtml,
     "  </ul>",
     '  <h2 style="margin:24px 0 8px 0;font-size:18px;color:#111;">Shipping Notice</h2>',
     "  <p style=\"margin:0 0 16px 0;\">",
@@ -148,11 +231,12 @@ export function buildOtherCountrysTemplateEmail({
     "",
     "Product & Pricing",
     ...normalizedItems.map(
-      (item) => `- ${item.quantity} x ${item.name} — ${formatMoneyPlain(item.lineTotalCents, resolvedCurrency)}`,
+      (item) =>
+        `- ${item.quantity} x ${item.name} - ${formatMoneyPlain(item.lineTotalCents, resolvedCurrency)}`,
     ),
     resolvedShippingCents > 0
-      ? `- Shipping — ${formatMoneyPlain(resolvedShippingCents, resolvedCurrency)}`
-      : "- Shipping — included",
+      ? `- Shipping - ${formatMoneyPlain(resolvedShippingCents, resolvedCurrency)}`
+      : "- Shipping - included",
     `- Total due: ${formatMoneyPlain(computedTotalCents, resolvedCurrency)}`,
     "",
     "Payment Options",
@@ -160,13 +244,8 @@ export function buildOtherCountrysTemplateEmail({
     safeWiseUrl ? `- Wise: ${wiseUrl}` : "- Wise payment link available upon request.",
     safeRevolutUrl ? `- Revolut: ${revolutUrl}` : "- Revolut payment link available upon request.",
     "",
-    "Important: When you send your payment, please also email us the details below (even if supplied before):",
-    "- Full name",
-    "- Full address",
-    "- Country",
-    "- Phone number",
-    "- Email address",
-    "- Copy of the payment receipt",
+    "Important: Once you have paid, please send the payment confirmation (Wise transaction # or Revolut @tag) together with the information below:",
+    ...detailItemsText,
     "",
     "Shipping Notice",
     "Please confirm with us before ordering if you are unsure whether we can ship to your country.",
@@ -265,6 +344,24 @@ function buildItemSummaries({
       currency,
     };
   });
+}
+
+function renderAddressPlain(address = {}) {
+  const parts = [];
+  if (address.name) parts.push(address.name);
+  if (address.company) parts.push(address.company);
+  if (address.line1) parts.push(address.line1);
+  if (address.line2) parts.push(address.line2);
+
+  const locality = [];
+  if (address.city) locality.push(address.city);
+  if (address.state) locality.push(address.state);
+  if (address.postal_code) locality.push(address.postal_code);
+  if (locality.length) parts.push(locality.join(", "));
+
+  if (address.country) parts.push(address.country);
+
+  return parts.filter(Boolean).join(", ");
 }
 
 function resolveShippingCents(order, fallback) {

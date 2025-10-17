@@ -38,3 +38,25 @@ https://chatgpt.com/g/g-p-68a6e20ab0c88191958f694dcc5dc007-miguelstuff/c/68d3705
   
 
   
+
+
+  - [ ] Email 
+    - [ ] -> diferente para New payment Request
+      * [ ] New PaymentRequest Template 
+    - [ ] -> A informação template ja feito
+      - [ ] Mas tem de confirmar com email para o alvaro com o comprovativo de pagamento 
+
+
+
+
+
+((Must have in the email TEMPLATE ))
+Once you have paid , please provide us with proof of payment( WISE transaction # or Revolut @TAG) 
+and be sure to include the information bellow:
+- OrderID 
+- Full name
+- Full address
+- Country
+- Phone number
+- Email address
+- Copy of the payment receipt

@@ -20,7 +20,7 @@ import createEmailAPI from "./api/emailAPI.mjs"; // --- New Contact API
 
 // --- Email (transport + service)
 import createEmailService from "./services/emailServices/emailService.mjs";
-import brevoTransport from "./services/emailServices/brevoTransports.mjs";
+import brevoTransport from "./services/emailServices/utils/brevoTransports.mjs";
 import createSubscribeAPI from "./api/subscribeAPI.mjs";
 
 
@@ -69,7 +69,7 @@ const stockService = createStockServices(db);
 // If your factory is `createStripeServices({ stockServices })`, pass an object.
 // If it's positional `createStripeServices(stockService)`, keep as-is.
 const stripeServices = createStripeServices(stockService);
-const ordersService = createOrdersService( db,stripeServices,emailService); // --- Pass emailService to ordersService
+const ordersService = createOrdersService( db,stripeServices,emailService,stockService); // --- Pass emailService to ordersService
 
 // -----------------------------------------------------------------------------
 // API Layer (controllers)
@@ -156,7 +156,7 @@ app.get("/api/products/:id", stockApi.getProductByIdAPI);
  * Handles frontend contact form submissions from /api/contactUs.
  * You can expand later to use Brevo or another mailer.
  */
-app.post("/api/email/invoice", emailApi.handleInvoiceEmail);
+app.post("/api/email/invoice", emailApi.handleSendThankYouAndAdmin);
 app.post("/api/email/shipping", emailApi.handleShippingEmail);
 app.post("/api/contactUs", emailApi.handleContactForm); // --- New Contact API
 

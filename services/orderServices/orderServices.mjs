@@ -160,13 +160,13 @@ export default function createOrdersService(db, stripeServices, emailService, st
 
     try {
       if (isRequestedOrderForOtherCountries) {
-        // 🌍 Order Request flow (outside Stripe-supported countries)
-        await emailService.sendOtherCountryEmail({ order: saved, orderId: saved.id });
-        await emailService.sendAdminNotificationEmail({
+
+        await emailService.sendInquiryOrderBundleEmails({
           order: saved,
           orderId: saved.id,
-          manual: true, // optional — for admin email wording
+          manual: true,
         });
+
 
         flagged = {
           ...saved,

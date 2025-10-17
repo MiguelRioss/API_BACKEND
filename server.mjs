@@ -157,6 +157,7 @@ app.get("/api/products/:id", stockApi.getProductByIdAPI);
  * You can expand later to use Brevo or another mailer.
  */
 app.post("/api/email/invoice", emailApi.handleSendThankYouAndAdmin);
+app.post("/api/email/inquireEmails", emailApi.handleSendInquiryOrderEmails);
 app.post("/api/email/shipping", emailApi.handleShippingEmail);
 app.post("/api/contactUs", emailApi.handleContactForm); // --- New Contact API
 

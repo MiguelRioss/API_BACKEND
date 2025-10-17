@@ -3,14 +3,9 @@ import { sendAdminNotificationEmail } from "./senders/sendAdminNotificationEmail
 import { sendContactEmail } from "./senders/sendContactEmail.mjs";
 import { sendShippingEmail } from "./senders/sendShippingEmail.mjs";
 import { sendOtherCountryEmail } from "./senders/sendOtherCountryEmail.mjs";
-import {sendOrderBundleEmails} from "./senders/sendOrderBundleEmails.mjs"
+import { sendOrderBundleEmails } from "./senders/sendOrderBundleEmails.mjs";
+import { sendInquiryOrderBundleEmails } from "./senders/sendInquiryOrderBundleEmails.mjs";
 
-/**
- * Email Service Factory
- * ---------------------
- * Injects the transport (Brevo, Nodemailer, etc.) and returns
- * ready-to-use senders with shared dependencies.
- */
 export default function createEmailService({ transport } = {}) {
   if (!transport || typeof transport.send !== "function") {
     throw new Error("emailService expects a transport with a send() function");
@@ -23,5 +18,6 @@ export default function createEmailService({ transport } = {}) {
     sendShippingEmail: (args) => sendShippingEmail({ transport, ...args }),
     sendOtherCountryEmail: (args) => sendOtherCountryEmail({ transport, ...args }),
     sendOrderBundleEmails: (args) => sendOrderBundleEmails({ transport, ...args }),
+    sendInquiryOrderBundleEmails: (args) => sendInquiryOrderBundleEmails({ transport, ...args }),
   };
 }

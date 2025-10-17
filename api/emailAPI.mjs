@@ -16,6 +16,7 @@ export default function createEmailAPI(emailService) {
     handleContactForm: handlerFactory(internalHandleContactForm),
     handleSendThankYouAndAdmin: handlerFactory(internalSendThankYouAndAdmin),
     handleShippingEmail: handlerFactory(internalHandleShippingEmail),
+    handleSendInquiryOrderEmails: handlerFactory(internalSendInquiryOrderEmails),
   };
 
   async function internalHandleContactForm(req, res) {
@@ -44,12 +45,12 @@ export default function createEmailAPI(emailService) {
     const { order, orderId, logoPath, live } = req.body || {};
 
     if (!order || typeof order !== "object") {
-      return errors.badRequest("Missing order payload" );
+      return errors.badRequest("Missing order payload");
     }
 
     const resolvedOrderId = orderId || order?.id;
     if (!resolvedOrderId) {
-      return errors.badRequest( "Order id is required" );
+      return errors.badRequest("Order id is required");
     }
 
     const normalizedLive =
@@ -108,6 +109,42 @@ export default function createEmailAPI(emailService) {
       description: "Shipping email sent",
       orderId: resolvedOrderId,
       uri: "/api/email/shipping",
+    });
+  }
+}
+async function internalSendInquiryOrderEmails(req, res) {
+  const { order, orderId, logoPath, live } = req.body || {};
+
+  if (!order || typeof order !== "object") {
+    return res.status(400).json({ error: "Missing order payload" });
+  }
+
+  const resolvedOrderId = orderId || order?.id;
+  if (!resolvedOrderId) {
+    return res.status(400).json({ error: "Order id is required" });
+  }
+
+  const normalizedLive =
+    typeof live === "string" ? live.toLowerCase() === "true" : Boolean(live);
+
+  try {
+    await emailService.sendInquiryOrderBundleEmails({
+      order,
+      orderId: resolvedOrderId,
+      logoPath,
+      live: normalizedLive,
+    });
+
+    return res.status(200).json({
+      description: "Inquiry order bundle emails sent (Other Country + Admin)",
+      orderId: resolvedOrderId,
+      uri: "/api/email/inquiry",
+    });
+  } catch (err) {
+    console.error("[emailAPI] Failed to send inquiry order emails:", err);
+    return res.status(500).json({
+      error: "Failed to send inquiry order bundle emails",
+      details: err.message,
     });
   }
 }

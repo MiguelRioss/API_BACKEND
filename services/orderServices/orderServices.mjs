@@ -99,12 +99,24 @@ export default function createOrdersService(db, stripeServices, emailService, st
       throw errors.invalidData("Country is required to process checkout");
     }
 
-    // 🌍 Countries that use Stripe checkout
-    const stripeAllowed = ["PT", "DE", "NL", "MX", "CA", "AU", "NZ", "ZA"];
+    // 🌍 Allowable Stripe countries (by both code and full name)
+    const stripeAllowed = [
+      "PT", "PORTUGAL",
+      "DE", "GERMANY",
+      "NL", "NETHERLANDS",
+      "MX", "MEXICO",
+      "CA", "CANADA",
+      "AU", "AUSTRALIA",
+      "NZ", "NEW ZEALAND",
+      "ZA", "SOUTH AFRICA"
+    ];
 
-    console.log("[ordersService] Checkout initiated for", country);
+    // Normalize the input for matching (uppercase, trim)
+    const normalizedCountry = (country || "").trim().toUpperCase();
 
-    if (stripeAllowed.includes(country)) {
+    console.log("[ordersService] Checkout initiated for", normalizedCountry);
+
+    if (stripeAllowed.includes(normalizedCountry)) {
       // 💳 Stripe route
       return stripeServices.createCheckoutSession(orderData);
     }

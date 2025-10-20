@@ -64,11 +64,12 @@ export function buildOtherCountrysTemplateEmail({
   const safeWiseUrl = escapeHtml(firstNonEmpty(wiseUrl, ""));
   const safeRevolutUrl = escapeHtml(firstNonEmpty(revolutUrl, ""));
   const mesoContactBaseUrl = "https://mesodose.com/mesocontact";
-  const contactParams = new URLSearchParams({ subject: "orderSupport" });
+  const contactParams = [];
   if (normalizedOrderId) {
-    contactParams.set("orderId", normalizedOrderId);
+    contactParams.push(`orderId=${encodeURIComponent(normalizedOrderId)}`);
   }
-  const contactUrl = `${mesoContactBaseUrl}?${contactParams.toString()}`;
+  contactParams.push(`subject=${encodeURIComponent("Order support")}`);
+  const contactUrl = `${mesoContactBaseUrl}?${contactParams.join("&")}`;
   const safeContactUrl = escapeHtml(contactUrl);
 
   const shippingAddress = resolveAddress(

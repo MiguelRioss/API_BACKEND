@@ -36,11 +36,12 @@ export function buildShippingNotificationTemplate({
   );
 
   const mesoContactBaseUrl = "https://mesodose.com/mesocontact";
-  const contactParams = new URLSearchParams({ subject: "orderSupport" });
+  const contactParams = [];
   if (resolvedOrderId) {
-    contactParams.set("orderId", resolvedOrderId);
+    contactParams.push(`orderId=${encodeURIComponent(resolvedOrderId)}`);
   }
-  const contactUrl = `${mesoContactBaseUrl}?${contactParams.toString()}`;
+  contactParams.push(`subject=${encodeURIComponent("Order support")}`);
+  const contactUrl = `${mesoContactBaseUrl}?${contactParams.join("&")}`;
   const safeContactUrl = escapeHtml(contactUrl);
 
   const customerName = firstNonEmpty(

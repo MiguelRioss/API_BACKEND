@@ -1,7 +1,7 @@
 import path from "path";
 import { fileURLToPath } from "url";
 import { buildOrderInvoiceHtml } from "../templates/emailTemplates.mjs";
-import { createPdfInvoice } from "../pdfInvoice.mjs";
+import { createPdfInvoice } from "../utils/pdfInvoice.mjs";
 
 const order = {
   name: "Jane Doe",
@@ -42,7 +42,7 @@ const order = {
 const html = buildOrderInvoiceHtml({ order, orderId: "ORDER-TEST-001" });
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
-const logoPath = path.resolve(currentDir, "assets/logo.png");
+const logoPath = path.resolve(currentDir, "../assets/logo.png");
 
 createPdfInvoice(html, logoPath).then((generatedPath) => {
   console.log(`PDF generated at: ${generatedPath}`);

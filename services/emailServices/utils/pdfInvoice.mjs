@@ -29,12 +29,22 @@ export async function createPdfInvoice(
   logoPath = DEFAULT_INVOICE_LOGO_PATH,
   outputPath = "./invoice.pdf"
 ) {
-  const browser = await puppeteer.launch({
-    args: chromium.args,
-    defaultViewport: chromium.defaultViewport,
-    executablePath: await chromium.executablePath(),
-    headless: chromium.headless,
-  });
+  const manualExecutable = (process.env.PUPPETEER_EXECUTABLE_PATH || "").trim();
+  const launchOptions = manualExecutable
+    ? {
+        args: chromium.args,
+        defaultViewport: chromium.defaultViewport,
+        executablePath: manualExecutable,
+        headless: true,
+      }
+    : {
+        args: chromium.args,
+        defaultViewport: chromium.defaultViewport,
+        executablePath: await chromium.executablePath(),
+        headless: chromium.headless,
+      };
+
+  const browser = await puppeteer.launch(launchOptions);
 
   const page = await browser.newPage();
   const logoSrc = await buildLogoSrc(logoPath);

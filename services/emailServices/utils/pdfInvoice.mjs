@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { buildLogoSrc } from "./utils.mjs";
 
 const moduleDir = path.dirname(fileURLToPath(import.meta.url));
-const fallbackLogoPath = path.resolve(moduleDir, "./assets/logo.png");
+const fallbackLogoPath = path.resolve(moduleDir, "../assets/logo.png");
 const envLogoPath = (process.env.INVOICE_LOGO_PATH || "").trim();
 
 const DEFAULT_INVOICE_LOGO_PATH = envLogoPath

@@ -1,6 +1,7 @@
 import puppeteer from "puppeteer-core";
 import chromium from "@sparticuz/chromium";
 
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildLogoSrc } from "./utils.mjs";
@@ -30,7 +31,15 @@ export async function createPdfInvoice(
   outputPath = "./invoice.pdf"
 ) {
   const manualExecutable = (process.env.PUPPETEER_EXECUTABLE_PATH || "").trim();
-  const launchOptions = manualExecutable
+  const hasManualExecutable = manualExecutable && fs.existsSync(manualExecutable);
+
+  if (manualExecutable && !hasManualExecutable) {
+    console.warn(
+      `[pdfInvoice] PUPPETEER_EXECUTABLE_PATH set but file not found: ${manualExecutable}. Falling back to bundled chromium.`
+    );
+  }
+
+  const launchOptions = hasManualExecutable
     ? {
         args: chromium.args,
         defaultViewport: chromium.defaultViewport,

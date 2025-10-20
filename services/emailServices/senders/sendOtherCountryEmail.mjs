@@ -10,7 +10,7 @@ export async function sendOtherCountryEmail({
   transport,
   order,
   orderId,
-  live = false,
+  live = true,
 } = {}) {
   if (!order || typeof order !== "object") {
     return Promise.reject(errors.invalidData("sendOtherCountryEmail requires an order object"));
@@ -39,6 +39,8 @@ export async function sendOtherCountryEmail({
     orderId,
   });
 
+ 
+ //Ask
   const bccEmail = normalizedLive
     ? normalizeEmail(process.env.OWNER_EMAIL)
     : undefined;
@@ -49,7 +51,7 @@ export async function sendOtherCountryEmail({
       toName,
       subject,
       html,
-      bcc: bccEmail || undefined,
+      bcc: undefined,
     });
 
     console.log(`[emailService] OtherCountryEmail sent to ${toEmail}`);

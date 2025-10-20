@@ -63,6 +63,11 @@ export function buildOtherCountrysTemplateEmail({
 
   const safeWiseUrl = escapeHtml(firstNonEmpty(wiseUrl, ""));
   const safeRevolutUrl = escapeHtml(firstNonEmpty(revolutUrl, ""));
+  const mesoContactBaseUrl = "https://mesodose.com/mesocontact";
+  const contactUrl = normalizedOrderId
+    ? `${mesoContactBaseUrl}?orderId=${encodeURIComponent(normalizedOrderId)}`
+    : mesoContactBaseUrl;
+  const safeContactUrl = escapeHtml(contactUrl);
 
   const shippingAddress = resolveAddress(
     order?.metadata?.shipping_address,
@@ -195,6 +200,7 @@ export function buildOtherCountrysTemplateEmail({
     '  <ul style="margin:0 0 16px 20px;padding:0;">',
     ...detailItemsHtml,
     "  </ul>",
+    `  <p style="margin:16px 0;">If you need to update any of the above details, please reply to this email or use our MesoContact form: <a href="${safeContactUrl}" style="color:#b87333;text-decoration:none;">${safeContactUrl}</a>.</p>`,
     '  <h2 style="margin:24px 0 8px 0;font-size:18px;color:#111;">Shipping Notice</h2>',
     "  <p style=\"margin:0 0 16px 0;\">",
     "    Please confirm with us before ordering if you are unsure whether we can ship to your country.",
@@ -246,6 +252,8 @@ export function buildOtherCountrysTemplateEmail({
     "",
     "Important: Once you have paid, please send the payment confirmation (Wise transaction # or Revolut @tag) together with the information below:",
     ...detailItemsText,
+    "",
+    `If you need to update any details, use our MesoContact form: ${contactUrl}`,
     "",
     "Shipping Notice",
     "Please confirm with us before ordering if you are unsure whether we can ship to your country.",

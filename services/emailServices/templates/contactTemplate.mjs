@@ -106,7 +106,7 @@ export function buildContactEmailTemplate({
   </div>
   `;
 
-  const subjectLine = `[MesoContact] ${subject || "New Message"}`;
+  const subjectLine = `[MesoContact] - ${subject || "New Message"}`;
 
   return { subject: subjectLine, html };
 }

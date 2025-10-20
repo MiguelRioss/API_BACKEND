@@ -36,7 +36,11 @@ export function buildShippingNotificationTemplate({
     locale,
   );
 
-  
+  const mesoContactBaseUrl = "https://mesodose.com/mesocontact";
+  const contactUrl = resolvedOrderId
+    ? `${mesoContactBaseUrl}?orderId=${encodeURIComponent(resolvedOrderId)}`
+    : mesoContactBaseUrl;
+  const safeContactUrl = escapeHtml(contactUrl);
 
   const customerName = firstNonEmpty(
     order?.name,
@@ -101,9 +105,9 @@ export function buildShippingNotificationTemplate({
       `  <p style="margin:0 0 8px 0;"><strong>Tracking:</strong> ${escapeHtml(trackingNumberDisplay)}</p>`,
       `  <p style="margin:0 0 16px 0;"><strong>Track here:</strong> ${trackingLinkHtml}</p>`,
       "  <p style=\"margin:16px 0;\">We use discreet, plain packaging and ship the goods as Berberine Tinctures.</p>",
-      "  <p style=\"margin:16px 0;\">If you have any questions or issues, please use our MesoContact form and quote your Order ID " +
-        `${escapeHtml(resolvedOrderId || "")}: ` +
-        '<a href="https://mesodose.com/mesocontact" style="color:#b87333;text-decoration:none;">https://mesodose.com/mesocontact</a>.</p>',
+      `  <p style="margin:16px 0;">If you have any questions or issues, please use our MesoContact form and quote your Order ID ${escapeHtml(
+        resolvedOrderId || "",
+      )}: <a href="${safeContactUrl}" style="color:#b87333;text-decoration:none;">${safeContactUrl}</a>.</p>`,
       "  <p style=\"margin:16px 0;\">Share the love – please don’t forget to rate us on TrustPilot 😊 " +
         '<a href="https://www.trustpilot.com/evaluate/ibogenics.com" style="color:#b87333;text-decoration:none;">https://www.trustpilot.com/evaluate/ibogenics.com</a></p>',
       "  <p style=\"margin:24px 0 0 0;\">With gratitude,<br/><strong>The Ibogenics Team</strong><br/>" +

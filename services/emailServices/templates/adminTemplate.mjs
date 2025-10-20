@@ -111,7 +111,7 @@ export function buildAdminNotificationSubject({ date, customerName, orderId }) {
   const safeDate = normalizeString(date) || "today";
   const safeName = normalizeString(customerName) || "customer";
   const safeId = normalizeString(orderId) || "pending";
-  return `New order received on ${safeDate} for ${safeName} (Order ID #${safeId})`;
+  return `Stripe/Manual - ${safeName} (Order #${safeId}, ${safeDate})`;
 }
 
 function renderPackedItemsList(items = [], currency = fallbackCurrency) {

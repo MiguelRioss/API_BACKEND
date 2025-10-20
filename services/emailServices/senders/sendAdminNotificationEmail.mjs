@@ -16,7 +16,7 @@ export async function sendAdminNotificationEmail({
   orderId,
   manual = false,
 }) {
-  const ownerEmail = normalizeEmail(process.env.OWNER_EMAIL);
+  const ownerEmail = normalizeEmail(process.env.ORDER_EMAIL);
   const forwardEmails = parseEmailList(process.env.ORDER_FORWARD_EMAILS || "");
 
   if (!ownerEmail) throw new Error("OWNER_EMAIL missing");

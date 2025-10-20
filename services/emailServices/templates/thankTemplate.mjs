@@ -51,6 +51,11 @@ export function buildThankTemplate({
     orderDate || order?.metadata?.order_date || order?.created_at,
     locale,
   );
+  const mesoContactBaseUrl = "https://mesodose.com/mesocontact";
+  const contactUrl = resolvedOrderId
+    ? `${mesoContactBaseUrl}?orderId=${encodeURIComponent(resolvedOrderId)}`
+    : mesoContactBaseUrl;
+  const safeContactUrl = escapeHtml(contactUrl);
 
   const items = Array.isArray(order?.items) ? order.items : [];
   const itemsHtml = renderItemsList(items);
@@ -105,7 +110,7 @@ export function buildThankTemplate({
       `    If anything above needs correcting, please reply to this email before dispatch, or use our MesoContact form and quote your Order ID ${escapeHtml(
         resolvedOrderId || "",
       )}:`,
-      '    <a href="https://mesodose.com/mesocontact" style="color:#b87333;text-decoration:none;">https://mesodose.com/mesocontact</a>',
+      `    <a href="${safeContactUrl}" style="color:#b87333;text-decoration:none;">${safeContactUrl}</a>`,
       "  </p>",
       "  <p style=\"margin:16px 0;\">",
       "    With gratitude,<br/>",

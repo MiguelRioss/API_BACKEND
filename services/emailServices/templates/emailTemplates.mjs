@@ -46,7 +46,7 @@ function formatDate(date = new Date()) {
 export function buildOrderInvoiceHtml({ order = {}, orderId } = {}) {
   const items = Array.isArray(order.items) ? order.items : [];
   const currency = String(order.currency || fallbackCurrency).toUpperCase();
-  const invoiceNumber = escapeHtml(orderId ? `#${orderId}` : "");
+  const invoiceNumber = escapeHtml(orderId ? `${orderId}` : "");
   const rawShipping =
     order?.shipping_cost_cents ??
     order?.metadata?.shipping_cost_cents ??

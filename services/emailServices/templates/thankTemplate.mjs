@@ -52,9 +52,11 @@ export function buildThankTemplate({
     locale,
   );
   const mesoContactBaseUrl = "https://mesodose.com/mesocontact";
-  const contactUrl = resolvedOrderId
-    ? `${mesoContactBaseUrl}?orderId=${encodeURIComponent(resolvedOrderId)}`
-    : mesoContactBaseUrl;
+  const contactParams = new URLSearchParams({ subject: "orderSupport" });
+  if (resolvedOrderId) {
+    contactParams.set("orderId", resolvedOrderId);
+  }
+  const contactUrl = `${mesoContactBaseUrl}?${contactParams.toString()}`;
   const safeContactUrl = escapeHtml(contactUrl);
 
   const items = Array.isArray(order?.items) ? order.items : [];
@@ -125,7 +127,7 @@ export function buildThankTemplate({
 export function buildThankTemplateSubject(orderId) {
   const normalized = normalizeString(orderId);
   if (normalized) {
-    return `Thank you for your order #${normalized} - invoice attached`;
+    return `Thank you for your order ${normalized} - invoice attached`;
   }
   return "Thank you for your order - invoice attached";
 }

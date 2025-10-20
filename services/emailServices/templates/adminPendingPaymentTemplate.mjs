@@ -77,7 +77,7 @@ export function buildAdminPendingPaymentTemplate({
     html: [
       '<div style="font-family:Helvetica,Arial,sans-serif;color:#222;font-size:14px;line-height:1.6;">',
       `  <h2 style="margin:0 0 16px 0;">A new Order awaiting payment — ${escapeHtml(customerName)}</h2>`,
-      `  <p style="margin:0 0 8px 0;">Order ID <strong>#${escapeHtml(resolvedOrderId || "")}</strong></p>`,
+      `  <p style="margin:0 0 8px 0;">Order ID <strong>${escapeHtml(resolvedOrderId || "")}</strong></p>`,
       `  <p style="margin:0 0 8px 0;">Received on ${escapeHtml(formattedDate)}</p>`,
       '  <p style="margin:16px 0;">Dear Ibogenics Admin &amp; Logistics Team,</p>',
       '  <p style="margin:0 0 16px 0;">A new order has been created and is currently <strong>awaiting payment confirmation</strong>. Please do not ship until payment has been verified.</p>',
@@ -112,7 +112,7 @@ export function buildAdminPendingPaymentSubject({ date, customerName, orderId })
   const safeDate = normalizeString(date) || "today";
   const safeName = normalizeString(customerName) || "customer";
   const safeId = normalizeString(orderId) || "pending";
-  return `Other Countries Order — ${safeName} (Order #${safeId}, ${safeDate})`;
+  return `Other Countries Order — ${safeName} (Order ${safeId}, ${safeDate})`;
 }
 
 function renderPackedItemsList(items = [], currency = fallbackCurrency) {

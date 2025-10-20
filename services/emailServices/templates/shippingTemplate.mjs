@@ -18,7 +18,6 @@ export function buildShippingNotificationTemplate({
   order = {},
   orderId,
   orderDate,
-  invoiceId,
   trackingNumber,
   trackingUrl,
   locale = defaultLocale,
@@ -37,9 +36,11 @@ export function buildShippingNotificationTemplate({
   );
 
   const mesoContactBaseUrl = "https://mesodose.com/mesocontact";
-  const contactUrl = resolvedOrderId
-    ? `${mesoContactBaseUrl}?orderId=${encodeURIComponent(resolvedOrderId)}`
-    : mesoContactBaseUrl;
+  const contactParams = new URLSearchParams({ subject: "orderSupport" });
+  if (resolvedOrderId) {
+    contactParams.set("orderId", resolvedOrderId);
+  }
+  const contactUrl = `${mesoContactBaseUrl}?${contactParams.toString()}`;
   const safeContactUrl = escapeHtml(contactUrl);
 
   const customerName = firstNonEmpty(
@@ -120,7 +121,7 @@ export function buildShippingNotificationTemplate({
 export function buildShippingNotificationSubject(orderId) {
   const safeId = normalizeString(orderId);
   if (safeId) {
-    return `Your Mesodose order #${safeId} has shipped — tracking inside`;
+    return `Your Mesodose order ${safeId} has shipped — tracking inside`;
   }
   return "Your Mesodose order has shipped — tracking inside";
 }

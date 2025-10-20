@@ -35,15 +35,6 @@ export function buildShippingNotificationTemplate({
     locale,
   );
 
-  const mesoContactBaseUrl = "https://mesodose.com/mesocontact";
-  const contactParams = [];
-  if (resolvedOrderId) {
-    contactParams.push(`orderId=${encodeURIComponent(resolvedOrderId)}`);
-  }
-  contactParams.push(`subject=${encodeURIComponent("Order support")}`);
-  const contactUrl = `${mesoContactBaseUrl}?${contactParams.join("&")}`;
-  const safeContactUrl = escapeHtml(contactUrl);
-
   const customerName = firstNonEmpty(
     order?.name,
     order?.metadata?.shipping_address?.name,
@@ -55,6 +46,38 @@ export function buildShippingNotificationTemplate({
     order?.metadata?.shipping_address,
     order?.shipping_address,
   );
+  const billingAddress = resolveAddress(
+    order?.metadata?.billing_address,
+    order?.billing_address,
+  );
+  const contactName = firstNonEmpty(
+    order?.name,
+    shippingAddress.name,
+    billingAddress.name,
+    order?.customer?.name,
+  );
+  const contactEmail = firstNonEmpty(
+    order?.email,
+    order?.metadata?.email,
+    shippingAddress.email,
+    billingAddress.email,
+    order?.customer?.email,
+  );
+
+  const mesoContactBaseUrl = "https://mesodose.com/mesocontact";
+  const contactParams = [];
+  if (resolvedOrderId) {
+    contactParams.push(`orderId=${encodeURIComponent(resolvedOrderId)}`);
+  }
+  contactParams.push(`subject=${encodeURIComponent("Order support")}`);
+  if (contactName) {
+    contactParams.push(`name=${encodeURIComponent(contactName)}`);
+  }
+  if (contactEmail) {
+    contactParams.push(`email=${encodeURIComponent(contactEmail)}`);
+  }
+  const contactUrl = `${mesoContactBaseUrl}?${contactParams.join("&")}`;
+  const safeContactUrl = escapeHtml(contactUrl);
 
   const items = Array.isArray(order?.items)
     ? order.items

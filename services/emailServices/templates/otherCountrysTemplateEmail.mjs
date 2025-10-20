@@ -63,14 +63,6 @@ export function buildOtherCountrysTemplateEmail({
 
   const safeWiseUrl = escapeHtml(firstNonEmpty(wiseUrl, ""));
   const safeRevolutUrl = escapeHtml(firstNonEmpty(revolutUrl, ""));
-  const mesoContactBaseUrl = "https://mesodose.com/mesocontact";
-  const contactParams = [];
-  if (normalizedOrderId) {
-    contactParams.push(`orderId=${encodeURIComponent(normalizedOrderId)}`);
-  }
-  contactParams.push(`subject=${encodeURIComponent("Order support")}`);
-  const contactUrl = `${mesoContactBaseUrl}?${contactParams.join("&")}`;
-  const safeContactUrl = escapeHtml(contactUrl);
 
   const shippingAddress = resolveAddress(
     order?.metadata?.shipping_address,
@@ -125,6 +117,21 @@ export function buildOtherCountrysTemplateEmail({
     "Not provided",
   );
   const safeEmail = escapeHtml(emailValue || "Not provided");
+
+  const mesoContactBaseUrl = "https://mesodose.com/mesocontact";
+  const contactParams = [];
+  if (normalizedOrderId) {
+    contactParams.push(`orderId=${encodeURIComponent(normalizedOrderId)}`);
+  }
+  contactParams.push(`subject=${encodeURIComponent("Order support")}`);
+  if (plainName) {
+    contactParams.push(`name=${encodeURIComponent(plainName)}`);
+  }
+  if (emailValue && emailValue !== "Not provided") {
+    contactParams.push(`email=${encodeURIComponent(emailValue)}`);
+  }
+  const contactUrl = `${mesoContactBaseUrl}?${contactParams.join("&")}`;
+  const safeContactUrl = escapeHtml(contactUrl);
 
   const detailItemsHtml = [];
   const detailItemsText = [];

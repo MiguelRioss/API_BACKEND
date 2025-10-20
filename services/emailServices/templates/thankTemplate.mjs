@@ -51,20 +51,7 @@ export function buildThankTemplate({
     orderDate || order?.metadata?.order_date || order?.created_at,
     locale,
   );
-  const mesoContactBaseUrl = "https://mesodose.com/mesocontact";
-  const contactParams = [];
-  if (resolvedOrderId) {
-    contactParams.push(`orderId=${encodeURIComponent(resolvedOrderId)}`);
-  }
-  contactParams.push(`subject=${encodeURIComponent("Order support")}`);
-  const contactUrl = `${mesoContactBaseUrl}?${contactParams.join("&")}`;
-  const safeContactUrl = escapeHtml(contactUrl);
-
   const items = Array.isArray(order?.items) ? order.items : [];
-  const itemsHtml = renderItemsList(items);
-  const shippingHtml = renderAddressHtml(shippingAddress);
-  const billingHtml = renderAddressHtml(billingAddress);
-
   const contactName =
     normalizeString(order?.name) ||
     shippingAddress.name ||
@@ -81,6 +68,25 @@ export function buildThankTemplate({
     billingAddress.email,
     shippingAddress.email,
   );
+
+  const mesoContactBaseUrl = "https://mesodose.com/mesocontact";
+  const contactParams = [];
+  if (resolvedOrderId) {
+    contactParams.push(`orderId=${encodeURIComponent(resolvedOrderId)}`);
+  }
+  contactParams.push(`subject=${encodeURIComponent("Order support")}`);
+  if (contactName) {
+    contactParams.push(`name=${encodeURIComponent(contactName)}`);
+  }
+  if (contactEmail) {
+    contactParams.push(`email=${encodeURIComponent(contactEmail)}`);
+  }
+  const contactUrl = `${mesoContactBaseUrl}?${contactParams.join("&")}`;
+  const safeContactUrl = escapeHtml(contactUrl);
+
+  const itemsHtml = renderItemsList(items);
+  const shippingHtml = renderAddressHtml(shippingAddress);
+  const billingHtml = renderAddressHtml(billingAddress);
 
   return {
     subject,

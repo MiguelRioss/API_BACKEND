@@ -20,8 +20,14 @@ export default function stripeWebhook({ ordersService, stockService }) {
 
   const router = express.Router();
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-  const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  const endpointSecret = "whsec_qG4ZozLotjVBcXLCr0p4vb1ATcj5T5QW";
   const debug = process.env.NODE_ENV !== "production";
+
+  console.log("[stripeWebhook] Initialised", {
+    keyPrefix: process.env.STRIPE_SECRET_KEY?.slice(0, 8) || null,
+    secretPrefix: endpointSecret?.slice(0, 8) || null,
+    nodeEnv: process.env.NODE_ENV,
+  });
 
   router.post("/", express.raw({ type: "application/json" }), async (req, res) => {
     let event;
@@ -30,6 +36,9 @@ export default function stripeWebhook({ ordersService, stockService }) {
       event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
     } catch (err) {
       console.error("[stripeWebhook] Signature verification failed:", err.message);
+       console.error("[stripeWebhook] Active secret prefix:", endpointSecret?.slice(0, 8) || null);
+       console.error("[stripeWebhook] Incoming signature header:", req.headers["stripe-signature"]);
+       console.error("[stripeWebhook] Request headers 'stripe-livemode':", req.headers["stripe-livemode"]);
       return res.status(400).send(`Webhook Error: ${err.message}`);
     }
 

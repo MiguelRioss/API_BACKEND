@@ -15,7 +15,6 @@ ENV NODE_ENV=production
 ENV PORT=3000
 
 # Chromium path baked into the Playwright image
-ENV PUPPETEER_EXECUTABLE_PATH=/ms-playwright/chromium-1080/chrome-linux/chrome
 
 EXPOSE 3000
 CMD ["node", "server.mjs"]

@@ -13,14 +13,14 @@ const { isAppError, sendError } = handlerFactory;
 
 export default function stripeWebhook({ ordersService, stockService }) {
   if (!process.env.STRIPE_SECRET_KEY) throw new Error("Missing STRIPE_SECRET_KEY");
-  if (!process.env.STRIPE_WEBHOOK_SECRET) throw new Error("Missing STRIPE_WEBHOOK_SECRET");
+  if (!process.env.STRIPE_WEBHOOK_KEY) throw new Error("Missing STRIPE_WEBHOOK_KEY");
   if (!ordersService || typeof ordersService.createOrderServices !== "function") {
     throw errors.internalError("stripeWebhook requires ordersService.createOrderServices()");
   }
 
   const router = express.Router();
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-  const endpointSecret = "whsec_qG4ZozLotjVBcXLCr0p4vb1ATcj5T5QW";
+  const endpointSecret = process.env.STRIPE_WEBHOOK_KEY;
   const debug = process.env.NODE_ENV !== "production";
 
   console.log("[stripeWebhook] Initialised", {

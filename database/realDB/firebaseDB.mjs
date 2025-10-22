@@ -383,3 +383,61 @@ export async function getPromoCodes() {
       )
     );
 }
+
+/**
+* Get a single promo code by its ID.
+*/
+export async function getPromoCodeById(id) {
+  const init = ensureInitDb();
+  if (init) return init;
+
+  if (!useRealtimeDB()) {
+    return Promise.reject(
+      errors.externalService("Firestore read not implemented yet")
+    );
+  }
+
+  const db = getRealtimeDB();
+  const ref = db.ref(`/promoCodes/${id}`);
+  const snap = await ref.once("value");
+  const val = snap.val();
+
+  if (val === null || typeof val === "undefined") {
+    return Promise.reject(errors.notFound(`Promo code "${id}" not found`));
+  }
+
+  return { id, ...val };
+}
+/**
+* Patch (partial update) existing promo code.
+* Only applies provided fields; preserves everything else.
+*
+* @param {string} id - Promo code ID
+* @param {Object} updates - Key/value pairs to patch
+* @returns {Promise<Object>} - Updated promo code
+*/
+export async function patchPromoCodeDB(id, updates) {
+  ensureInitDb();
+  if (!useRealtimeDB()) {
+    return Promise.reject(
+      errors.externalService("Firestore patch not implemented yet")
+    );
+  }
+
+  if (!updates || typeof updates !== "object") {
+    return Promise.reject(errors.invalidData("Invalid update payload"));
+  }
+
+  const db = getRealtimeDB();
+  const ref = db.ref(`/promoCodes/${id}`);
+
+  const snap = await ref.once("value");
+  if (!snap.exists()) {
+    return Promise.reject(errors.notFound(`Promo code "${id}" not found`));
+  }
+
+  await ref.update(updates);
+  const newData = { ...(snap.val() || {}), ...updates };
+  return { id, ...newData };
+}
+

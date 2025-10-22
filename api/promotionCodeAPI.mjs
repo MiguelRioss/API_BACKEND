@@ -12,8 +12,7 @@ export default function createPromotionCodeAPI(promotionCodeServices) {
 
   async function internalCreatePromoCode(req, rsp) {
     const body = req.body ?? {};
-    const promoCode = body.promoCode;
-    console.log(promoCode)
+    const promoCode = body.promocode;
     return promotionCodeServices.createPromoCode(promoCode);
   }
 

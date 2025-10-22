@@ -42,7 +42,7 @@ export async function getAllOrders() {
       );
   }
 
-  return Promise.resolve([]);
+  return Promise.reject(errors.internal("No supported DB configured"));
 }
 
 /**
@@ -75,7 +75,7 @@ export async function getOrderByStripeSessionId(sessionId) {
   if (!order) {
     return Promise.reject(errors.notFound(`Order with session_id "${sessionId}" not found`))
   }
-  
+
   return order;
 }
 
@@ -319,11 +319,11 @@ export async function findStockAndDecrement(stockSnapshot, orderData) {
     const qty = Number(item.quantity);
 
     const found = stockSnapshot.find(s => Number(s.id) === stockId);
-    if (!found) 
+    if (!found)
       return Promise.reject(errors.invalidData(`STOCK with id :${stockId} notFound`));
 
     const newVal = Number(found.stockValue) - qty;
-    if (!Number.isFinite(newVal) || newVal < 0) 
+    if (!Number.isFinite(newVal) || newVal < 0)
       return Promise.reject(errors.badRequest(`INSUFFICIENT_STOCK for id:${stockId}`));
 
     await updateStockValue(stockId, newVal);          // <-- only field-level update
@@ -331,16 +331,6 @@ export async function findStockAndDecrement(stockSnapshot, orderData) {
   }
   return applied;
 }
-
-
-
-
-
-
-
-
-
-
 
 
 // database/firebaseDB.mjs
@@ -352,4 +342,44 @@ export async function updateStockValue(id, stockValue) {
   // PATCH the field (preserves all other product fields)
   await db.ref(`/stock/${id}`).update({ stockValue });
   return { id, stockValue };
+}
+
+
+export async function createPromoCodeDB(promoCodeObj) {
+  ensureInitDb();
+  if (!useRealtimeDB()) throw errors.externalService("FireStore update not implementedyet");
+
+  const db = getRealtimeDB();
+  const newRef = db.ref("/promoCodes").push();
+  await newRef.set(promoCodeObj);
+  const result = { id: newRef.key, ...promoCodeObj };
+  return result;
+}
+
+export async function getPromoCodes() {
+  const init = ensureInitDb();
+  if (init) return init;
+
+  if (!useRealtimeDB()) {
+    return Promise.reject(errors.externalService("FireStore get not implemented yet"));
+  }
+
+  const db = getRealtimeDB();
+  return db
+    .ref("/promoCodes")
+    .once("value")
+    .then((snap) => snap.val() || {})
+    .then((val) =>
+      Object.entries(val).map(([id, data]) => ({
+        id,
+        ...data,
+      }))
+    )
+    .catch((err) =>
+      Promise.reject(
+        errors.externalService("Failed to read promo codes from DB", {
+          original: err,
+        })
+      )
+    );
 }

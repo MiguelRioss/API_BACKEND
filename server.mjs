@@ -26,6 +26,8 @@ import createSubscribeAPI from "./api/subscribeAPI.mjs";
 
 // --- Stripe webhook router (must use raw body; mount before express.json())
 import stripeWebhook from "./stripe/webhook.mjs";
+import createPromoCodeServices from "./services/promoCodesServices/promoCodeServices.mjs";
+import createPromotionCodeAPI from "./api/promotionCodeAPI.mjs";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -65,11 +67,9 @@ const db = await createDb({ type: process.env.DB_TYPE });
  * - stripeServices: create checkout sessions, etc. (uses stockService)
  */
 const stockService = createStockServices(db);
-// NOTE: Ensure the factory signature matches your import:
-// If your factory is `createStripeServices({ stockServices })`, pass an object.
-// If it's positional `createStripeServices(stockService)`, keep as-is.
 const stripeServices = createStripeServices(stockService);
-const ordersService = createOrdersService( db,stripeServices,emailService,stockService); // --- Pass emailService to ordersService
+const ordersService = createOrdersService( db,stripeServices,emailService,stockService); 
+const promotionCodeServices = createPromoCodeServices(db)
 
 // -----------------------------------------------------------------------------
 // API Layer (controllers)
@@ -83,6 +83,7 @@ const ordersApi = createOrdersAPI(ordersService);
 const stripeAPi = createStripeAPI(stripeServices);
 const emailApi = createEmailAPI(emailService); // --- New Contact API
 const subscribeApi = createSubscribeAPI();  // --- New Subscribe API
+const promoCodeApi = createPromotionCodeAPI(promotionCodeServices)
 
 // -----------------------------------------------------------------------------
 // Stripe Webhook
@@ -146,8 +147,11 @@ app.get("/api/products", stockApi.getProductsAPI);
 app.get("/api/products/:id", stockApi.getProductByIdAPI);
 
 
-
-
+// -----------------------------------------------------------------------------
+// PromoCode API
+// -----------------------------------------------------------------------------
+app.post("/api/promoCodes", promoCodeApi.createPromoCode);
+app.get("/api/promoCodes", promoCodeApi.getPromoCodes);
 
 // -----------------------------------------------------------------------------
 // Contact Form API

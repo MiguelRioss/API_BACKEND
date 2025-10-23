@@ -3,7 +3,6 @@ const DEFAULT_SUCCESS_URL =
   `${process.env.PUBLIC_BASE_URL}/checkout/orderSuccess`;
 
 import errors from "../../errors/errors.mjs";
-import { PAYMENT_TYPE } from "../commonUtils.mjs";
 import {
   filterByStatus,
   filterByQuery,

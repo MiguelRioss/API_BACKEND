@@ -1,6 +1,6 @@
 ﻿// database/firebaseDB.mjs
 import "dotenv/config"; // dotenv is idempotent
-import { initFirebase, getRealtimeDB, useRealtimeDB } from "../firebase/firebaseInit.mjs";
+import { initFirebase, getRealtimeDB, getFirestore, useRealtimeDB } from "../firebase/firebaseInit.mjs";
 import errors from "../../errors/errors.mjs"; // <- use your ApplicationError style
 
 
@@ -77,6 +77,24 @@ export async function getOrderByStripeSessionId(sessionId) {
   }
 
   return order;
+}
+
+export async function getPageConfig() {
+  const init = ensureInitDb();
+  if (init) return init;
+
+  if (useRealtimeDB()) {
+    const db = getRealtimeDB();
+    const snap = await db.ref("/site_config/mesodoseConfig").once("value");
+    return snap.val();
+  }
+
+  const firestore = getFirestore();
+  const doc = await firestore.collection("site_config").doc("mesodoseConfig").get();
+  if (!doc.exists) {
+    return null;
+  }
+  return doc.data();
 }
 
 /**
@@ -441,3 +459,27 @@ export async function patchPromoCodeDB(id, updates) {
   return { id, ...newData };
 }
 
+/**
+* Get the page Config.
+*/
+export async function getPageConfig() {
+  const init = ensureInitDb();
+  if (init) return init;
+
+  if (!useRealtimeDB()) {
+    return Promise.reject(
+      errors.externalService("Firestore read not implemented yet")
+    );
+  }
+
+  const db = getRealtimeDB();
+  const ref = db.ref(`/pageConfig`);
+  const snap = await ref.once("value");
+  const val = snap.val();
+
+  if (val === null || typeof val === "undefined") {
+    return Promise.reject(errors.notFound(`Promo code "${id}" not found`));
+  }
+
+  return { ...val };
+}

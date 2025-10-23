@@ -351,8 +351,7 @@ export async function validateAndPrepareOrder(order, options = {}) {
   const hasStripeSession =
     Boolean(order.session_id) ||
     Boolean(order.metadata?.stripe_session_id) ||
-    (typeof order.payment_type === "string" &&
-      order.payment_type.trim().toUpperCase() === PAYMENT_TYPE.STRIPE);
+    (typeof order.payment_type === "string" && order.payment_type.trim().toUpperCase() === PAYMENT_TYPE.STRIPE);
 
   // Explicit rule: Stripe if it looks like Stripe, otherwise Manual
   const normalizedPaymentType = hasStripeSession ? PAYMENT_TYPE.STRIPE : PAYMENT_TYPE.MANUAL;

@@ -150,12 +150,6 @@ export default function createOrdersService(db, stripeServices, emailService, st
   async function createOrderServices(order, options = {}) {
     const { isRequestedOrderForOtherCountries = false } = options;
 
-    console.log(
-      "[ordersService] Creating order:",
-      order,
-      "Requested for other country:",
-      isRequestedOrderForOtherCountries
-    );
 
     // Pass the flag into validation (as an object for clarity)
     const prepared = await validateAndPrepareOrder(order, {

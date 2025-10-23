@@ -11,12 +11,13 @@ import createCorsMiddleware from "./middleware/cors.mjs";
 import createStockServices from "./services/stockServices/stockServices.mjs";
 import createOrdersService from "./services/orderServices/orderServices.mjs";
 import createStripeServices from "./services/stripe/stripeServices.mjs";
+import createPageServices from "./services/pageServices/pageServices.mjs";
 
 import createStocksAPI from "./api/stockAPI.mjs";
 import createOrdersAPI from "./api/ordersAPI.mjs";
-
 import createStripeAPI from "./api/stripeAPI.mjs";
-import createEmailAPI from "./api/emailAPI.mjs"; // --- New Contact API
+import createEmailAPI from "./api/emailAPI.mjs"; 
+import createPageApi from "./api/pageAPI.mjs";
 
 // --- Email (transport + service)
 import createEmailService from "./services/emailServices/emailService.mjs";
@@ -70,6 +71,7 @@ const stockService = createStockServices(db);
 const stripeServices = createStripeServices(stockService);
 const ordersService = createOrdersService( db,stripeServices,emailService,stockService); 
 const promotionCodeServices = createPromoCodeServices(db)
+const pageServices = createPageServices(db);
 
 // -----------------------------------------------------------------------------
 // API Layer (controllers)
@@ -84,6 +86,7 @@ const stripeAPi = createStripeAPI(stripeServices);
 const emailApi = createEmailAPI(emailService); // --- New Contact API
 const subscribeApi = createSubscribeAPI();  // --- New Subscribe API
 const promoCodeApi = createPromotionCodeAPI(promotionCodeServices)
+const pageAPI = createPageApi(pageServices);  // --- New Page API
 
 // -----------------------------------------------------------------------------
 // Stripe Webhook
@@ -175,6 +178,17 @@ app.post("/api/contactUs", emailApi.handleContactForm); // --- New Contact API
  */
 
 app.post("/api/subscribe", subscribeApi.handleSubscribe); // --- New Subscribe API
+
+// -----------------------------------------------------------------------------
+// GET PAGE CONFIGURATION
+// -----------------------------------------------------------------------------
+/**
+ * Handles frontend contact form submissions from /api/contactUs.
+ * You can expand later to use Brevo or another mailer.
+ */
+
+app.get("/page/config", pageAPI.getPageApi); // --- New Subscribe API
+
 
 // -----------------------------------------------------------------------------
 // Server Boot

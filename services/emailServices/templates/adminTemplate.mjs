@@ -116,7 +116,7 @@ export function buildAdminNotificationSubject({paymentType, date, customerName, 
   const safeName = normalizeString(customerName) || "customer";
   const safeId = normalizeString(orderId) || "pending";
   const typeLabel = paymentType === PAYMENT_TYPE.STRIPE ? "Stripe" : "Manual";
-  return `${typeLabel} - ${safeName} (Order ${safeId}, ${safeDate})`;
+  return `${typeLabel} Payment - ${safeName} (Order ${safeId}, ${safeDate})`;
 }
 
 function renderPackedItemsList(items = [], currency = fallbackCurrency) {

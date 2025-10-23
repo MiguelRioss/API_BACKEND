@@ -1,7 +1,8 @@
 // api/services/servicesUtils.mjs
 import { randomUUID } from "node:crypto";
 import errors from "../errors/errors.mjs";
-import { STATUS_KEYS, makeDefaultStatus, assertValidStatusKey } from "./orderServices/orderStatus.mjs";
+import { PAYMENT_TYPE } from "./commonUtils.mjs";
+import {  makeDefaultStatus, assertValidStatusKey } from "./orderServices/orderStatus.mjs";
 
 
 const allowedCurrencies = new Set(["eur", "usd", "gbp"]);
@@ -336,20 +337,28 @@ export async function validateAndPrepareOrder(order, options = {}) {
     return Promise.reject(errors.invalidData(`Unsupported currency: ${currencyNorm}`));
   }
 
-  const resolvedPaymentId = order.payment_id
-  console.log("PaymentId :", order.name)
+  const resolvedPaymentId = order.payment_id;
+  console.log("PaymentId :", order.name);
   if (!resolvedPaymentId)
-    return Promise.reject(errors.invalidData("No payment ID"))
+    return Promise.reject(errors.invalidData("No payment ID"));
+
+  const rawPaymentType = typeof order.payment_type === "string" ? order.payment_type.trim().toUpperCase() : "";
+  const normalizedPaymentType =
+    rawPaymentType && Object.values(PAYMENT_TYPE).includes(rawPaymentType)
+      ? rawPaymentType
+      : isRequestedOrderForOtherCountries
+        ? PAYMENT_TYPE.MANUAL
+        : PAYMENT_TYPE.STRIPE;
 
   const paymentStatusNormalized = isRequestedOrderForOtherCountries ? false : true;
 
-    if (typeof paymentStatusNormalized !== "boolean") {
-      return Promise.reject(errors.invalidData("Missing or invalid payment status."));
-    }
+  if (typeof paymentStatusNormalized !== "boolean") {
+    return Promise.reject(errors.invalidData("Missing or invalid payment status."));
+  }
 
-    // --- Validate items & metadata ---
-    const normItems = validateItemsArray(items, amount_total, shippingCents);
-    const normMetadata = validateMetadata(metadata);
+  // --- Validate items & metadata ---
+  const normItems = validateItemsArray(items, amount_total, shippingCents);
+  const normMetadata = validateMetadata(metadata);
   const initialStatus = makeDefaultStatus();
   const initalSentShipEmailStatus = false
   const rawSessionId =
@@ -364,6 +373,7 @@ export async function validateAndPrepareOrder(order, options = {}) {
     id: randomUUID(),
     event_id: randomUUID(),
     payment_id: resolvedPaymentId,
+    payment_type: normalizedPaymentType,
     name: name.trim(),
     email: emailTrimmed,
     phone : phone, 

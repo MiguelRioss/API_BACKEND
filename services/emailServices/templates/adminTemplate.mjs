@@ -1,3 +1,4 @@
+import { PAYMENT_TYPE } from "../../commonUtils.mjs";
 import {
   defaultLocale,
   escapeHtml,
@@ -114,7 +115,8 @@ export function buildAdminNotificationSubject({paymentType, date, customerName, 
   const safeDate = normalizeString(date) || "today";
   const safeName = normalizeString(customerName) || "customer";
   const safeId = normalizeString(orderId) || "pending";
-  return `Stripe/Manual - ${safeName} (Order ${safeId}, ${safeDate})`;
+  const typeLabel = paymentType === PAYMENT_TYPE.STRIPE ? "Stripe" : "Manual";
+  return `${typeLabel} - ${safeName} (Order ${safeId}, ${safeDate})`;
 }
 
 function renderPackedItemsList(items = [], currency = fallbackCurrency) {

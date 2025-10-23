@@ -52,3 +52,7 @@ function sendError(rsp, appError) {
   const httpError = errosMapping(appError);
   rsp.status(httpError.status).json(httpError.body);
 }
+
+// Expose helpers so other modules (webhooks, etc.) can reuse shared logic.
+handlerFactory.isAppError = isAppError;
+handlerFactory.sendError = sendError;

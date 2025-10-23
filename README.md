@@ -1,6 +1,19 @@
-Trying To create a backend with dependenct Injection
-For easy implementation further on other projects with the same idead 
+# 🌆 LisbonWhisper
 
--> Needs to improve
-GOAL!
--> One Day all the information for the site will come from here the react front end just need to do api calls and render info 
+Sistema simples de **reservas para walking tours** em Lisboa.
+
+Projeto full-stack com **frontend em React (Vite)** e **backend com API própria**, usando **Firebase** como base de dados.  
+Em desenvolvimento, com autenticação e gestão de marcações a serem finalizadas.
+
+## 🔧 Tecnologias
+- Frontend: React (Vite)
+- Backend: Node.js + Express
+- Base de Dados: Firebase Firestore
+- Testes: Postman
+- Deploy: Vercel (frontend), Render (backend)
+
+
+## 📋 Estado
+- Autenticação em desenvolvimento  
+- Melhorias planeadas na gestão de reservas e segurança  
+- Projeto ativo e funcional para testes

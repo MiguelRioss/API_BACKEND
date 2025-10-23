@@ -3,6 +3,7 @@ const DEFAULT_SUCCESS_URL =
   `${process.env.PUBLIC_BASE_URL}/checkout/orderSuccess`;
 
 import errors from "../../errors/errors.mjs";
+import { PAYMENT_TYPE } from "../commonUtils.mjs";
 import {
   filterByStatus,
   filterByQuery,
@@ -130,6 +131,7 @@ export default function createOrdersService(db, stripeServices, emailService, st
       paymentId: orderData.paymentId,
       catalog,
     });
+    console.log("[ordersService] Creating manual order for other country:", otherCountryOrderPayload);
 
     // ✅ Create the order directly in DB (request-for-order flow)
     const savedOrder = await createOrderServices(otherCountryOrderPayload, {

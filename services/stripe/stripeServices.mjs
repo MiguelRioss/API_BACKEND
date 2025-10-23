@@ -71,7 +71,7 @@ export default function createStripeServices(stockServices) {
         quantity: 1,
       });
     }
-
+    console.log("[stripeServices] Creating Stripe checkout session with line items:", line_items);
     const sessionResult = await createUrlCheckoutSession({
       stripe,
       line_items,

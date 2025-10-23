@@ -358,7 +358,7 @@ export async function validateAndPrepareOrder(order, options = {}) {
   const normalizedPaymentType = hasStripeSession ? PAYMENT_TYPE.STRIPE : PAYMENT_TYPE.MANUAL;
 
   // Paid automatically if Stripe, otherwise unpaid
-  const paymentStatusNormalized = hasStripeSession ? true : false;
+  const paymentStatusNormalized = isRequestedOrderForOtherCountries ? false : true;
 
 
   if (typeof paymentStatusNormalized !== "boolean") {

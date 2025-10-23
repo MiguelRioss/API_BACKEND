@@ -1,6 +1,6 @@
 import errors from "../../errors/errors.mjs";
 import { randomUUID } from "node:crypto";
-
+import { validatePromoCodeObj } from "./promoCodeServicesUtils.mjs";
 export default function createPromoCodeServices(db) {
     if (!db) {
         throw errors.internalError("Services dependency invalid");
@@ -10,16 +10,10 @@ export default function createPromoCodeServices(db) {
 
     async function createPromoCode(discount) {
         console.log(discount);
-        if (Number.isNaN(discount)) throw errors.invalidData("Invalid discount");
-        const promoCodeObjValidated = validatePromoCodeObj(discount);
-        const promoCodeObj = {
-            ...discount,
-            code: randomUUID(),
-            status: true,
-            created: new Date().toISOString(),
-        };
+        const promoCodeObjValidated = await validatePromoCodeObj(discount);
+       
 
-        return await db.createPromoCodeDB(promoCodeObj);
+        return await db.createPromoCodeDB(promoCodeObjValidated);
     }
 
     async function getPromoCodes() {

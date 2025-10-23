@@ -952,6 +952,6 @@
         }
     },
     "shippingPrices": {
-        "default": 0
+        "default": 1000
     }
 }

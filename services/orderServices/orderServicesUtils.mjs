@@ -4,6 +4,7 @@ import { sanitizeAddress, toInteger, sanitizeString, pickNonEmpty, EMAIL_REGEX }
 import { PAYMENT_TYPE } from "../commonUtils.mjs";
 
 export default async function buildManualOrderFromCart({
+  
     items = [],
     customer = {},
     shippingAddress = {},
@@ -15,7 +16,7 @@ export default async function buildManualOrderFromCart({
     currency = "eur",
     paymentId,
     catalog
-  } = {}) {
+    } = {}) {
     if (!Array.isArray(items) || items.length === 0)
       throw errors.invalidData("No items in payload");
 

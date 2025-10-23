@@ -16,6 +16,7 @@ import {
  * all fulfilment details needed for packing.
  */
 export function buildAdminNotificationTemplate({
+  paymentType,
   order = {},
   orderId,
   orderDate,
@@ -57,6 +58,7 @@ export function buildAdminNotificationTemplate({
   const contactEmail = firstNonEmpty(order?.email, order?.metadata?.email);
 
   const subject = buildAdminNotificationSubject({
+    paymentType,
     date: formattedDate,
     customerName,
     orderId: resolvedOrderId,
@@ -107,7 +109,8 @@ export function buildAdminNotificationTemplate({
   };
 }
 
-export function buildAdminNotificationSubject({ date, customerName, orderId }) {
+export function buildAdminNotificationSubject({paymentType, date, customerName, orderId }) {
+  console.log("Payment_Type in email Subject",paymentType)
   const safeDate = normalizeString(date) || "today";
   const safeName = normalizeString(customerName) || "customer";
   const safeId = normalizeString(orderId) || "pending";

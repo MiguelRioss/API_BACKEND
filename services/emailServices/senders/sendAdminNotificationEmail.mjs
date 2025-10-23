@@ -16,6 +16,8 @@ export async function sendAdminNotificationEmail({
   orderId,
   manual = false,
 }) {
+  const paymentType = order.payment_type || "unknown";
+  console.log("[emailService] This is their payment_type:", order.paymentType);
   const ownerEmail = normalizeEmail(process.env.ORDER_EMAIL);
   const forwardEmails = parseEmailList(process.env.ORDER_FORWARD_EMAILS || "");
 
@@ -34,6 +36,7 @@ export async function sendAdminNotificationEmail({
         orderDate: order.createdAt || order.metadata?.order_date,
       })
     : buildAdminNotificationTemplate({
+        paymentType,
         order,
         orderId,
         orderDate: order.createdAt || order.metadata?.order_date,

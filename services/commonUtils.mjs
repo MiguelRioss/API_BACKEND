@@ -1,3 +1,7 @@
+export const PAYMENT_TYPE = {
+  STRIPE: 'STRIPE',
+  MANUAL: 'MANUAL'
+};
 
 
 export const sanitizeAddress = (address = {}) => {

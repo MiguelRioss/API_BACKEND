@@ -187,7 +187,7 @@ export default function createOrdersService(db, stripeServices, emailService, st
         };
       } else {
         // 💳 Stripe / standard checkout flow (immediate payment)
-        await emailService.sendOrderBundleEmails({ order: saved, orderId: saved.id });
+        await emailService.sendOrderBundleEmails({ order: saved, orderId: saved.id});
 
         flagged = {
           ...saved,

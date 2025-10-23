@@ -60,3 +60,14 @@ and be sure to include the information bellow:
 - Phone number
 - Email address
 - Copy of the payment receipt
+
+
+
+Dias para o codigo 31 dias 
+-> multiple use codes
+-> one time uses
+
+Ultimo dia para usar o codigo 
+Deve estar lá no codigo 
+
+ -> Possivel email 

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import errors from "../../errors/errors.mjs";
 import { sanitizeAddress, toInteger, sanitizeString, pickNonEmpty, EMAIL_REGEX } from "../commonUtils.mjs";
+import { PAYMENT_TYPE } from "../commonUtils.mjs";
 
 export default async function buildManualOrderFromCart({
     items = [],
@@ -157,5 +158,6 @@ export function buildManualOrderPayload({
     payment_id: resolvedPaymentId,
     payment_status: false,
     metadata,
+    payment_type: PAYMENT_TYPE.MANUAL,
   };
 }

@@ -25,7 +25,7 @@ import createSubscribeAPI from "./api/subscribeAPI.mjs";
 
 
 // --- Stripe webhook router (must use raw body; mount before express.json())
-import stripeWebhook from "./stripe/webhook.mjs";
+import stripeWebhook from "./services/stripe/WEBHOOK/webhook.mjs";
 import createPromoCodeServices from "./services/promoCodesServices/promoCodeServices.mjs";
 import createPromotionCodeAPI from "./api/promotionCodeAPI.mjs";
 

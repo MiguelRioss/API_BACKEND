@@ -1,5 +1,5 @@
+import { PAYMENT_TYPE } from "../../commonUtils.mjs";
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
 const sanitizeString = (value) => (typeof value === "string" ? value.trim() : "");
 
 const firstNonEmpty = (...values) => {
@@ -161,6 +161,7 @@ export function normalizeLineItemsWithCatalog(lineItems = [], catalog = []) {
 }
 
 export function buildOrderPayload({ session, items }) {
+  console.log("BUILDING ORDER PAYLOAD");
   const meta = session?.metadata || {};
 
   const shippingCandidate =
@@ -244,6 +245,7 @@ export function buildOrderPayload({ session, items }) {
     shipping_cost_cents: shippingCost,
     payment_status: sanitizeString(session?.payment_status).toLowerCase() === "paid",
     metadata: buildMetadata(),
+    payment_type: PAYMENT_TYPE.STRIPE
   };
 
   function buildMetadata() {

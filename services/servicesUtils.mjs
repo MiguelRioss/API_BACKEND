@@ -2,7 +2,7 @@
 import { randomUUID } from "node:crypto";
 import errors from "../errors/errors.mjs";
 import { PAYMENT_TYPE } from "./commonUtils.mjs";
-import {  makeDefaultStatus, assertValidStatusKey } from "./orderServices/orderStatus.mjs";
+import { makeDefaultStatus, assertValidStatusKey } from "./orderServices/orderStatus.mjs";
 
 
 const allowedCurrencies = new Set(["eur", "usd", "gbp"]);
@@ -159,7 +159,7 @@ function validateItemsArray(items, amount_total, shippingCents = 0) {
 
     const { id, name, quantity, unit_amount } = it;
     let normalizedID = Number(id)
-    if (!Number.isInteger(normalizedID) ) {
+    if (!Number.isInteger(normalizedID)) {
       throw errors.invalidData(`Order.items[${idx}].id must be a positive integer.`);
     }
     if (typeof name !== "string" || name.trim() === "") {
@@ -278,7 +278,7 @@ export function updateOrderStatus(currentStatus, key, { status, date = null, tim
  */
 export async function validateAndPrepareOrder(order, options = {}) {
 
-    const { isRequestedOrderForOtherCountries = false } = options;
+  const { isRequestedOrderForOtherCountries = false } = options;
 
   if (!order || typeof order !== "object" || Array.isArray(order)) {
     return Promise.reject(
@@ -286,7 +286,7 @@ export async function validateAndPrepareOrder(order, options = {}) {
     );
   }
 
-    const { name, email, phone, amount_total, currency, items, metadata, payment_status } = order;
+  const { name, email, phone, amount_total, currency, items, metadata, payment_status } = order;
   const shippingCents =
     Number(order.shipping_cost_cents ??
       order.metadata?.shipping_cost_cents ??
@@ -300,7 +300,7 @@ export async function validateAndPrepareOrder(order, options = {}) {
     return Promise.reject(errors.invalidData("Missing or invalid customer email."));
   }
 
-   if (typeof phone !== "string" || phone.trim() === "") {
+  if (typeof phone !== "string" || phone.trim() === "") {
     return Promise.reject(errors.invalidData("Missing or invalid customer phone."));
   }
 
@@ -343,14 +343,23 @@ export async function validateAndPrepareOrder(order, options = {}) {
     return Promise.reject(errors.invalidData("No payment ID"));
 
   const rawPaymentType = typeof order.payment_type === "string" ? order.payment_type.trim().toUpperCase() : "";
-  const normalizedPaymentType =
-    rawPaymentType && Object.values(PAYMENT_TYPE).includes(rawPaymentType)
-      ? rawPaymentType
-      : isRequestedOrderForOtherCountries
-        ? PAYMENT_TYPE.MANUAL
-        : PAYMENT_TYPE.STRIPE;
+  // ──────────────────────────────
+  // Payment logic: Stripe vs Manual
+  // ──────────────────────────────
 
-  const paymentStatusNormalized = isRequestedOrderForOtherCountries ? false : true;
+  // Detect if order originated from Stripe
+  const hasStripeSession =
+    Boolean(order.session_id) ||
+    Boolean(order.metadata?.stripe_session_id) ||
+    (typeof order.payment_type === "string" &&
+      order.payment_type.trim().toUpperCase() === PAYMENT_TYPE.STRIPE);
+
+  // Explicit rule: Stripe if it looks like Stripe, otherwise Manual
+  const normalizedPaymentType = hasStripeSession ? PAYMENT_TYPE.STRIPE : PAYMENT_TYPE.MANUAL;
+
+  // Paid automatically if Stripe, otherwise unpaid
+  const paymentStatusNormalized = hasStripeSession ? true : false;
+
 
   if (typeof paymentStatusNormalized !== "boolean") {
     return Promise.reject(errors.invalidData("Missing or invalid payment status."));
@@ -376,18 +385,18 @@ export async function validateAndPrepareOrder(order, options = {}) {
     payment_type: normalizedPaymentType,
     name: name.trim(),
     email: emailTrimmed,
-    phone : phone, 
-      currency: currencyNorm,
-      items: normItems,
-      amount_total,
-      shipping_cost_cents: shippingCents,
-      session_id: normalizedSessionId || "",
-      payment_status: paymentStatusNormalized,
-      metadata: {
-        ...normMetadata,
-      },
+    phone: phone,
+    currency: currencyNorm,
+    items: normItems,
+    amount_total,
+    shipping_cost_cents: shippingCents,
+    session_id: normalizedSessionId || "",
+    payment_status: paymentStatusNormalized,
+    metadata: {
+      ...normMetadata,
+    },
     status: initialStatus,
-    sentShippingEmail:initalSentShipEmailStatus,
+    sentShippingEmail: initalSentShipEmailStatus,
     track_url: "",
     written_at: new Date().toISOString(),
   };

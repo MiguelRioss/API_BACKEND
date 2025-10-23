@@ -11,6 +11,7 @@ export default function createPromoCodeServices(db) {
     async function createPromoCode(discount) {
         console.log(discount);
         if (Number.isNaN(discount)) throw errors.invalidData("Invalid discount");
+        const promoCodeObjValidated = validatePromoCodeObj(discount);
         const promoCodeObj = {
             ...discount,
             code: randomUUID(),
@@ -27,39 +28,6 @@ export default function createPromoCodeServices(db) {
         }
         console.log("Fetching promo codes from DB", await db.getPromoCodes());
         return await db.getPromoCodes();
-    }
-
-    /**
- * Patch (partial update) existing promo code.
- * Only applies provided fields; preserves everything else.
- *
- * @param {string} id - Promo code ID
- * @param {Object} updates - Key/value pairs to patch
- * @returns {Promise<Object>} - Updated promo code
- */
-    async function patchPromoCodeDB(id, updates) {
-        ensureInitDb();
-        if (!useRealtimeDB()) {
-            return Promise.reject(
-                errors.externalService("Firestore patch not implemented yet")
-            );
-        }
-
-        if (!updates || typeof updates !== "object") {
-            return Promise.reject(errors.invalidData("Invalid update payload"));
-        }
-
-        const db = getRealtimeDB();
-        const ref = db.ref(`/promoCodes/${id}`);
-
-        const snap = await ref.once("value");
-        if (!snap.exists()) {
-            return Promise.reject(errors.notFound(`Promo code "${id}" not found`));
-        }
-
-        await ref.update(updates);
-        const newData = { ...(snap.val() || {}), ...updates };
-        return { id, ...newData };
     }
     /**
    * Patch existing promo code by ID.

@@ -459,27 +459,3 @@ export async function patchPromoCodeDB(id, updates) {
   return { id, ...newData };
 }
 
-/**
-* Get the page Config.
-*/
-export async function getPageConfig() {
-  const init = ensureInitDb();
-  if (init) return init;
-
-  if (!useRealtimeDB()) {
-    return Promise.reject(
-      errors.externalService("Firestore read not implemented yet")
-    );
-  }
-
-  const db = getRealtimeDB();
-  const ref = db.ref(`/pageConfig`);
-  const snap = await ref.once("value");
-  const val = snap.val();
-
-  if (val === null || typeof val === "undefined") {
-    return Promise.reject(errors.notFound(`Promo code "${id}" not found`));
-  }
-
-  return { ...val };
-}

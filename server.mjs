@@ -29,9 +29,15 @@ import createSubscribeAPI from "./api/subscribeAPI.mjs";
 import stripeWebhook from "./services/stripe/WEBHOOK/webhook.mjs";
 import createPromoCodeServices from "./services/promoCodesServices/promoCodeServices.mjs";
 import createPromotionCodeAPI from "./api/promotionCodeAPI.mjs";
+import createVideoUploadServices from "./services/videoUploadServices/videoUploadServices.mjs";
+import createVideosAPI from "./api/videosAPI.mjs";
+
+import multer from "multer";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const upload = multer({ storage: multer.memoryStorage() });
+
 
 // -----------------------------------------------------------------------------
 // CORS
@@ -72,6 +78,7 @@ const stripeServices = createStripeServices(stockService);
 const ordersService = createOrdersService( db,stripeServices,emailService,stockService); 
 const promotionCodeServices = createPromoCodeServices(db)
 const pageServices = createPageServices(db);
+const videoUploadServices = createVideoUploadServices(db);
 
 // -----------------------------------------------------------------------------
 // API Layer (controllers)
@@ -87,6 +94,7 @@ const emailApi = createEmailAPI(emailService); // --- New Contact API
 const subscribeApi = createSubscribeAPI();  // --- New Subscribe API
 const promoCodeApi = createPromotionCodeAPI(promotionCodeServices)
 const pageAPI = createPageApi(pageServices);  // --- New Page API
+const videoUploadApi = createVideosAPI(videoUploadServices);  // --- New Upload API
 
 // -----------------------------------------------------------------------------
 // Stripe Webhook
@@ -190,6 +198,12 @@ app.post("/api/subscribe", subscribeApi.handleSubscribe); // --- New Subscribe A
 app.get("/page/config", pageAPI.getPageApi); // --- New Subscribe API
 
 
+//---------------------------------------------------------------------------
+//UploadRelated API
+// -----------------------------------------------------------------------------
+app.post("/api/upload", upload.single("video"), videoUploadApi.uploadVideo);
+app.get("/api/videosMetadata", videoUploadApi.getVideosMetadata)
+app.get("/api/video/:id", videoUploadApi.getVideoById)
 // -----------------------------------------------------------------------------
 // Server Boot
 // -----------------------------------------------------------------------------

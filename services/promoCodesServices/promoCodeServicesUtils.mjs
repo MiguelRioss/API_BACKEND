@@ -78,6 +78,5 @@ export async function validatePromoCodeObj(data) {
     expiryDate: expiryDate.toISOString(), // ← auto-calculated expiry
     daysValid,
     usageType,
-    usageLimit,
   };
 }

@@ -2,6 +2,7 @@
 import "dotenv/config"; // dotenv is idempotent
 import { initFirebase, getRealtimeDB, getFirestore, useRealtimeDB } from "../firebase/firebaseInit.mjs";
 import errors from "../../errors/errors.mjs"; // <- use your ApplicationError style
+import { getStorage } from "firebase-admin/storage"; // <-- make sure this import is at the top
 
 
 /**
@@ -459,3 +460,163 @@ export async function patchPromoCodeDB(id, updates) {
   return { id, ...newData };
 }
 
+
+
+// -----------------------------------------------------------------------------
+// Upload Video to Storage
+// -----------------------------------------------------------------------------
+export async function uploadVideoToStorage(file) {
+  const init = ensureInitDb();
+  if (init) return init;
+
+  if (!file || !file.buffer || !file.mimetype.startsWith("video/")) {
+    throw errors.invalidData("Invalid or missing video file");
+  }
+
+  try {
+    const storage = getStorage();
+    const bucketName = 'storageproducts-bbe30.firebasestorage.app';
+    const bucket = storage.bucket(bucketName);
+
+    const videoId = Date.now().toString();
+    const filename = `videos/${videoId}_${file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+    const blob = bucket.file(filename);
+
+    // Upload the file
+    await blob.save(file.buffer, {
+      contentType: file.mimetype,
+      public: true,
+      metadata: {
+        firebaseStorageDownloadTokens: videoId,
+        metadata: {
+          originalName: file.originalname,
+          uploadedAt: new Date().toISOString()
+        }
+      }
+    });
+
+    // For the new Firebase Storage URL format
+    // ✅ FIXED: Use the correct Firebase Storage URL format
+    const url = `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodeURIComponent(filename)}?alt=media&token=${videoId}`;
+
+    console.log(`Video uploaded successfully: ${filename}`);
+    return {
+      id: videoId,
+      url,
+      filename,
+      bucket: bucket.name,
+      size: file.buffer.length
+    };
+
+  } catch (error) {
+    console.error('Storage upload error:', error);
+
+    if (error.code === 404) {
+      throw errors.externalService(`Storage bucket not found. Please check if bucket 'storageproducts-bbe30.firebasestorage.app' exists.`);
+    } else {
+      throw errors.externalService(`Failed to upload video: ${error.message}`);
+    }
+  }
+}
+// -----------------------------------------------------------------------------
+// Save Video Metadata to Realtime DB
+// -----------------------------------------------------------------------------
+export async function saveVideoMetadata(videoData) {
+  const init = ensureInitDb();
+  if (init) return init;
+
+  if (!useRealtimeDB()) {
+    return Promise.reject(errors.externalService("Firestore not yet implemented for videos"));
+  }
+
+  const db = getRealtimeDB();
+  const ref = db.ref(`/videos/${videoData.id}`);
+  await ref.set(videoData);
+  return videoData;
+}
+
+// -----------------------------------------------------------------------------
+// Retrieve all uploaded videos
+// -----------------------------------------------------------------------------
+export async function getAllVideos() {
+  const init = ensureInitDb();
+  if (init) return init;
+
+  const db = getRealtimeDB();
+  const snap = await db.ref("/videos").once("value");
+  const val = snap.val() || {};
+  return Object.entries(val).map(([id, data]) => ({ id, ...data }));
+}
+
+// -----------------------------------------------------------------------------
+// Retrieve one video by ID
+// -----------------------------------------------------------------------------
+export async function getVideoById(id) {
+  const init = ensureInitDb();
+  if (init) return init;
+
+  const db = getRealtimeDB();
+  const snap = await db.ref(`/videos/${id}`).once("value");
+  const val = snap.val();
+  if (val === null) {
+    return Promise.reject(errors.notFound(`Video "${id}" not found`));
+  }
+  return { id, ...val };
+}
+
+// -----------------------------------------------------------------------------
+// Delete Video from Storage and Metadata from Realtime DB
+// -----------------------------------------------------------------------------
+export async function deleteVideoById(id) {
+  const init = ensureInitDb();
+  if (init) return init;
+
+  try {
+    // 1. First get the video metadata to find the filename
+    const videoMetadata = await getVideoById(id);
+
+    if (!videoMetadata || !videoMetadata.filename) {
+      throw errors.notFound(`Video metadata not found for ID: ${id}`);
+    }
+
+    // 2. Delete from Storage
+    const storage = getStorage();
+    const bucketName = 'storageproducts-bbe30.firebasestorage.app';
+    const bucket = storage.bucket(bucketName);
+    const file = bucket.file(videoMetadata.filename);
+
+    const [exists] = await file.exists();
+    if (exists) {
+      await file.delete();
+      console.log(`Video file deleted from storage: ${videoMetadata.filename}`);
+    } else {
+      console.warn(`Video file not found in storage: ${videoMetadata.filename}`);
+    }
+
+    // 3. Delete from Realtime DB
+    if (useRealtimeDB()) {
+      const db = getRealtimeDB();
+      const ref = db.ref(`/videos/${id}`);
+      await ref.remove();
+      console.log(`Video metadata deleted from DB: ${id}`);
+    }
+
+    return {
+      success: true,
+      id: id,
+      filename: videoMetadata.filename,
+      message: 'Video and metadata deleted successfully'
+    };
+
+  } catch (error) {
+    console.error('Delete video error:', error);
+
+    if (error.code === 404 || error.httpStatus === 404) {
+      throw errors.notFound(`Video not found: ${error.message}`);
+    } else if (error.code === 403) {
+      throw errors.externalService(`Permission denied: ${error.message}`);
+    } else {
+      throw errors.externalService(`Failed to delete video: ${error.message}`);
+    }
+  }
+}

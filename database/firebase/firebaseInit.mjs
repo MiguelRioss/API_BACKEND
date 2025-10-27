@@ -72,6 +72,9 @@ function loadServiceAccountSafe() {
   return null;
 }
 
+// firebase/firebaseInit.mjs
+// ... existing imports and code ...
+
 export function initFirebase({ force = false } = {}) {
   if (admin.apps && admin.apps.length && !force) return admin;
 
@@ -98,11 +101,20 @@ export function initFirebase({ force = false } = {}) {
   if (process.env.FIREBASE_DATABASE_URL) initOptions.databaseURL = process.env.FIREBASE_DATABASE_URL;
   if (process.env.FIREBASE_PROJECT_ID) initOptions.projectId = process.env.FIREBASE_PROJECT_ID;
 
+  // ADD STORAGE BUCKET CONFIGURATION
+  if (process.env.FIREBASE_STORAGE_BUCKET) {
+    initOptions.storageBucket = process.env.FIREBASE_STORAGE_BUCKET;
+  } else {
+    // Fallback - but you should set the env variable
+    initOptions.storageBucket = 'storageproducts-bbe30.firebasestorage.app';
+  }
+
   try {
     admin.initializeApp(initOptions);
     if (process.env.NODE_ENV !== 'production') {
-      console.info('Firebase Admin initialized (projectId=%s, useRTDB=%s)',
+      console.info('Firebase Admin initialized (projectId=%s, storageBucket=%s, useRTDB=%s)',
         process.env.FIREBASE_PROJECT_ID || '<unset>',
+        initOptions.storageBucket,
         process.env.FIREBASE_USE_RTDB || '<unset>');
     }
     return admin;
@@ -112,11 +124,13 @@ export function initFirebase({ force = false } = {}) {
   }
 }
 
+// ... rest of your existing functions ...
+
 export function getAdmin() {
   if (!admin.apps || !admin.apps.length) throw new Error('Firebase not initialized. Call initFirebase() first.');
   return admin;
 }
-export function getFirestore(){ return getAdmin().firestore(); }
-export function getRealtimeDB(){ const a=getAdmin(); if(!a.database) throw new Error('RTDB not available'); return a.database(); }
-export function isInitialized(){ return !!(admin.apps && admin.apps.length); }
-export function useRealtimeDB(){ return isTruthy(process.env.FIREBASE_USE_RTDB); }
+export function getFirestore() { return getAdmin().firestore(); }
+export function getRealtimeDB() { const a = getAdmin(); if (!a.database) throw new Error('RTDB not available'); return a.database(); }
+export function isInitialized() { return !!(admin.apps && admin.apps.length); }
+export function useRealtimeDB() { return isTruthy(process.env.FIREBASE_USE_RTDB); }

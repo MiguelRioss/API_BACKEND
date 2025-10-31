@@ -1,45 +1,90 @@
 import { getVideoById } from "../database/realDB/firebaseDB.mjs";
-import handlerFactory from "../utils/handleFactory.mjs"
+import handlerFactory from "../utils/handleFactory.mjs";
 
 export default function createVideosAPI(videoUploadService) {
-    return {
-        uploadVideo: handlerFactory(internalUploadVideo),
-        getVideosMetadata: handlerFactory(internalGetVideosMetadata),
-        getVideoById: handlerFactory(internalGetVideoByID)
+  return {
+    uploadVideo: handlerFactory(internalUploadVideo),
+    getVideosMetadata: handlerFactory(internalGetVideosMetadata),
+    getVideoById: handlerFactory(internalGetVideoByID),
+    acceptVideo: handlerFactory(internalAcceptVideo),
+    declineVideo: handlerFactory(internalDeclineVideo),
+  };
+
+  async function internalUploadVideo(req, res) {
+    try {
+      const videoFile = req.file;
+      const { name, description, city, country, userEmail, userName } =
+        req.body;
+
+      // Debug logging
+      console.log("📧 Email parameters received:");
+      console.log("- userEmail:", userEmail);
+      console.log("- userName:", userName);
+      console.log("- name:", name);
+      console.log("- city:", city);
+      console.log("- country:", country);
+      console.log("Video file:", videoFile?.originalname);
+
+      if (!videoFile) {
+        return res.status(400).json({
+          success: false,
+          message: "No video file uploaded",
+        });
+      }
+
+      const result = await videoUploadService.videoUploadService(
+        name,
+        description,
+        city,
+        country,
+        videoFile,
+        userEmail,
+        userName
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: "Video uploaded successfully",
+        data: result,
+      });
+    } catch (err) {
+      console.error("Upload error:", err);
+      return res.status(500).json({
+        success: false,
+        message: err.message || "Upload failed",
+      });
     }
+  }
+  async function internalGetVideosMetadata(req, res) {
+    return videoUploadService.getVideosMetadata();
+  }
 
-    async function internalUploadVideo(req, res) {
-        try {
-            const videoFile = req.file; // multer puts single file here
-            const videoName = req.body.name;
-            const videoDescription = req.body.description;
-            const videoCity = req.body.city;
-            const videoCountry = req.body.country;
-            console.log("Received video file:", videoFile?.originalname, videoFile?.mimetype, videoFile?.size);
+  async function internalGetVideoByID(req, res) {
+    const id = req.params;
+    return videoUploadService.getVideoById(id);
+  }
+  async function internalAcceptVideo(req, res) {
+    try {
+      const { id } = req.params;
 
-            if (!videoFile) {
-                return res.status(400).json({ success: false, message: "No video file uploaded" });
-            }
+      // Call the internal function
+      const result = await videoUploadService.acceptVideoService(Number(id));
 
-            const result = await videoUploadService.videoUploadService(videoName,videoDescription,videoCity,videoCountry, videoFile);
-
-            return res.status(200).json({
-                success: true,
-                message: "Video uploaded successfully",
-                data: result,
-            });
-        } catch (err) {
-            console.error("Upload error:", err);
-            return res.status(500).json({ success: false, message: err.message || "Upload failed" });
-        }
+      res.status(200).json({
+        success: true,
+        message: "Video accepted successfully",
+        data: result,
+      });
+    } catch (err) {
+      console.error("Error accepting video:", err);
+      res.status(500).json({
+        success: false,
+        message: err.message || "Failed to accept video",
+      });
     }
-    async function internalGetVideosMetadata(req, res) {
-        return  videoUploadService.getVideosMetadata();
-    }
-
-     async function internalGetVideoByID(req, res) {
-        const id  = req.params;
-        return  videoUploadService.getVideoById(id);
-    }
-
+  }
+  
+  async function internalDeclineVideo(req, res) {
+    TODO();
+  }
 }

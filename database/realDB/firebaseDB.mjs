@@ -46,6 +46,33 @@ export async function getAllOrders() {
   return Promise.reject(errors.internal("No supported DB configured"));
 }
 
+
+/**
+ * Get all orders (RTDB or Firestore depending on env).
+ *
+ * @returns {Promise<Object[]>} Array of orders.
+ * @rejects {externalService} If DB call fails.
+ */
+export async function getAllOrdersByFolder(folderName) {
+  const init = ensureInitDb();
+  if (init) return init; // ensureInitDb may return a rejected promise
+
+  if (useRealtimeDB()) {
+    const db = getRealtimeDB();
+    return db
+      .ref(folderName)
+      .once("value")
+      .then((snap) => snap.val() || {})
+      .then((val) => Object.entries(val).map(([id, data]) => ({ id, ...data })))
+      .catch((err) =>
+        Promise.reject(errors.externalService("Failed to read orders from DB", { original: err }))
+      );
+  }
+
+  return Promise.reject(errors.internal("No supported DB configured"));
+}
+
+
 /**
  * Get a single order by id.
  *
@@ -619,4 +646,113 @@ export async function deleteVideoById(id) {
       throw errors.externalService(`Failed to delete video: ${error.message}`);
     }
   }
+}
+
+/**
+ * Patch (partial update) an existing video entry in Realtime DB.
+ * Only applies provided fields; preserves everything else.
+ *
+ * @param {string} id - Video ID
+ * @param {Object} updates - Key/value pairs to patch
+ * @returns {Promise<Object>} - Updated video object
+ */
+export async function patchVideo(id, updates) {
+  ensureInitDb();
+  if (!useRealtimeDB()) {
+    return Promise.reject(
+      errors.externalService("Firestore patch not implemented yet for videos")
+    );
+  }
+
+  if (!id || typeof updates !== "object") {
+    return Promise.reject(errors.invalidData("Invalid patch payload or ID"));
+  }
+
+  const db = getRealtimeDB();
+  const ref = db.ref(`/videos/${id}`);
+
+  const snap = await ref.once("value");
+  if (!snap.exists()) {
+    return Promise.reject(errors.notFound(`Video "${id}" not found`));
+  }
+
+  // Apply partial update
+  await ref.update(updates);
+
+  const newData = { ...(snap.val() || {}), ...updates };
+  return { id, ...newData };
+}
+
+
+/**
+ * Atomically move one or many orders between top-level RTDB folders.
+ * Example: moveOrdersBetweenFolders(["A","B"], "orders", "archive")
+ *
+ * @param {string[]|string} ids            - Order id or array of ids to move
+ * @param {string} fromFolderName          - Source folder ("orders" | "archive" | "deleted")
+ * @param {string} toFolderName            - Destination folder ("orders" | "archive" | "deleted")
+ * @returns {Promise<{moved:number, skipped:string[]}>}
+ * @rejects {externalService|internal} on failure
+ */
+export async function moveOrdersBetweenFolders(ids, fromFolderName, toFolderName) {
+  const init = ensureInitDb();
+  if (init) return init; // may return a rejected promise
+
+  const idList = Array.isArray(ids) ? ids : [ids];
+  if (!idList.length) {
+    return Promise.reject(errors.internal("No ids provided to move"));
+  }
+  if (!fromFolderName || !toFolderName) {
+    return Promise.reject(errors.internal("Both fromFolderName and toFolderName are required"));
+  }
+  if (fromFolderName === toFolderName) {
+    return { moved: 0, skipped: [...idList] };
+  }
+
+  if (!useRealtimeDB()) {
+    return Promise.reject(errors.internal("No supported DB configured"));
+  }
+
+  try {
+    const db = getRealtimeDB();
+    const movedAt = Date.now();
+    const updates = {};
+    const skipped = [];
+
+    // Fetch each source record; only move if it exists
+    const reads = await Promise.allSettled(
+      idList.map(async (id) => {
+        const snap = await db.ref(`${fromFolderName}/${id}`).once("value");
+        if (!snap.exists()) {
+          skipped.push(id);
+          return;
+        }
+        const data = snap.val();
+        // copy to destination (add lightweight audit trail), delete from source
+        updates[`/${toFolderName}/${id}`] = { ...data, _movedAt: movedAt, _from: fromFolderName };
+        updates[`/${fromFolderName}/${id}`] = null;
+      })
+    );
+
+    // If nothing to update, return early
+    const updateKeys = Object.keys(updates);
+    if (updateKeys.length === 0) {
+      return { moved: 0, skipped };
+    }
+
+    // Atomic multi-path update
+    await db.ref().update(updates);
+
+    const moved = idList.length - skipped.length;
+    return { moved, skipped };
+  } catch (err) {
+    throw errors.externalService("Failed to move orders between folders", { original: err });
+  }
+}
+
+/**
+ * Convenience wrapper to move a single order.
+ */
+export function moveOrderBetweenFolders(id, fromFolderName, toFolderName) {
+  return moveOrdersBetweenFolders([id], fromFolderName, toFolderName);
 }

@@ -15,15 +15,28 @@ import {
 } from "../servicesUtils.mjs";
 import buildManualOrderFromCart from "./orderServicesUtils.mjs";
 
+// ─────────────────────────────────────────────
+// Folder validation helpers
+// ─────────────────────────────────────────────
+const ALLOWED_FOLDERS = new Set(["orders", "archive", "deleted"]);
+function normalizeFolderName(raw) {
+  const v = String(raw || "").trim().toLowerCase();
+  if (v === "archived") return "archive";           // accept synonym
+  if (ALLOWED_FOLDERS.has(v)) return v;
+  return null;
+}
+function assertFolderName(raw, what = "folder") {
+  const norm = normalizeFolderName(raw);
+  if (!norm) {
+    throw errors.invalidData(
+      `Invalid ${what} '${raw}'. Allowed: orders | archive | deleted`
+    );
+  }
+  return norm;
+}
+
 /**
- * createOrdersService(db, emailService)
- * - db must expose:
- *    - async getAllOrders(): Promise<Array>
- *    - optional async getOrderById(id): Promise<Object|null>
- *    - async createOrderDB(order): Promise<Object>
- *    - optional async updateOrderDB(id, order): Promise<Object>
- *
- * Service throws domain errors for HTTP layer to map.
+ * createOrdersService(db, stripeServices, emailService, stockServices)
  */
 export default function createOrdersService(db, stripeServices, emailService, stockServices) {
   if (!db || typeof db.createOrderDB !== "function") {
@@ -32,7 +45,6 @@ export default function createOrdersService(db, stripeServices, emailService, st
   if (!stripeServices) {
     return errors.internalError("OrdersService requires a stripeServices");
   }
-
   if (!emailService) {
     return errors.internalError("[ordersService] emailService missing or invalid; invoice emails disabled.");
   }
@@ -43,9 +55,16 @@ export default function createOrdersService(db, stripeServices, emailService, st
     getOrderByStripeSessionId,
     createOrderServices,
     updateOrderServices,
-    createCheckoutSession
+    createCheckoutSession,
+    getOrdersByFolderService,
+    // NEW:
+    moveOrdersService,
+    moveOrderService,
   };
 
+  // ──────────────────────────────
+  // READ
+  // ──────────────────────────────
   async function getOrdersServices({ limit, status, q } = {}) {
     return db
       .getAllOrders()
@@ -60,28 +79,29 @@ export default function createOrdersService(db, stripeServices, emailService, st
     return db.getOrderById(normalizedID);
   }
 
+  async function getOrdersByFolderService(folderName) {
+    const folder = assertFolderName(folderName, "folder name");
+    if (typeof db.getAllOrdersByFolder !== "function") {
+      throw errors.externalService("DB adapter missing getOrdersByFolder(folder)");
+    }
+    return db.getAllOrdersByFolder(folder);
+  }
+
   async function getOrderByStripeSessionId(sessionId) {
     if (sessionId === null || typeof sessionId === "undefined") {
-      return Promise.reject(
-        errors.invalidData("You must provide a Stripe session id.")
-      );
+      return Promise.reject(errors.invalidData("You must provide a Stripe session id."));
     }
-
     const normalized = normalizeId(sessionId);
     if (!normalized) {
-      return Promise.reject(
-        errors.invalidData("Stripe session id cannot be empty.")
-      );
+      return Promise.reject(errors.invalidData("Stripe session id cannot be empty."));
     }
-
     if (typeof db.getOrderByStripeSessionId === "function") {
       return db.getOrderByStripeSessionId(normalized);
     }
   }
 
-
   // ──────────────────────────────
-  // STEP 1: Decide Stripe vs Request-Order
+  // CHECKOUT DECISION (Stripe vs manual)
   // ──────────────────────────────
   async function createCheckoutSession(orderData) {
     const {
@@ -99,40 +119,26 @@ export default function createOrdersService(db, stripeServices, emailService, st
       throw errors.invalidData("Country is required to process checkout");
     }
 
-    // 🌍 Allowable Stripe countries (by both code and full name)
     const stripeAllowed = [
-      "PT", "PORTUGAL",
-      "DE", "GERMANY",
-      "NL", "NETHERLANDS",
-      "MX", "MEXICO",
-      "CA", "CANADA",
-      "AU", "AUSTRALIA",
-      "NZ", "NEW ZEALAND",
-      "ZA", "SOUTH AFRICA"
+      "PT","PORTUGAL","DE","GERMANY","NL","NETHERLANDS","MX","MEXICO",
+      "CA","CANADA","AU","AUSTRALIA","NZ","NEW ZEALAND","ZA","SOUTH AFRICA"
     ];
 
-    // Normalize the input for matching (uppercase, trim)
     const normalizedCountry = (country || "").trim().toUpperCase();
-
     console.log("[ordersService] Checkout initiated for", normalizedCountry);
 
     if (stripeAllowed.includes(normalizedCountry)) {
-      // 💳 Stripe route
       return stripeServices.createCheckoutSession(orderData);
     }
 
-    // 🌍 Other-country request (no Stripe)
     const catalog = await stockServices.getAllProducts();
-
     const otherCountryOrderPayload = await buildManualOrderFromCart({
       ...orderData,
       currency: orderData.currency || "eur",
       paymentId: orderData.paymentId,
       catalog,
     });
-    console.log("[ordersService] Creating manual order for other country:", otherCountryOrderPayload);
 
-    // ✅ Create the order directly in DB (request-for-order flow)
     const savedOrder = await createOrderServices(otherCountryOrderPayload, {
       isRequestedOrderForOtherCountries: true,
     });
@@ -140,18 +146,12 @@ export default function createOrdersService(db, stripeServices, emailService, st
     return { url: `${DEFAULT_SUCCESS_URL}/${savedOrder.id}` };
   }
 
-
-
-
-
   // ──────────────────────────────
-  // STEP 2: Create Order + Emails
+  // CREATE + EMAILS
   // ──────────────────────────────
   async function createOrderServices(order, options = {}) {
     const { isRequestedOrderForOtherCountries = false } = options;
 
-
-    // Pass the flag into validation (as an object for clarity)
     const prepared = await validateAndPrepareOrder(order, {
       isRequestedOrderForOtherCountries,
     });
@@ -164,57 +164,45 @@ export default function createOrdersService(db, stripeServices, emailService, st
     }
 
     let flagged = {};
-
     try {
       if (isRequestedOrderForOtherCountries) {
-
         await emailService.sendInquiryOrderBundleEmails({
           order: saved,
           orderId: saved.id,
           manual: true,
         });
-
-
         flagged = {
           ...saved,
           email_Sent_ThankYou_Admin: false,
-          payment_status: false, // ❌ Not yet paid — awaiting manual payment
+          payment_status: false,
         };
       } else {
-        // 💳 Stripe / standard checkout flow (immediate payment)
-        await emailService.sendOrderBundleEmails({ order: saved, orderId: saved.id});
-
+        await emailService.sendOrderBundleEmails({ order: saved, orderId: saved.id });
         flagged = {
           ...saved,
           email_Sent_ThankYou_Admin: true,
-          payment_status: true, // ✅ Paid immediately
+          payment_status: true,
         };
       }
 
-      // Persist updated flags in DB
       if (typeof db.updateOrderDB === "function" && saved?.id) {
         try {
           await db.updateOrderDB(saved.id, flagged);
         } catch (updateErr) {
-          console.warn(
-            "[ordersService] Failed to persist flag updates:",
-            updateErr?.message || updateErr
-          );
+          console.warn("[ordersService] Failed to persist flag updates:", updateErr?.message || updateErr);
         }
       }
 
       return flagged;
     } catch (err) {
-      console.error(
-        "[ordersService] Failed to send order emails:",
-        err?.message || err
-      );
+      console.error("[ordersService] Failed to send order emails:", err?.message || err);
       return saved;
     }
   }
 
-
-
+  // ──────────────────────────────
+  // UPDATE
+  // ──────────────────────────────
   async function updateOrderServices(orderID, orderChanges = {}) {
     return validateAndNormalizeID(orderID).then((normalizedId) =>
       db.getOrderById(normalizedId).then((existingOrder) => {
@@ -223,5 +211,46 @@ export default function createOrdersService(db, stripeServices, emailService, st
         return db.updateOrderDB(normalizedId, updated);
       })
     );
+  }
+
+  // ──────────────────────────────
+  // NEW: MOVE (bulk + single), with folder validation
+  // ──────────────────────────────
+  async function moveOrdersService({ ids, source, dest }) {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw errors.invalidData("You must provide a non-empty array of ids.");
+    }
+
+    const fromFolder = assertFolderName(source, "source folder");
+    const toFolder   = assertFolderName(dest,   "destination folder");
+
+    if (fromFolder === toFolder) {
+      return { moved: 0, skipped: [...ids], source: fromFolder, dest: toFolder };
+    }
+
+    // Prefer bulk DB op if present; else fall back to single
+    if (typeof db.moveOrdersBetweenFolders === "function") {
+      return db.moveOrdersBetweenFolders(ids, fromFolder, toFolder);
+    }
+
+    if (typeof db.moveOrderBetweenFolders === "function") {
+      const results = await Promise.allSettled(
+        ids.map((id) => db.moveOrderBetweenFolders(id, fromFolder, toFolder))
+      );
+      const moved = results.filter(r => r.status === "fulfilled").length;
+      const skipped = results
+        .map((r, i) => (r.status === "fulfilled" ? null : ids[i]))
+        .filter(Boolean);
+      return { moved, skipped, source: fromFolder, dest: toFolder };
+    }
+
+    throw errors.externalService(
+      "DB adapter missing moveOrdersBetweenFolders(ids, from, to) or moveOrderBetweenFolders(id, from, to)"
+    );
+  }
+
+  async function moveOrderService({ id, source, dest }) {
+    const ids = [await validateAndNormalizeID(id)];
+    return moveOrdersService({ ids, source, dest });
   }
 }

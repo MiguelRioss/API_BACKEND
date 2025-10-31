@@ -50,7 +50,7 @@ https://chatgpt.com/g/g-p-68a6e20ab0c88191958f694dcc5dc007-miguelstuff/c/68d3705
 
 
 
-((Must have in the email TEMPLATE ))
+- [ ] ((Must have in the email TEMPLATE ))
 Once you have paid , please provide us with proof of payment( WISE transaction # or Revolut @TAG) 
 and be sure to include the information bellow:
 - OrderID 
@@ -71,3 +71,8 @@ Ultimo dia para usar o codigo
 Deve estar lá no codigo 
 
  -> Possivel email 
+
+
+ Apos autorizar deve mandar o email de autorização com o codigo criado
+ Caso seja declined deve ser enviado o email a dizer que foi rejeitado
+ - Tem de haver a indicação da razao de ter siod rejeitado

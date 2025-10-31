@@ -6,14 +6,14 @@ export const PROMO_USAGE_TYPE = Object.freeze({
   MULTIPLE: "multiple",
 });
 
-export async function validatePromoCodeObj(data) {
+export async function validatePromoCodeObjAndCreateCode(data) {
   const discountCode = data.promocode || data;
 
-  const valCode = randomUUID();
+  const valCode = randomUUID().replace(/-/g, "").slice(0, 8).toUpperCase();
   const createdDate = new Date();
 
   if (typeof discountCode !== "object" || discountCode === null) {
-    return errors.invalidData("Invalid promo code object");
+    throw errors.invalidData("Invalid promo code object");
   }
 
   // ✅ Require name
@@ -22,7 +22,7 @@ export async function validatePromoCodeObj(data) {
     !discountCode.name.trim() ||
     discountCode.name.trim().length < 3
   ) {
-    return errors.invalidData(
+    throw errors.invalidData(
       "Invalid name: must be a non-empty string of at least 3 characters"
     );
   }
@@ -35,38 +35,37 @@ export async function validatePromoCodeObj(data) {
     Number(discountCode.daysValid) <= 0 ||
     Number(discountCode.daysValid) > 31
   ) {
-    return errors.invalidData(
-      "Invalid daysValid: must be between 1 and 31 days"
-    );
+    throw errors.invalidData("Invalid daysValid: must be between 1 and 31 days");
   }
 
   const daysValid = Number(discountCode.daysValid);
 
-  // ✅ Calculate expiry date at 23:59:59 of the last valid day
+  // ✅ Calculate expiry date
   const expiryDate = new Date(createdDate);
   expiryDate.setDate(expiryDate.getDate() + daysValid);
   expiryDate.setHours(23, 59, 59, 999);
 
-  // ✅ Validate discount percentage / value
-  let pct = discountCode.discountPercentage ?? discountCode.value;
-  if (pct !== undefined) {
-    pct = Number(pct);
-    if (isNaN(pct) || pct <= 0 || pct > 100) {
-      return errors.invalidData(
-        "Invalid discount percentage/value: must be between 1 and 100"
-      );
-    }
+  // ✅ Validate discount percentage
+  let pct = discountCode.discountPercentage || discountCode.value;
+  if (pct === undefined) {
+    throw errors.invalidData("Missing discount percentage");
+  }
+
+  pct = Number(pct);
+  if (isNaN(pct) || pct <= 0 || pct > 100) {
+    throw errors.invalidData(
+      "Invalid discount percentage/value: must be between 1 and 100"
+    );
   }
 
   // ✅ Usage type enforcement
   const usageType =
     discountCode.usageType?.toLowerCase() || PROMO_USAGE_TYPE.SINGLE;
   if (!Object.values(PROMO_USAGE_TYPE).includes(usageType)) {
-    return errors.invalidData(
+    throw errors.invalidData(
       `Invalid usageType: must be '${PROMO_USAGE_TYPE.SINGLE}' or '${PROMO_USAGE_TYPE.MULTIPLE}'`
     );
   }
-
 
   return {
     ...discountCode,
@@ -75,7 +74,7 @@ export async function validatePromoCodeObj(data) {
     code: valCode,
     status: true,
     created: createdDate.toISOString(),
-    expiryDate: expiryDate.toISOString(), // ← auto-calculated expiry
+    expiryDate: expiryDate.toISOString(),
     daysValid,
     usageType,
   };

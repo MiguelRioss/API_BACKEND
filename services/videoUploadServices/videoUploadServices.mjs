@@ -1,5 +1,6 @@
 import errors from "../../errors/errors.mjs";
 import createPromoCodeForCertainTime from "../videoUploadServices/videoUploadServicesUtils.mjs";
+import ensureString from "../videoUploadServices/videoUploadServicesUtils.mjs";
 const PROMO_CODE_DAYS = 30;
 
 export default function createVideoUploadServices(
@@ -165,26 +166,35 @@ export default function createVideoUploadServices(
    * @returns {Promise<Object>} Returning success deleted the video with ID.
    */
   async function declineVideoWithReason(videoID, reason, notes) {
-    // Validate ID (support string IDs too)
     const id = typeof videoID === "string" ? videoID.trim() : videoID;
     if (!id && id !== 0)
       throw errors.invalidData("Need a valid Id for the video");
-    if (!reason) {
-      return errors.invalidData("No reason found for the rejection of the video")
-    }
+
+    // ✅ Validate inputs
+    const safeReason = ensureString(reason, {
+      name: "reason",
+      required: true,
+      max: 120,
+    });
+
+    const safeNotes = ensureString(notes, {
+      name: "notes",
+      required: false,
+      max: 1000,
+      allowEmpty: true,
+    });
+
     const video = await database.getVideoById(id);
     if (video) {
-      // Always await async emails
       await emailService.sendSubmissionRejection({
         userEmail: video.userEmail,
         userName: video.userName || video.name || "Valued Customer",
-        rejectionReason: reason,
-        rejectionNotes: notes,
+        rejectionReason: safeReason,
+        rejectionNotes: safeNotes, // empty string if none
         resubmitUrl: "https://mesodose.com/mesobuzz/upload",
       });
     }
 
-    // Then delete from DB
     return await database.deleteVideoById(id);
   }
 

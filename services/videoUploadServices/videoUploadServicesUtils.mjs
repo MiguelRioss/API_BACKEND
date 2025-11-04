@@ -17,7 +17,7 @@ const ALLOWED_REASONS = new Set([
  * @param {Int} numberDays  - Number of days the code will be.
  * @returns {Promise<Object>} A discount object to create on database.
  */
-export default function createPromoCodeForCertainTime(numberDays) {
+export function createPromoCodeForCertainTime(numberDays) {
   return {
     name: `CODE_GENERATED-${randomUUID()}`,
     daysValid: numberDays,
@@ -27,7 +27,7 @@ export default function createPromoCodeForCertainTime(numberDays) {
 }
 
 
-export default function ensureString(value, {
+export  function ensureString(value, {
   name = "value",
   required = false,
   max = 500,

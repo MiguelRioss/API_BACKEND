@@ -1,6 +1,5 @@
 import errors from "../../errors/errors.mjs";
-import createPromoCodeForCertainTime from "../videoUploadServices/videoUploadServicesUtils.mjs";
-import ensureString from "../videoUploadServices/videoUploadServicesUtils.mjs";
+import { createPromoCodeForCertainTime, ensureString } from "../videoUploadServices/videoUploadServicesUtils.mjs";
 const PROMO_CODE_DAYS = 30;
 
 export default function createVideoUploadServices(

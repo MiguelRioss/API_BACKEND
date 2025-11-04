@@ -83,8 +83,22 @@ export default function createVideosAPI(videoUploadService) {
       });
     }
   }
-  
+
   async function internalDeclineVideo(req, res) {
-    TODO();
+    try {
+      const { id } = req.params;
+
+      const result = await videoUploadService.declineVideo(Number(id));
+      res.status(200).json({
+        success: true,
+        message: "Video Was deleted",
+        data: result,
+      });
+    } catch (err) {
+      res.status(500).json({
+        success: false,
+        message: err.message,
+      });
+    }
   }
 }

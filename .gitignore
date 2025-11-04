@@ -24,3 +24,4 @@ Thumbs.db
 # misc
 coverage/
 *.tgz
+yt_tokens.json

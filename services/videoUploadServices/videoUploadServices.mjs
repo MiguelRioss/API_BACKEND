@@ -164,20 +164,28 @@ export default function createVideoUploadServices(
    * @param {Object} videoID  - Video ID to be deleted.
    * @returns {Promise<Object>} Returning success deleted the video with ID.
    */
-  async function declineVideoWithReason(videoID, reason) {
-    if (Number.isNaN(videoID)) {
+  async function declineVideoWithReason(videoID, reason, notes) {
+    // Validate ID (support string IDs too)
+    const id = typeof videoID === "string" ? videoID.trim() : videoID;
+    if (!id && id !== 0)
       throw errors.invalidData("Need a valid Id for the video");
+    if (!reason) {
+      return errors.invalidData("No reason found for the rejection of the video")
     }
-    const videoToBeDeleted = await database.getVideoById(videoID);
-    if (videoToBeDeleted) {
-      emailService.sendSubmissionRejection(
-        videoToBeDeleted.userEmail,
-        videoToBeDeleted.userName,
-        reason
-      );
+    const video = await database.getVideoById(id);
+    if (video) {
+      // Always await async emails
+      await emailService.sendSubmissionRejection({
+        userEmail: video.userEmail,
+        userName: video.userName || video.name || "Valued Customer",
+        rejectionReason: reason,
+        rejectionNotes: notes,
+        resubmitUrl: "https://mesodose.com/mesobuzz/upload",
+      });
     }
 
-    return await database.deleteVideoById(videoID);
+    // Then delete from DB
+    return await database.deleteVideoById(id);
   }
 
   /**

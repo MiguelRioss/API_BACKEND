@@ -1,5 +1,6 @@
 import { PROMO_USAGE_TYPE } from "../promoCodesServices/promoCodeServicesUtils.mjs";
 import { randomUUID } from "node:crypto";
+import errors from "../../errors/errors.mjs";
 
 const ALLOWED_REASONS = new Set([
   "Poor audio/video quality",

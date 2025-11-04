@@ -87,8 +87,9 @@ export default function createVideosAPI(videoUploadService) {
   async function internalDeclineVideo(req, res) {
     try {
       const { id } = req.params;
-
-      const result = await videoUploadService.declineVideo(Number(id));
+      const {reason , notes} = req.body
+      
+      const result = await videoUploadService.declineVideoWithReason(Number(id),reason,notes);
       res.status(200).json({
         success: true,
         message: "Video Was deleted",

@@ -1,5 +1,5 @@
 import errors from "../../errors/errors.mjs";
-import { createPromoCodeForCertainTime, ensureString } from "../videoUploadServices/videoUploadServicesUtils.mjs";
+import { createPromoCodeForCertainTime, ensureString,ALLOWED_REASONS } from "../videoUploadServices/videoUploadServicesUtils.mjs";
 const PROMO_CODE_DAYS = 30;
 
 export default function createVideoUploadServices(
@@ -174,8 +174,9 @@ export default function createVideoUploadServices(
       name: "reason",
       required: true,
       max: 120,
+      whitelist : ALLOWED_REASONS
     });
-
+    
     const safeNotes = ensureString(notes, {
       name: "notes",
       required: false,

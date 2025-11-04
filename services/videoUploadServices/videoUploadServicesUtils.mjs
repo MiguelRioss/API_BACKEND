@@ -2,7 +2,7 @@ import { PROMO_USAGE_TYPE } from "../promoCodesServices/promoCodeServicesUtils.m
 import { randomUUID } from "node:crypto";
 import errors from "../../errors/errors.mjs";
 
-const ALLOWED_REASONS = new Set([
+export const ALLOWED_REASONS = new Set([
   "Poor audio/video quality",
   "Contains identifying or sensitive info",
   "Not relevant to prompt/guidelines",
@@ -33,7 +33,7 @@ export  function ensureString(value, {
   required = false,
   max = 500,
   allowEmpty = false,
-  whitelist = ALLOWED_REASONS /* Set<string> | undefined */,
+  whitelist /* Set<string> | undefined */,
 } = {}) {
   if (value == null) {
     if (required) throw errors.invalidData(`${name} is required`);

@@ -16,7 +16,9 @@ export default function createPromoCodeServices(db) {
   async function createPromoCode(promoCodeObj) {
     console.log("🎟️ Incoming promoCodeObj:", promoCodeObj);
     try {
-      const promoCodeObjValidated = await validatePromoCodeObjAndCreateCode(promoCodeObj);
+      const promoCodeObjValidated = await validatePromoCodeObjAndCreateCode(
+        promoCodeObj
+      );
       if (!promoCodeObjValidated) return null;
       const result = await db.createPromoCodeDB(promoCodeObjValidated);
       return result;
@@ -75,28 +77,21 @@ export default function createPromoCodeServices(db) {
 
     // 1) Lookup by code (prefer direct DB method; fallback to in-memory scan)
     let promo = null;
-    if (typeof db.getPromoCodeByCode === "function") {
-      promo = await db.getPromoCodeByCode(normCode);
-    } else {
-      const all = await getPromoCodes();
-      promo = Array.isArray(all) ? all.find(p => String(p.code).trim() === normCode) : null;
-    }
+    const all = await getPromoCodes();
+    promo = Array.isArray(all)
+      ? all.find((p) => String(p.code).trim() === normCode)
+      : null;
     if (!promo) throw errors.notFound(`Promo code ${normCode} not found`);
 
     // 2) Basic validity gates (only enforced if fields exist on record)
     if ("active" in promo && promo.active === false) {
       throw errors.forbidden("Promo code is inactive");
     }
+
     if ("expiresAt" in promo && promo.expiresAt) {
       const expiresAtMs = new Date(promo.expiresAt).getTime();
       if (Number.isFinite(expiresAtMs) && Date.now() > expiresAtMs) {
         throw errors.forbidden("Promo code has expired");
-      }
-    }
-    if ("maxUses" in promo && Number.isFinite(Number(promo.maxUses))) {
-      const usesVal = Number(promo.uses ?? promo.usageCount ?? 0);
-      if (usesVal >= Number(promo.maxUses)) {
-        throw errors.forbidden("Promo code usage limit reached");
       }
     }
 
@@ -108,33 +103,18 @@ export default function createPromoCodeServices(db) {
         break;
       }
     }
-    if (storedPercent != null && normPercent != null && storedPercent !== normPercent) {
+    if (
+      storedPercent != null &&
+      normPercent != null &&
+      storedPercent !== normPercent
+    ) {
       throw errors.invalidData(
         `Promo code ${normCode} does not match percent ${normPercent}`
       );
     }
-
-    // 4) Build a safe "touch" update:
-    //    - increment uses/usageCount if present
-    //    - set lastUsedAt if present
-    //    - echo percent into any matching field if it exists
-    //    NOTE: updatePromoCode will filter to existing keys anyway.
-    const changes = {};
-    if ("uses" in promo) changes.uses = Number(promo.uses || 0) + 1;
-    if ("usageCount" in promo) changes.usageCount = Number(promo.usageCount || 0) + 1;
-    if ("lastUsedAt" in promo) changes.lastUsedAt = new Date().toISOString();
-
-    for (const k of ["percent", "percentage", "discountPercent"]) {
-      if (k in promo && normPercent != null) {
-        changes[k] = normPercent;
-        break;
-      }
-    }
-
-    // Optionally track lastDiscountPercent if the field exists
-    if ("lastDiscountPercent" in promo && normPercent != null) {
-      changes.lastDiscountPercent = normPercent;
-    }
+    const changes = {
+      status: false,
+    };
 
     // 5) Persist and return the updated promo
     const updated = await updatePromoCode(String(promo.id), changes);

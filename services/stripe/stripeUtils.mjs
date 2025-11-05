@@ -94,11 +94,8 @@ export async function createUrlCheckoutSession({
   successUrl = DEFAULT_SUCCESS_URL,
   cancelUrl = DEFAULT_CANCEL_URL,
 
-  // NEW: discount inputs
+  // receives { code, value } where value = percent
   discount,
-  discountCode,
-  discountAmountCents,
-  discountPercent,
 }) {
   if (!stripe) {
     return errors.internalError("Stripe client is required");
@@ -113,43 +110,28 @@ export async function createUrlCheckoutSession({
     : sanitizeAddress(billingAddress);
   const shippingCost = toInteger(shippingCostCents, 0);
 
-  // ---- Normalize discount (accept nested or flat) --------------------------
-  const incomingDiscount =
-    (discount && typeof discount === "object" && discount) || {};
-  const code =
-    (discountCode ?? incomingDiscount.code ?? incomingDiscount.label ?? null) ||
-    null;
-
-  const rawAmountCents =
-    discountAmountCents ??
-    incomingDiscount.amountCents ??
-    incomingDiscount.amount_cents ??
-    null;
-
-  // number or null
-  const uiAmountCents = Number.isFinite(Number(rawAmountCents))
-    ? Math.max(0, Math.trunc(Number(rawAmountCents)))
-    : 0;
-
-  const rawPercent = discountPercent ?? incomingDiscount.percent ?? null;
-  const uiPercent = Number.isFinite(Number(rawPercent))
-    ? Math.max(0, Math.trunc(Number(rawPercent)))
+  // ---- Normalize discount: { code, value } (percent) -----------------------
+  const incomingDiscount = (discount && typeof discount === "object" && discount) || {};
+  const code = incomingDiscount.code ? String(incomingDiscount.code).trim() : "";
+  const uiPercent = Number.isFinite(Number(incomingDiscount.value))
+    ? Math.max(0, Math.trunc(Number(incomingDiscount.value)))
     : null;
 
-  // ---- Compute pre-discount total from line_items --------------------------
-  const itemsTotalCents = line_items.reduce((sum, li) => {
+  // ---- Totals (exclude shipping line from merchandise total) ---------------
+  const merchandiseTotalCents = line_items.reduce((sum, li) => {
+    const pid = li?.price_data?.product_data?.metadata?.productId;
+    if (pid === "__shipping__") return sum; // exclude shipping
     const unit = Number(li?.price_data?.unit_amount) || 0;
-    const qty = Math.max(1, Math.trunc(Number(li?.quantity) || 1));
+    const qty  = Math.max(1, Math.trunc(Number(li?.quantity) || 1));
     return sum + unit * qty;
   }, 0);
 
-  const preDiscountTotalCents = itemsTotalCents; // includes shipping because we pushed it as a line item already
-
-  // Cap the discount so we never exceed the pre-discount total
-  const appliedDiscountCents = Math.min(
-    uiAmountCents,
-    Math.max(0, preDiscountTotalCents)
-  );
+  // Keep full pre-discount total for audit (includes shipping)
+  const preDiscountTotalCents = line_items.reduce((sum, li) => {
+    const unit = Number(li?.price_data?.unit_amount) || 0;
+    const qty  = Math.max(1, Math.trunc(Number(li?.quantity) || 1));
+    return sum + unit * qty;
+  }, 0);
 
   // ---- Build metadata ------------------------------------------------------
   const metaResult = buildCheckoutMetadata({
@@ -165,44 +147,50 @@ export async function createUrlCheckoutSession({
 
   const { metadata, customerEmail } = metaResult;
 
-  // Append discount details to metadata for auditing
+  // Audit fields
   metadata.discount_code = code || "";
-  metadata.discount_amount_cents = String(appliedDiscountCents || 0);
   metadata.discount_percent = uiPercent != null ? String(uiPercent) : "";
   metadata.pre_discount_total_cents = String(preDiscountTotalCents);
+  metadata.merchandise_total_cents = String(merchandiseTotalCents);
 
-  // ---- Optionally create a Stripe coupon for the applied discount ----------
-  // Only create a coupon if there's something to discount
+  // ---- Create coupon as AMOUNT OFF on merchandise only ---------------------
   let discountsParam = undefined;
   try {
+    let appliedDiscountCents = 0;
+
+    if (uiPercent && uiPercent > 0 && merchandiseTotalCents > 0) {
+      appliedDiscountCents = Math.floor((merchandiseTotalCents * uiPercent) / 100);
+      // safety caps
+      appliedDiscountCents = Math.max(0, Math.min(appliedDiscountCents, merchandiseTotalCents));
+    }
+
     if (appliedDiscountCents > 0) {
       const coupon = await stripe.coupons.create({
-        amount_off: appliedDiscountCents,
+        amount_off: appliedDiscountCents,   // amount off (so shipping isn't discounted)
         currency: "eur",
         duration: "once",
-        name: code || `Manual discount ${appliedDiscountCents / 100} EUR`,
+        name: code || `Manual discount €${(appliedDiscountCents / 100).toFixed(2)}`,
         metadata: {
           source: "custom_checkout",
           ui_code: code || "",
-          ui_percent: uiPercent != null ? String(uiPercent) : "",
+          ui_percent: String(uiPercent ?? ""),
         },
       });
 
       discountsParam = [{ coupon: coupon.id }];
     }
   } catch (e) {
-    // If coupon creation fails, surface a clear error
     return errors.externalService("Stripe coupon creation failed", {
       reason: e?.message || "Unknown error",
     });
   }
 
-  // ---- Create the session with the discount applied ------------------------
+  // ---- Create the session (apply coupon via discounts) ---------------------
   try {
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       line_items,
-      discounts: discountsParam, // <-- APPLY DISCOUNT HERE
+      discounts: discountsParam,
       billing_address_collection: "auto",
       phone_number_collection: { enabled: false },
       customer_creation: "always",

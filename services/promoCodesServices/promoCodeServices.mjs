@@ -68,6 +68,7 @@ export default function createPromoCodeServices(db) {
   // NEW: Validate + touch a promo code by (code, discountPercent)
   // ───────────────────────────────────────────────────────────────────────────
   async function validatePromocode(code, discountPercent) {
+    console.log(code,discountPercent)
     const normCode = String(code || "").trim();
     const normPercent = Number.isFinite(Number(discountPercent))
       ? Math.trunc(Number(discountPercent))
@@ -84,7 +85,7 @@ export default function createPromoCodeServices(db) {
     if (!promo) throw errors.notFound(`Promo code ${normCode} not found`);
 
     // 2) Basic validity gates (only enforced if fields exist on record)
-    if ("active" in promo && promo.active === false) {
+    if (promo.status === false) {
       throw errors.forbidden("Promo code is inactive");
     }
 

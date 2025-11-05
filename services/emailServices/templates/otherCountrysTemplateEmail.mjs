@@ -24,6 +24,9 @@ export function buildOtherCountrysTemplateEmail({
   currency = "EUR",
   wiseUrl = "https://wise.com/pay/me/alvaronigelgiovanniz",
   revolutUrl = "https://revolut.me/alvaro9dt1",
+
+  // (optional) normalized discount from caller: { code?, percent?, amount_cents? }
+  discount,
 } = {}) {
   const normalizedOrderId = normalizeString(
     orderId ||
@@ -51,7 +54,88 @@ export function buildOtherCountrysTemplateEmail({
   });
 
   const resolvedShippingCents = resolveShippingCents(order, shippingCents);
-  const itemsTotalCents = normalizedItems.reduce((sum, item) => sum + item.lineTotalCents, 0);
+
+  const itemsTotalCents = normalizedItems.reduce(
+    (sum, item) => sum + item.lineTotalCents,
+    0
+  );
+
+  // ─────────────────────────────────────────────────────────
+  // Normalize discount (prefer function arg; else metadata)
+  // Supports:
+  //   - discount: { code?, percent?, amount_cents? }
+  //   - order.metadata.discount with same fields
+  //   - order.metadata.discount_percent / discount_amount_cents (flat)
+  // Discount applies to MERCHANDISE ONLY (not shipping)
+  // ─────────────────────────────────────────────────────────
+  const metaDiscObj =
+    order?.metadata?.discount && typeof order.metadata.discount === "object"
+      ? order.metadata.discount
+      : undefined;
+
+  const normalizedDiscount = (() => {
+    const code =
+      (discount?.code ??
+        metaDiscObj?.code ??
+        order?.metadata?.discount_code ??
+        undefined);
+
+    const percentSrc =
+      (discount?.percent ??
+        discount?.value ?? // if caller passed value as percent
+        metaDiscObj?.percent ??
+        order?.metadata?.discount_percent ??
+        undefined);
+
+    const amountCentsSrc =
+      (discount?.amount_cents ??
+        metaDiscObj?.amount_cents ??
+        order?.metadata?.discount_amount_cents ??
+        undefined);
+
+    const percent = Number.isFinite(Number(percentSrc))
+      ? Math.max(0, Math.trunc(Number(percentSrc)))
+      : undefined;
+
+    const amount_cents = Number.isInteger(amountCentsSrc)
+      ? Math.max(0, amountCentsSrc)
+      : undefined;
+
+    // If nothing present, return undefined
+    if (!code && percent == null && amount_cents == null) return undefined;
+
+    return {
+      ...(code ? { code: String(code) } : {}),
+      ...(percent != null ? { percent } : {}),
+      ...(amount_cents != null ? { amount_cents } : {}),
+    };
+  })();
+
+  // Compute the display discount in cents (prefer amount_cents; else derive from percent)
+  let discountCents = 0;
+  if (normalizedDiscount) {
+    if (Number.isInteger(normalizedDiscount.amount_cents)) {
+      discountCents = Math.max(0, normalizedDiscount.amount_cents);
+    } else if (
+      Number.isFinite(Number(normalizedDiscount.percent)) &&
+      itemsTotalCents > 0
+    ) {
+      discountCents = Math.floor(
+        (itemsTotalCents * Math.trunc(Number(normalizedDiscount.percent))) / 100
+      );
+      // Safety cap
+      discountCents = Math.max(0, Math.min(discountCents, itemsTotalCents));
+    }
+  }
+  const hasDiscount = discountCents > 0;
+  const discountLabel = normalizedDiscount?.code
+    ? `Discount — ${escapeHtml(String(normalizedDiscount.code))}`
+    : "Discount";
+  const formattedDiscount = hasDiscount
+    ? formatMoneyHtml(discountCents, resolvedCurrency)
+    : null;
+
+  // We keep your total logic: prefer order.amount_total etc.
   const computedTotalCents = resolveOrderTotal({
     order,
     itemsTotalCents,
@@ -188,6 +272,10 @@ export function buildOtherCountrysTemplateEmail({
       (item) =>
         `    <li>${item.quantity} &times; ${escapeHtml(item.name)} &mdash; ${formatMoneyHtml(item.lineTotalCents, resolvedCurrency)}</li>`,
     ),
+    // Optional discount line
+    hasDiscount
+      ? `    <li>${escapeHtml(discountLabel)} &mdash; -${formattedDiscount}</li>`
+      : "",
     resolvedShippingCents > 0
       ? `    <li>Shipping &mdash; ${formattedShipping}</li>`
       : "",
@@ -250,6 +338,10 @@ export function buildOtherCountrysTemplateEmail({
       (item) =>
         `- ${item.quantity} x ${item.name} - ${formatMoneyPlain(item.lineTotalCents, resolvedCurrency)}`,
     ),
+    // Optional discount (text)
+    hasDiscount
+      ? `- ${discountLabel}: -${formatMoneyPlain(discountCents, resolvedCurrency)}`
+      : null,
     resolvedShippingCents > 0
       ? `- Shipping - ${formatMoneyPlain(resolvedShippingCents, resolvedCurrency)}`
       : "- Shipping - included",
@@ -284,7 +376,7 @@ export function buildOtherCountrysTemplateEmail({
     "Al Ziani",
     "IBOGENICS (R)",
     "Mobile (PT): +351 965 751 649",
-  ];
+  ].filter(Boolean);
 
   if (normalizedOrderId) {
     textLines.splice(3, 0, `Order ID: ${normalizedOrderId}`, "");

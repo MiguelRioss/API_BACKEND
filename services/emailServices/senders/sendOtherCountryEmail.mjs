@@ -34,13 +34,46 @@ export async function sendOtherCountryEmail({
       "Customer"
     : "Ibogenics Template Preview";
 
+  // 🔗 Normalize discount from metadata (supports both object and flat fields)
+  const metaDisc = order?.metadata?.discount && typeof order.metadata.discount === "object"
+    ? order.metadata.discount
+    : undefined;
+
+  const discount = (() => {
+    const code =
+      (metaDisc?.code ?? order?.metadata?.discount_code ?? undefined);
+    const percentSrc =
+      (metaDisc?.percent ?? order?.metadata?.discount_percent ?? undefined);
+    const amountCentsSrc =
+      (metaDisc?.amount_cents ?? order?.metadata?.discount_amount_cents ?? undefined);
+
+    const percent = Number.isFinite(Number(percentSrc))
+      ? Math.max(0, Math.trunc(Number(percentSrc)))
+      : undefined;
+
+    const amount_cents = Number.isInteger(amountCentsSrc)
+      ? Math.max(0, amountCentsSrc)
+      : undefined;
+
+    // Only pass if *something* is present
+    if (code || percent != null || amount_cents != null) {
+      return {
+        ...(code ? { code: String(code) } : {}),
+        ...(percent != null ? { percent } : {}),
+        ...(amount_cents != null ? { amount_cents } : {}),
+      };
+    }
+    return undefined;
+  })();
+
   const { subject, html } = buildOtherCountrysTemplateEmail({
     order,
     orderId,
+    // 👉 now the template can show a discount row if present
+    discount,
   });
 
- 
- //Ask
+  // Ask
   const bccEmail = normalizedLive
     ? normalizeEmail(process.env.OWNER_EMAIL)
     : undefined;

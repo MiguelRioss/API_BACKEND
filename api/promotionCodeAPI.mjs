@@ -9,6 +9,7 @@ export default function createPromotionCodeAPI(promotionCodeServices) {
     createPromoCode: handlerFactory(internalCreatePromoCode),
     getPromoCodes: handlerFactory(internalGetPromoCodes),
     updatePromoCode: handlerFactory(internalUpdatePromoCode),
+    validatePromocode: handlerFactory(internalValidatePromoCode),
   };
 
   async function internalCreatePromoCode(req, rsp) {
@@ -21,9 +22,15 @@ export default function createPromotionCodeAPI(promotionCodeServices) {
     return promotionCodeServices.getPromoCodes();
   }
   async function internalUpdatePromoCode(req, rsp) {
-    const body = req.body ;
+    const body = req.body;
     const id = req.params.id;
-    const changes = body.changes ;
-    return promotionCodeServices.updatePromoCode(id,changes);
+    const changes = body.changes;
+    return promotionCodeServices.updatePromoCode(id, changes);
+  }
+  async function internalValidatePromoCode(req, rsp) {
+    const body = req.body;
+    const code = body.code;
+    const discountPercent = body.discountPercent;
+    return promotionCodeServices.validatePromocode(code, discountPercent);
   }
 }

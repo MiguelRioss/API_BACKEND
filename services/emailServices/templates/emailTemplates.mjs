@@ -18,7 +18,9 @@ function escapeHtml(value) {
  * Falls back to a simple amount + currency text if Intl fails.
  */
 function formatMoney(amountCents = 0, currency = fallbackCurrency) {
-  const amount = Number.isFinite(Number(amountCents)) ? Number(amountCents) / 100 : 0;
+  const amount = Number.isFinite(Number(amountCents))
+    ? Number(amountCents) / 100
+    : 0;
   const upperCurrency = String(currency || fallbackCurrency).toUpperCase();
   try {
     return new Intl.NumberFormat("en-US", {
@@ -47,14 +49,19 @@ export function buildOrderInvoiceHtml({ order = {}, orderId } = {}) {
   const items = Array.isArray(order.items) ? order.items : [];
   const currency = String(order.currency || fallbackCurrency).toUpperCase();
   const invoiceNumber = escapeHtml(orderId ? `${orderId}` : "");
+
+  // ---- Shipping (cents) ----------------------------------------------------
   const rawShipping =
     order?.shipping_cost_cents ??
     order?.metadata?.shipping_cost_cents ??
     order?.metadata?.shipping_cost ??
     0;
-  const shippingCents = Number.isFinite(Number(rawShipping)) ? Number(rawShipping) : 0;
+  const shippingCents = Number.isFinite(Number(rawShipping))
+    ? Number(rawShipping)
+    : 0;
   const shippingAmount = formatMoney(shippingCents, currency);
 
+  // ---- Addresses -----------------------------------------------------------
   const shippingAddress = coalesceAddress(
     order?.metadata?.shipping_address,
     order?.shipping_address
@@ -64,17 +71,16 @@ export function buildOrderInvoiceHtml({ order = {}, orderId } = {}) {
     order?.billing_address
   );
 
-  // ✅ Fallback: inject metadata.phone into billing/shipping if missing
+  // Fallback phone/email into addresses (optional)
   if (order?.metadata?.phone) {
     if (!billingAddress.phone) billingAddress.phone = order.metadata.phone;
     if (!shippingAddress.phone) shippingAddress.phone = order.metadata.phone;
   }
-
-  // ✅ Fallback: inject order.email into billing/shipping if missing
   if (order?.email) {
     if (!billingAddress.email) billingAddress.email = order.email;
     if (!shippingAddress.email) shippingAddress.email = order.email;
   }
+
   const legacyAddress = coalesceAddress(order?.metadata?.address);
 
   const addressBlocks = buildAddressBlocks({
@@ -85,33 +91,112 @@ export function buildOrderInvoiceHtml({ order = {}, orderId } = {}) {
     billingSameFlag: order?.metadata?.billing_same_as_shipping,
   });
 
+  // ---- Items markup + merchandise subtotal ---------------------------------
+  let merchandiseSubtotalCents = 0;
   const itemsMarkup = items.length
     ? items
-      .map((item) => {
-        const qty = Number(item.quantity) || 1;
-        const itemTotal = Number(item.unit_amount || 0) * qty;
-        const maybeQty = qty > 1 ? ` <span style="color:#666;">(x${qty})</span>` : "";
-        return `
+        .map((item) => {
+          const qty = Math.max(1, Number(item.quantity) || 1);
+          const unit = Math.max(0, Number(item.unit_amount) || 0);
+          const lineTotal = qty * unit;
+          merchandiseSubtotalCents += lineTotal;
+          const maybeQty =
+            qty > 1 ? ` <span style="color:#666;">(x${qty})</span>` : "";
+          return `
             <li>
-              <span class="item-name">${escapeHtml(item.name || "Item")}${maybeQty}</span>
-              <span class="item-amount">${formatMoney(itemTotal, currency)}</span>
+              <span class="item-name">${escapeHtml(
+                item.name || "Item"
+              )}${maybeQty}</span>
+              <span class="item-amount">${formatMoney(
+                lineTotal,
+                currency
+              )}</span>
             </li>
           `;
-      })
-      .join("")
+        })
+        .join("")
     : `
       <li>
         <span class="item-name">Order summary</span>
-        <span class="item-amount">${formatMoney(order.amount_total || 0, currency)}</span>
+        <span class="item-amount">${formatMoney(
+          order.amount_total || 0,
+          currency
+        )}</span>
       </li>
     `;
 
+  // ---- Discount (from metadata) --------------------------------------------
+  // Supports: { code, value } where value = percent,
+  // or { code, percent }, or { amount_cents } fallback.
+  const disc =
+    order?.metadata?.discount && typeof order.metadata.discount === "object"
+      ? order.metadata.discount
+      : null;
+
+  const discountCode =
+    typeof disc?.code === "string" && disc.code.trim() ? disc.code.trim() : "";
+
+  // prefer value (percent), then percent; clamp 0..100
+  const percentRaw = disc?.value ?? disc?.percent;
+  const percent = Number.isFinite(Number(percentRaw))
+    ? Math.max(0, Math.min(100, Math.trunc(Number(percentRaw))))
+    : null;
+
+  // compute from percent on MERCH only; else fallback to amount_cents; else derive from totals
+  let discountCents = 0;
+  if (percent && merchandiseSubtotalCents > 0) {
+    discountCents = Math.floor((merchandiseSubtotalCents * percent) / 100);
+  } else if (Number.isInteger(disc?.amount_cents) && disc.amount_cents > 0) {
+    discountCents = disc.amount_cents;
+  } else if (
+    Number.isInteger(order?.amount_total) &&
+    (merchandiseSubtotalCents || shippingCents)
+  ) {
+    // derive if needed (tolerate rounding)
+    const derived =
+      merchandiseSubtotalCents + shippingCents - order.amount_total;
+    if (Number.isFinite(derived) && derived > 0)
+      discountCents = Math.trunc(derived);
+  }
+  // safety caps
+  discountCents = Math.max(
+    0,
+    Math.min(discountCents, merchandiseSubtotalCents)
+  );
+
+  // Build optional discount line
+  const discountLineMarkup =
+    discountCents > 0
+      ? `
+      <li class="summary-line">
+        <span class="item-name">
+          Discount${
+            discountCode
+              ? ` (${escapeHtml(discountCode)})`
+              : percent
+              ? ` (${percent}% )`
+              : ""
+          }
+        </span>
+        <span class="item-amount">-${formatMoney(
+          discountCents,
+          currency
+        )}</span>
+      </li>`
+      : "";
+
+  // ---- Shipping line --------------------------------------------------------
   const shippingLineMarkup = `
       <li class="summary-line">
         <span class="item-name">Shipping</span>
         <span class="item-amount">${shippingAmount}</span>
       </li>
     `;
+
+  // ---- Total (use server-computed amount_total) ----------------------------
+  const finalTotalCents = Number.isInteger(order.amount_total)
+    ? order.amount_total
+    : Math.max(0, merchandiseSubtotalCents + shippingCents - discountCents);
 
   return `
     <section class="details">
@@ -122,12 +207,13 @@ export function buildOrderInvoiceHtml({ order = {}, orderId } = {}) {
 
     <ul class="line-items">
       ${itemsMarkup}
+      ${discountLineMarkup}
       ${shippingLineMarkup}
     </ul>
 
     <div class="total">
       <span>Total</span>
-      <span>${formatMoney(order.amount_total || 0, currency)}</span>
+      <span>${formatMoney(finalTotalCents, currency)}</span>
     </div>
   `;
 }
@@ -136,7 +222,13 @@ export default {
   buildOrderInvoiceHtml,
 };
 
-function buildAddressBlocks({ shipping, billing, fallback, customerName, billingSameFlag }) {
+function buildAddressBlocks({
+  shipping,
+  billing,
+  fallback,
+  customerName,
+  billingSameFlag,
+}) {
   const shippingHas = hasAddress(shipping);
   const billingHas = hasAddress(billing);
   const fallbackHas = hasAddress(fallback);
@@ -192,13 +284,19 @@ function buildAddressBlocks({ shipping, billing, fallback, customerName, billing
   }
 
   const blocks = sections
-    .map(({ label, address }) => renderAddressBlock(label, address, seenContacts))
+    .map(({ label, address }) =>
+      renderAddressBlock(label, address, seenContacts)
+    )
     .join("");
 
   return `<div class="addresses">${blocks}</div>`;
 }
 
-function renderAddressBlock(label, address = {}, seenContacts = createSeenContacts()) {
+function renderAddressBlock(
+  label,
+  address = {},
+  seenContacts = createSeenContacts()
+) {
   const safeLabel = escapeHtml(label);
   const lines = Array.isArray(address.lines)
     ? address.lines
@@ -236,7 +334,9 @@ function buildAddressLines(address = {}, seenContacts = createSeenContacts()) {
   if (normalizedPhone) {
     const phoneKey = normalizedPhone.replace(/\s+/g, "");
     if (!seenContacts.phones.has(phoneKey)) {
-      lines.push(`<span style="color:#666;">Phone: ${escapeHtml(normalizedPhone)}</span>`);
+      lines.push(
+        `<span style="color:#666;">Phone: ${escapeHtml(normalizedPhone)}</span>`
+      );
       seenContacts.phones.add(phoneKey);
     }
   }
@@ -245,14 +345,17 @@ function buildAddressLines(address = {}, seenContacts = createSeenContacts()) {
   const normalizedEmail = normalizedEmailRaw.toLowerCase();
   if (normalizedEmail) {
     if (!seenContacts.emails.has(normalizedEmail)) {
-      lines.push(`<span style="color:#666;">Email: ${escapeHtml(normalizedEmailRaw)}</span>`);
+      lines.push(
+        `<span style="color:#666;">Email: ${escapeHtml(
+          normalizedEmailRaw
+        )}</span>`
+      );
       seenContacts.emails.add(normalizedEmail);
     }
   }
 
   return lines.length ? lines : [escapeHtml(address.fallback || "")];
 }
-
 
 function hasAddress(address) {
   if (!address) return false;
@@ -264,8 +367,19 @@ function hasAddress(address) {
 }
 
 function addressesEqual(a = {}, b = {}) {
-  const keys = ["name", "line1", "line2", "city", "state", "postal_code", "country", "phone"];
-  return keys.every((key) => normalizeString(a[key]) === normalizeString(b[key]));
+  const keys = [
+    "name",
+    "line1",
+    "line2",
+    "city",
+    "state",
+    "postal_code",
+    "country",
+    "phone",
+  ];
+  return keys.every(
+    (key) => normalizeString(a[key]) === normalizeString(b[key])
+  );
 }
 
 function withFallbackName(address = {}, fallbackName = "") {

@@ -1,6 +1,5 @@
 ﻿// api/services/ordersServiceFactory.mjs
-const DEFAULT_SUCCESS_URL =
-  `${process.env.PUBLIC_BASE_URL}/checkout/orderSuccess`;
+const DEFAULT_SUCCESS_URL = `${process.env.PUBLIC_BASE_URL}/checkout/orderSuccess`;
 
 import errors from "../../errors/errors.mjs";
 import {
@@ -20,8 +19,10 @@ import buildManualOrderFromCart from "./orderServicesUtils.mjs";
 // ─────────────────────────────────────────────
 const ALLOWED_FOLDERS = new Set(["orders", "archive", "deleted"]);
 function normalizeFolderName(raw) {
-  const v = String(raw || "").trim().toLowerCase();
-  if (v === "archived") return "archive";           // accept synonym
+  const v = String(raw || "")
+    .trim()
+    .toLowerCase();
+  if (v === "archived") return "archive"; // accept synonym
   if (ALLOWED_FOLDERS.has(v)) return v;
   return null;
 }
@@ -38,15 +39,24 @@ function assertFolderName(raw, what = "folder") {
 /**
  * createOrdersService(db, stripeServices, emailService, stockServices)
  */
-export default function createOrdersService(db, stripeServices, emailService, stockServices) {
+export default function createOrdersService(
+  db,
+  stripeServices,
+  emailService,
+  stockServices
+) {
   if (!db || typeof db.createOrderDB !== "function") {
-    return errors.externalService("OrdersService requires a db with createOrderDB()");
+    return errors.externalService(
+      "OrdersService requires a db with createOrderDB()"
+    );
   }
   if (!stripeServices) {
     return errors.internalError("OrdersService requires a stripeServices");
   }
   if (!emailService) {
-    return errors.internalError("[ordersService] emailService missing or invalid; invoice emails disabled.");
+    return errors.internalError(
+      "[ordersService] emailService missing or invalid; invoice emails disabled."
+    );
   }
 
   return {
@@ -82,18 +92,24 @@ export default function createOrdersService(db, stripeServices, emailService, st
   async function getOrdersByFolderService(folderName) {
     const folder = assertFolderName(folderName, "folder name");
     if (typeof db.getAllOrdersByFolder !== "function") {
-      throw errors.externalService("DB adapter missing getOrdersByFolder(folder)");
+      throw errors.externalService(
+        "DB adapter missing getOrdersByFolder(folder)"
+      );
     }
     return db.getAllOrdersByFolder(folder);
   }
 
   async function getOrderByStripeSessionId(sessionId) {
     if (sessionId === null || typeof sessionId === "undefined") {
-      return Promise.reject(errors.invalidData("You must provide a Stripe session id."));
+      return Promise.reject(
+        errors.invalidData("You must provide a Stripe session id.")
+      );
     }
     const normalized = normalizeId(sessionId);
     if (!normalized) {
-      return Promise.reject(errors.invalidData("Stripe session id cannot be empty."));
+      return Promise.reject(
+        errors.invalidData("Stripe session id cannot be empty.")
+      );
     }
     if (typeof db.getOrderByStripeSessionId === "function") {
       return db.getOrderByStripeSessionId(normalized);
@@ -120,8 +136,22 @@ export default function createOrdersService(db, stripeServices, emailService, st
     }
 
     const stripeAllowed = [
-      "PT","PORTUGAL","DE","GERMANY","NL","NETHERLANDS","MX","MEXICO",
-      "CA","CANADA","AU","AUSTRALIA","NZ","NEW ZEALAND","ZA","SOUTH AFRICA"
+      "PT",
+      "PORTUGAL",
+      "DE",
+      "GERMANY",
+      "NL",
+      "NETHERLANDS",
+      "MX",
+      "MEXICO",
+      "CA",
+      "CANADA",
+      "AU",
+      "AUSTRALIA",
+      "NZ",
+      "NEW ZEALAND",
+      "ZA",
+      "SOUTH AFRICA",
     ];
 
     const normalizedCountry = (country || "").trim().toUpperCase();
@@ -159,7 +189,9 @@ export default function createOrdersService(db, stripeServices, emailService, st
     const saved = await db.createOrderDB(prepared);
 
     if (!emailService) {
-      console.warn("[ordersService] No email service available, skipping emails.");
+      console.warn(
+        "[ordersService] No email service available, skipping emails."
+      );
       return saved;
     }
 
@@ -177,7 +209,10 @@ export default function createOrdersService(db, stripeServices, emailService, st
           payment_status: false,
         };
       } else {
-        await emailService.sendOrderBundleEmails({ order: saved, orderId: saved.id });
+        await emailService.sendOrderBundleEmails({
+          order: saved,
+          orderId: saved.id,
+        });
         flagged = {
           ...saved,
           email_Sent_ThankYou_Admin: true,
@@ -189,13 +224,19 @@ export default function createOrdersService(db, stripeServices, emailService, st
         try {
           await db.updateOrderDB(saved.id, flagged);
         } catch (updateErr) {
-          console.warn("[ordersService] Failed to persist flag updates:", updateErr?.message || updateErr);
+          console.warn(
+            "[ordersService] Failed to persist flag updates:",
+            updateErr?.message || updateErr
+          );
         }
       }
 
       return flagged;
     } catch (err) {
-      console.error("[ordersService] Failed to send order emails:", err?.message || err);
+      console.error(
+        "[ordersService] Failed to send order emails:",
+        err?.message || err
+      );
       return saved;
     }
   }
@@ -222,10 +263,15 @@ export default function createOrdersService(db, stripeServices, emailService, st
     }
 
     const fromFolder = assertFolderName(source, "source folder");
-    const toFolder   = assertFolderName(dest,   "destination folder");
+    const toFolder = assertFolderName(dest, "destination folder");
 
     if (fromFolder === toFolder) {
-      return { moved: 0, skipped: [...ids], source: fromFolder, dest: toFolder };
+      return {
+        moved: 0,
+        skipped: [...ids],
+        source: fromFolder,
+        dest: toFolder,
+      };
     }
 
     // Prefer bulk DB op if present; else fall back to single
@@ -237,7 +283,7 @@ export default function createOrdersService(db, stripeServices, emailService, st
       const results = await Promise.allSettled(
         ids.map((id) => db.moveOrderBetweenFolders(id, fromFolder, toFolder))
       );
-      const moved = results.filter(r => r.status === "fulfilled").length;
+      const moved = results.filter((r) => r.status === "fulfilled").length;
       const skipped = results
         .map((r, i) => (r.status === "fulfilled" ? null : ids[i]))
         .filter(Boolean);

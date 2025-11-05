@@ -40,34 +40,18 @@ export default function prepareCheckOut(body = {}) {
       ? customer.notes
       : undefined;
 
-  // ── NEW: Discount extraction (supports flat and nested shapes) ──────────────
-  const incomingDiscount =
-    (body.discount && typeof body.discount === "object" && body.discount) || {};
+  // ── Safe discount extraction ───────────────────────────────────────────────
+  const disc = body && typeof body.discount === "object" ? body.discount : null;
+  const rawCode = disc?.code;
+  const rawVal = disc?.value;
 
-  const discountCode = body.discountCode;
-
-  const rawDiscountAmountCents = body.discountAmountCents;
-
-  const discountAmountCents = Number.isFinite(Number(rawDiscountAmountCents))
-    ? Number(rawDiscountAmountCents)
-    : null;
-
-  const rawDiscountPercent = body.discountPercent;
-
-  const discountPercent = Number.isFinite(Number(rawDiscountPercent))
-    ? Number(rawDiscountPercent)
-    : null;
-
-  const discount =
-    discountCode != null &&
-    discountAmountCents != null &&
-    discountPercent != null
-      ? {
-          code: discountCode,
-          amountCents: discountAmountCents,
-          percent: discountPercent,
-        }
-      : null;
+  let discount = null;
+  if (rawCode && Number.isFinite(Number(rawVal)) && Number(rawVal) > 0) {
+    discount = {
+      code: String(rawCode).trim().toUpperCase(), // or keep case if you prefer
+      value: Math.trunc(Number(rawVal)), // percent
+    };
+  }
 
   return {
     items,
@@ -78,11 +62,6 @@ export default function prepareCheckOut(body = {}) {
     billingSameAsShipping,
     shippingCostCents,
     notes,
-
-    // ── Added fields ──
-    discount, // { code, amountCents, percent } or null
-    discountCode: discountCode ,
-    discountAmountCents: discountAmountCents,
-    // (percent also available inside `discount` if you want it on the service layer)
+    discount, // null when not provided/invalid
   };
 }

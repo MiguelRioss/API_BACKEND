@@ -22,11 +22,8 @@ export default async function buildManualOrderFromCart({
   paymentId,
   catalog,
 
-  // NEW: discount can come nested or flat
+  // NOW: discount only as { code, value } where value is percent
   discount,
-  discountCode,
-  discountAmountCents,
-  discountPercent,
 } = {}) {
   if (!Array.isArray(items) || items.length === 0)
     throw errors.invalidData("No items in payload");
@@ -49,11 +46,8 @@ export default async function buildManualOrderFromCart({
     currency,
     paymentId,
 
-    // pass through discount inputs
+    // pass through discount
     discount,
-    discountCode,
-    discountAmountCents,
-    discountPercent,
   });
 }
 
@@ -70,11 +64,8 @@ export function buildManualOrderPayload({
   currency = "eur",
   paymentId,
 
-  // NEW: discount inputs
+  // NOW: discount only as { code, value } where value is percent
   discount,
-  discountCode,
-  discountAmountCents,
-  discountPercent,
 } = {}) {
   if (!Array.isArray(catalog) || catalog.length === 0) {
     throw errors.internalError("Product catalog unavailable for manual checkout");
@@ -83,31 +74,12 @@ export function buildManualOrderPayload({
     throw errors.invalidData("No items in payload");
   }
 
-  // ---------- Normalize discount (handles nested or flat) ----------
-  const incomingDiscount =
-    (discount && typeof discount === "object" && discount) || {};
-
-  const code =
-    pickNonEmpty(
-      discountCode,
-      incomingDiscount.code,
-      incomingDiscount.label
-    ) ?? null;
-
-  const rawAmountCents =
-    pickNonEmpty(
-      discountAmountCents,
-      incomingDiscount.amountCents,
-      incomingDiscount.amount_cents
-    );
-  const amountCents = Number.isFinite(Number(rawAmountCents))
-    ? Math.max(0, Math.trunc(Number(rawAmountCents)))
-    : 0;
-
-  const rawPercent =
-    pickNonEmpty(discountPercent, incomingDiscount.percent);
-  const percent =
-    Number.isFinite(Number(rawPercent)) ? Math.max(0, Math.trunc(Number(rawPercent))) : null;
+  // ---------- Normalize discount ({ code, value } = percent) ----------
+  const disc = (discount && typeof discount === "object") ? discount : null;
+  const code = typeof disc?.code === "string" ? disc.code : null;
+  const percent = Number.isFinite(Number(disc?.value))
+    ? Math.max(0, Math.trunc(Number(disc.value)))
+    : null;
 
   // ---------- Addresses / customer ----------
   const byId = new Map(catalog.map((product) => [String(product.id), product]));
@@ -177,13 +149,18 @@ export function buildManualOrderPayload({
     });
   }
 
-  // ---------- Totals (apply discount) ----------
-  const preDiscountTotal = itemsTotalCents + shippingCost;
+  // ---------- Totals (apply percent to MERCHANDISE ONLY) ----------
+  const merchandiseTotal = itemsTotalCents;          // products only
+  const preDiscountTotal = itemsTotalCents + shippingCost; // products + shipping
 
-  // Cap discount so we never go below zero
-  const appliedDiscountCents = Math.min(amountCents, Math.max(0, preDiscountTotal));
+  let appliedDiscountCents = 0;
+  if (percent && percent > 0 && merchandiseTotal > 0) {
+    appliedDiscountCents = Math.floor((merchandiseTotal * percent) / 100);
+    // safety cap so we never exceed merchandise
+    appliedDiscountCents = Math.max(0, Math.min(appliedDiscountCents, merchandiseTotal));
+  }
+
   const amountTotal = Math.max(0, preDiscountTotal - appliedDiscountCents);
-
   const currencyNorm = sanitizeString(currency).toLowerCase() || "eur";
 
   // ---------- Metadata ----------
@@ -197,14 +174,14 @@ export function buildManualOrderPayload({
 
   if (notes) metadata.notes = sanitizeString(notes);
 
-  // Add discount to metadata for Stripe / backoffice visibility
+  // Discount audit info
   metadata.discount = {
     code: code ?? null,
     amount_cents: appliedDiscountCents,
     percent: percent ?? null,
-    // Optional: record pre/post numbers for auditing
     pre_discount_total_cents: preDiscountTotal,
     final_total_cents: amountTotal,
+    merchandise_total_cents: merchandiseTotal,
   };
 
   const resolvedPaymentId =
@@ -224,7 +201,7 @@ export function buildManualOrderPayload({
     metadata,
     payment_type: PAYMENT_TYPE.MANUAL,
 
-    // Optional top-level mirrors (handy for queries/exports)
+    // mirrors for convenience
     discount_code: code ?? null,
     discount_amount_cents: appliedDiscountCents,
     discount_percent: percent ?? null,

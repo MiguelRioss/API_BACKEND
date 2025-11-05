@@ -2,11 +2,12 @@
 import { randomUUID } from "node:crypto";
 import errors from "../errors/errors.mjs";
 import { PAYMENT_TYPE } from "./commonUtils.mjs";
-import { makeDefaultStatus, assertValidStatusKey } from "./orderServices/orderStatus.mjs";
-
+import {
+  makeDefaultStatus,
+  assertValidStatusKey,
+} from "./orderServices/orderStatus.mjs";
 
 const allowedCurrencies = new Set(["eur", "usd", "gbp"]);
-
 
 /*───────────────────────────────────────────────*/
 /*  BASIC UTILITIES                              */
@@ -15,7 +16,9 @@ const allowedCurrencies = new Set(["eur", "usd", "gbp"]);
 export async function validateAndNormalizeID(id) {
   if (id === null || typeof id === "undefined") {
     return Promise.reject(
-      errors.invalidData(`To create an Order you must provide a valid id, not ${id}`)
+      errors.invalidData(
+        `To create an Order you must provide a valid id, not ${id}`
+      )
     );
   }
 
@@ -70,11 +73,11 @@ export function findOrderBySessionId(ordersArray, sessionId) {
     return null;
   }
 
-
   return (
-    ordersArray.find((order) =>
-      candidateMatches(order?.session_id, needle) ||
-      candidateMatches(order?.metadata?.stripe_session_id, needle)
+    ordersArray.find(
+      (order) =>
+        candidateMatches(order?.session_id, needle) ||
+        candidateMatches(order?.metadata?.stripe_session_id, needle)
     ) || null
   );
 }
@@ -82,7 +85,9 @@ export function findOrderBySessionId(ordersArray, sessionId) {
 export function filterByStatus(orders = [], status) {
   if (typeof status === "undefined") return orders;
   const want =
-    typeof status === "boolean" ? status : String(status).toLowerCase() === "true";
+    typeof status === "boolean"
+      ? status
+      : String(status).toLowerCase() === "true";
   return orders.filter((o) => Boolean(o.status) === want);
 }
 
@@ -102,7 +107,9 @@ export function filterByQuery(orders = [], q) {
       o?.metadata?.shipping_address?.postal_code,
       o?.metadata?.billing_address?.line1,
     ];
-    return fields.some((f) => (f ? String(f).toLowerCase().includes(needle) : false));
+    return fields.some((f) =>
+      f ? String(f).toLowerCase().includes(needle) : false
+    );
   });
 }
 
@@ -129,9 +136,9 @@ export function applyLimit(orders = [], limit) {
 function normalizeAddress(addr = {}) {
   if (typeof addr !== "object" || Array.isArray(addr)) return {};
   return {
-    name: (addr.name).trim(),
-    phone: (addr.phone).trim(),
-    line1: (addr.line1).trim(),
+    name: (addr.name ?? "").trim(),
+    phone: (addr.phone ?? "").trim(),
+    line1: (addr.line1 ?? "").trim(),
     line2: (addr.line2 ?? "").trim(),
     city: (addr.city ?? "").trim(),
     postal_code: (addr.postal_code ?? "").trim(),
@@ -141,16 +148,14 @@ function normalizeAddress(addr = {}) {
 
 /**
  * Validates and normalizes an array of order items.
- * Includes verification that item totals + shipping cost = amount_total.
+ * Returns both normalized items and the MERCHANDISE subtotal (in cents).
  *
  * @param {Object[]} items - Array of raw items.
- * @param {number} amount_total - Declared total (in cents).
- * @param {number} shippingCents - Shipping cost in cents.
- * @returns {Object[]} Normalized items.
- * @throws {ValidationError} If any item is invalid or totals mismatch.
+ * @returns {{ normItems: Object[], merchandiseTotalCents: number }}
+ * @throws {ValidationError} If any item is invalid.
  */
-function validateItemsArray(items, amount_total, shippingCents = 0) {
-  let computedTotal = 0;
+function validateItemsArray(items) {
+  let merchandiseTotalCents = 0;
 
   const normItems = items.map((it, idx) => {
     if (!it || typeof it !== "object") {
@@ -158,15 +163,22 @@ function validateItemsArray(items, amount_total, shippingCents = 0) {
     }
 
     const { id, name, quantity, unit_amount } = it;
-    let normalizedID = Number(id)
+
+    const normalizedID = Number(id);
     if (!Number.isInteger(normalizedID)) {
-      throw errors.invalidData(`Order.items[${idx}].id must be a positive integer.`);
+      throw errors.invalidData(
+        `Order.items[${idx}].id must be a positive integer.`
+      );
     }
     if (typeof name !== "string" || name.trim() === "") {
-      throw errors.invalidData(`Order.items[${idx}].name must be a non-empty string.`);
+      throw errors.invalidData(
+        `Order.items[${idx}].name must be a non-empty string.`
+      );
     }
     if (!Number.isInteger(quantity) || quantity <= 0) {
-      throw errors.invalidData(`Order.items[${idx}].quantity must be a positive integer.`);
+      throw errors.invalidData(
+        `Order.items[${idx}].quantity must be a positive integer.`
+      );
     }
     if (!Number.isInteger(unit_amount) || unit_amount < 0) {
       throw errors.invalidData(
@@ -174,22 +186,13 @@ function validateItemsArray(items, amount_total, shippingCents = 0) {
       );
     }
 
-    computedTotal += quantity * unit_amount;
+    merchandiseTotalCents += quantity * unit_amount;
 
     return { id: normalizedID, name: name.trim(), quantity, unit_amount };
   });
 
-  const expectedTotal = computedTotal + shippingCents;
-
-  if (expectedTotal !== amount_total) {
-    throw errors.invalidData(
-      `Order.amount_total (${amount_total}) does not match items total + shipping (${shippingCents}).`
-    );
-  }
-
-  return normItems;
+  return { normItems, merchandiseTotalCents };
 }
-
 
 /*───────────────────────────────────────────────*/
 /*  METADATA VALIDATION (Unified w/ Stripe)      */
@@ -197,8 +200,7 @@ function validateItemsArray(items, amount_total, shippingCents = 0) {
 
 /**
  * Validates and normalizes order metadata.
- * Strict mode — will REJECT legacy flat metadata (addr_city, addr_line1, etc.)
- * Only accepts objects containing nested shipping_address and billing_address.
+ * Strict mode — requires nested shipping_address and billing_address.
  *
  * @param {Object} meta - Raw metadata input.
  * @returns {Object} Normalized metadata object.
@@ -224,14 +226,40 @@ function validateMetadata(meta) {
   const shipping_address = normalizeAddress(meta.shipping_address);
   const billing_address = normalizeAddress(meta.billing_address);
 
-  // Validate core metadata fields (strict
-
   const billing_same_as_shipping = !!meta.billing_same_as_shipping;
 
   // Shipping cost validation
   const shipping_cost_cents = Number(meta.shipping_cost_cents);
   if (!Number.isInteger(shipping_cost_cents) || shipping_cost_cents < 0) {
-    throw errors.invalidData("shipping_cost_cents must be a non-negative integer.");
+    throw errors.invalidData(
+      "shipping_cost_cents must be a non-negative integer."
+    );
+  }
+
+  // ✅ Preserve (and lightly normalize) discount if present
+  let discount = undefined;
+  if (meta.discount && typeof meta.discount === "object") {
+    const raw = meta.discount;
+    const code =
+      typeof raw.code === "string" ? raw.code.trim() : undefined;
+
+    // accept either `value` or `percent`
+    const percentSrc =
+      raw.value ?? raw.percent ?? raw.discountPercent ?? undefined;
+    const percent = Number.isFinite(Number(percentSrc))
+      ? Math.max(0, Math.trunc(Number(percentSrc)))
+      : undefined;
+
+    const amount_cents =
+      Number.isInteger(raw.amount_cents) && raw.amount_cents >= 0
+        ? raw.amount_cents
+        : undefined;
+
+    discount = {
+      ...(code ? { code } : {}),
+      ...(percent != null ? { percent } : {}),
+      ...(amount_cents != null ? { amount_cents } : {}),
+    };
   }
 
   return {
@@ -240,23 +268,28 @@ function validateMetadata(meta) {
     shipping_address,
     billing_address,
     stripe_session_id:
-      typeof meta.stripe_session_id === "string" || typeof meta.stripe_session_id === "number"
+      typeof meta.stripe_session_id === "string" ||
+      typeof meta.stripe_session_id === "number"
         ? normalizeId(meta.stripe_session_id)
         : "",
     client_reference_id:
-      typeof meta.client_reference_id === "string" || typeof meta.client_reference_id === "number"
+      typeof meta.client_reference_id === "string" ||
+      typeof meta.client_reference_id === "number"
         ? normalizeId(meta.client_reference_id)
         : "",
+    ...(discount ? { discount } : {}),
   };
 }
-
-
 
 /*───────────────────────────────────────────────*/
 /*  STATUS MANAGEMENT                            */
 /*───────────────────────────────────────────────*/
 
-export function updateOrderStatus(currentStatus, key, { status, date = null, time = null }) {
+export function updateOrderStatus(
+  currentStatus,
+  key,
+  { status, date = null, time = null }
+) {
   assertValidStatusKey(key);
   if (typeof status !== "boolean") {
     throw errors.invalidData("status must be boolean");
@@ -267,7 +300,6 @@ export function updateOrderStatus(currentStatus, key, { status, date = null, tim
   };
 }
 
-
 /*───────────────────────────────────────────────*/
 /*  MAIN ORDER VALIDATOR                         */
 /*───────────────────────────────────────────────*/
@@ -277,7 +309,6 @@ export function updateOrderStatus(currentStatus, key, { status, date = null, tim
  * Includes shipping cost validation and full metadata checks.
  */
 export async function validateAndPrepareOrder(order, options = {}) {
-
   const { isRequestedOrderForOtherCountries = false } = options;
 
   if (!order || typeof order !== "object" || Array.isArray(order)) {
@@ -286,22 +317,38 @@ export async function validateAndPrepareOrder(order, options = {}) {
     );
   }
 
-  const { name, email, phone, amount_total, currency, items, metadata, payment_status } = order;
-  const shippingCents =
-    Number(order.shipping_cost_cents ??
-      order.metadata?.shipping_cost_cents ??
-      0);
+  const {
+    name,
+    email,
+    phone,
+    amount_total,
+    currency,
+    items,
+    metadata,
+    payment_status,
+  } = order;
+
+  const shippingCents = Number(
+    order.shipping_cost_cents ?? order.metadata?.shipping_cost_cents ?? 0
+  );
+
   // --- Basic fields ---
   if (typeof name !== "string" || name.trim() === "") {
-    return Promise.reject(errors.invalidData("Missing or invalid customer name."));
+    return Promise.reject(
+      errors.invalidData("Missing or invalid customer name.")
+    );
   }
 
   if (typeof email !== "string" || email.trim() === "") {
-    return Promise.reject(errors.invalidData("Missing or invalid customer email."));
+    return Promise.reject(
+      errors.invalidData("Missing or invalid customer email.")
+    );
   }
 
   if (typeof phone !== "string" || phone.trim() === "") {
-    return Promise.reject(errors.invalidData("Missing or invalid customer phone."));
+    return Promise.reject(
+      errors.invalidData("Missing or invalid customer phone.")
+    );
   }
 
   const emailTrimmed = email.trim().toLowerCase();
@@ -311,21 +358,31 @@ export async function validateAndPrepareOrder(order, options = {}) {
 
   // --- Amount and currency ---
   if (!Number.isInteger(amount_total) || amount_total < 0) {
-    return Promise.reject(errors.invalidData("amount_total must be a positive integer (in cents)."));
+    return Promise.reject(
+      errors.invalidData("amount_total must be a positive integer (in cents).")
+    );
   }
 
   if (shippingCents < 0) {
-    return Promise.reject(errors.invalidData("shippingCostCents must be a non-negative integer (in cents)."));
+    return Promise.reject(
+      errors.invalidData(
+        "shippingCostCents must be a non-negative integer (in cents)."
+      )
+    );
   }
 
   if (amount_total < shippingCents) {
     return Promise.reject(
-      errors.invalidData("amount_total must be greater than or equal to shippingCostCents.")
+      errors.invalidData(
+        "amount_total must be greater than or equal to shippingCostCents."
+      )
     );
   }
 
   if (!Array.isArray(items) || items.length === 0) {
-    return Promise.reject(errors.invalidData("You did not Introduce a valid array for items."));
+    return Promise.reject(
+      errors.invalidData("You did not Introduce a valid array for items.")
+    );
   }
 
   if (typeof currency !== "string" || currency.trim() === "") {
@@ -334,7 +391,9 @@ export async function validateAndPrepareOrder(order, options = {}) {
 
   const currencyNorm = currency.trim().toLowerCase();
   if (!allowedCurrencies.has(currencyNorm)) {
-    return Promise.reject(errors.invalidData(`Unsupported currency: ${currencyNorm}`));
+    return Promise.reject(
+      errors.invalidData(`Unsupported currency: ${currencyNorm}`)
+    );
   }
 
   const resolvedPaymentId = order.payment_id;
@@ -342,39 +401,151 @@ export async function validateAndPrepareOrder(order, options = {}) {
   if (!resolvedPaymentId)
     return Promise.reject(errors.invalidData("No payment ID"));
 
-  const rawPaymentType = typeof order.payment_type === "string" ? order.payment_type.trim().toUpperCase() : "";
-  // ──────────────────────────────
-  // Payment logic: Stripe vs Manual
-  // ──────────────────────────────
+  const rawPaymentType =
+    typeof order.payment_type === "string"
+      ? order.payment_type.trim().toUpperCase()
+      : "";
 
   // Detect if order originated from Stripe
   const hasStripeSession =
     Boolean(order.session_id) ||
     Boolean(order.metadata?.stripe_session_id) ||
-    (typeof order.payment_type === "string" && order.payment_type.trim().toUpperCase() === PAYMENT_TYPE.STRIPE);
+    (typeof order.payment_type === "string" &&
+      order.payment_type.trim().toUpperCase() === PAYMENT_TYPE.STRIPE);
 
   // Explicit rule: Stripe if it looks like Stripe, otherwise Manual
-  const normalizedPaymentType = hasStripeSession ? PAYMENT_TYPE.STRIPE : PAYMENT_TYPE.MANUAL;
+  const normalizedPaymentType = hasStripeSession
+    ? PAYMENT_TYPE.STRIPE
+    : PAYMENT_TYPE.MANUAL;
 
   // Paid automatically if Stripe, otherwise unpaid
-  const paymentStatusNormalized = isRequestedOrderForOtherCountries ? false : true;
-
+  const paymentStatusNormalized = isRequestedOrderForOtherCountries
+    ? false
+    : true;
 
   if (typeof paymentStatusNormalized !== "boolean") {
-    return Promise.reject(errors.invalidData("Missing or invalid payment status."));
+    return Promise.reject(
+      errors.invalidData("Missing or invalid payment status.")
+    );
   }
 
   // --- Validate items & metadata ---
-  const normItems = validateItemsArray(items, amount_total, shippingCents);
+  const { normItems, merchandiseTotalCents } = validateItemsArray(items);
   const normMetadata = validateMetadata(metadata);
+
+  // ───────────────────────────────────────────────────────────────
+  // Discount math validation (merchandise-only discount, not shipping)
+  // ───────────────────────────────────────────────────────────────
+  const disc =
+    normMetadata && typeof normMetadata.discount === "object"
+      ? normMetadata.discount
+      : null;
+
+  // Basic guards
+  if (merchandiseTotalCents < 0) {
+    return Promise.reject(errors.invalidData("Invalid merchandise total."));
+  }
+  if (shippingCents > amount_total) {
+    return Promise.reject(
+      errors.invalidData("amount_total cannot be less than shipping.")
+    );
+  }
+
+  let expectedDiscountCents = 0;
+
+  if (disc) {
+    // Validate types/ranges (code is optional but must be a string if present)
+    if (typeof disc.code !== "undefined" && typeof disc.code !== "string") {
+      return Promise.reject(
+        errors.invalidData("discount.code must be a string when provided.")
+      );
+    }
+    if (typeof disc.percent !== "undefined") {
+      const p = Number(disc.percent);
+      if (!Number.isFinite(p) || p < 0 || p > 100) {
+        return Promise.reject(
+          errors.invalidData(
+            "discount.percent must be a number between 0 and 100."
+          )
+        );
+      }
+    }
+    if (typeof disc.amount_cents !== "undefined") {
+      const a = Number(disc.amount_cents);
+      if (!Number.isInteger(a) || a < 0) {
+        return Promise.reject(
+          errors.invalidData(
+            "discount.amount_cents must be a non-negative integer."
+          )
+        );
+      }
+    }
+
+    // Compute discount from percent on merchandise only
+    const percent = Number.isFinite(Number(disc?.percent))
+      ? Math.trunc(Number(disc.percent))
+      : null;
+
+    if (percent && percent > 0 && merchandiseTotalCents > 0) {
+      expectedDiscountCents = Math.floor(
+        (merchandiseTotalCents * percent) / 100
+      );
+      // safety cap
+      expectedDiscountCents = Math.max(
+        0,
+        Math.min(expectedDiscountCents, merchandiseTotalCents)
+      );
+    }
+
+    // If client sent amount_cents, it must match our computed one (±1 cent tolerance)
+    if (Number.isInteger(disc?.amount_cents)) {
+      const delta = Math.abs(
+        Number(disc.amount_cents) - expectedDiscountCents
+      );
+      if (delta > 1) {
+        return Promise.reject(
+          errors.invalidData(
+            "Discount amount does not match merchandise × percent calculation."
+          )
+        );
+      }
+      // trust server-side recompute; normalize to computed
+      expectedDiscountCents = Math.min(
+        Number(disc.amount_cents),
+        merchandiseTotalCents
+      );
+    }
+  }
+
+  // Final math: merchandise + shipping − discount
+  const expectedTotal = Math.max(
+    0,
+    merchandiseTotalCents + shippingCents - expectedDiscountCents
+  );
+
+  // Allow ±1 cent tolerance for rounding
+  if (Math.abs(amount_total - expectedTotal) > 1) {
+    return Promise.reject(
+      errors.invalidData(
+        `Order total mismatch. Expected ${expectedTotal} cents, got ${amount_total} cents.`
+      )
+    );
+  }
+
   const initialStatus = makeDefaultStatus();
-  const initalSentShipEmailStatus = false
+  const initalSentShipEmailStatus = false;
   const rawSessionId =
-    typeof order.session_id !== "undefined" ? order.session_id : normMetadata.stripe_session_id;
+    typeof order.session_id !== "undefined"
+      ? order.session_id
+      : normMetadata.stripe_session_id;
   const normalizedSessionId =
     rawSessionId === null
       ? ""
-      : normalizeId(typeof rawSessionId === "string" || typeof rawSessionId === "number" ? rawSessionId : "");
+      : normalizeId(
+          typeof rawSessionId === "string" || typeof rawSessionId === "number"
+            ? rawSessionId
+            : ""
+        );
 
   // --- Build final normalized order ---
   const prepared = {
@@ -419,7 +590,9 @@ export function mergeOrderChanges(existing, changes) {
     if (k === "status" && isPlainObject(v) && isPlainObject(existing.status)) {
       updated.status = { ...existing.status };
       for (const [sk, sv] of Object.entries(v)) {
-        const prev = isPlainObject(updated.status[sk]) ? updated.status[sk] : {};
+        const prev = isPlainObject(updated.status[sk])
+          ? updated.status[sk]
+          : {};
         updated.status[sk] = isPlainObject(sv) ? { ...prev, ...sv } : sv;
       }
       continue;

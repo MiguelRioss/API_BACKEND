@@ -22,10 +22,7 @@ export default function createStripeServices(stockServices) {
     notes,
 
     // NEW: discount inputs
-    discount,
-    discountCode,
-    discountAmountCents,
-    discountPercent,
+    discount
   }) {
     if (!Array.isArray(items) || items.length === 0)
       throw errors.invalidData("No items in payload");
@@ -83,6 +80,7 @@ export default function createStripeServices(stockServices) {
         quantity: 1,
       });
     }
+    console.log(discount)
     console.log(
       "[stripeServices] Creating Stripe checkout session with line items:",
       line_items
@@ -99,9 +97,6 @@ export default function createStripeServices(stockServices) {
       notes,
       // NEW: forward discount inputs
       discount,
-      discountCode,
-      discountAmountCents,
-      discountPercent,
     });
 
     if (

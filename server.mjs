@@ -172,6 +172,7 @@ app.get("/api/products/:id", stockApi.getProductByIdAPI);
 app.post("/api/promoCodes", promoCodeApi.createPromoCode);
 app.get("/api/promoCodes", promoCodeApi.getPromoCodes);
 app.patch("/api/promoCodes/:id", promoCodeApi.updatePromoCode);
+app.post("/api/validatePromoCode", promoCodeApi.validatePromocode)
 
 // -----------------------------------------------------------------------------
 // Contact Form API

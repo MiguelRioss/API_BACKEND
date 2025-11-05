@@ -20,6 +20,12 @@ export default function createStripeServices(stockServices) {
     billingSameAsShipping = false,
     shippingCostCents = null,
     notes,
+
+    // NEW: discount inputs
+    discount,
+    discountCode,
+    discountAmountCents,
+    discountPercent,
   }) {
     if (!Array.isArray(items) || items.length === 0)
       throw errors.invalidData("No items in payload");
@@ -31,10 +37,9 @@ export default function createStripeServices(stockServices) {
       throw errors.internalError("Catalog fetch failed (not an array)");
     }
 
-    if (!stripe)
-      throw errors.forbidden("STRIPE_SECRET_KEY missing");
+    if (!stripe) throw errors.forbidden("STRIPE_SECRET_KEY missing");
 
-    const byId = new Map(catalog.map(p => [String(p.id), p]));
+    const byId = new Map(catalog.map((p) => [String(p.id), p]));
 
     const normalizedShippingCents = (() => {
       const num = Number(shippingCostCents);
@@ -49,29 +54,39 @@ export default function createStripeServices(stockServices) {
       currency: "eur",
       errorFactory: (reason, ctx) => {
         switch (reason) {
-          case "MALFORMED_INPUT": return errors.badRequest(ctx.msg);
-          case "UNKNOWN_PRODUCT": return errors.notFound(ctx.msg);
-          case "OUT_OF_STOCK":    return errors.conflict(ctx.msg);
-          case "PRICE_MISMATCH":  return errors.unprocessableEntity(ctx.msg);
-          default:                return errors.internal(ctx.msg);
+          case "MALFORMED_INPUT":
+            return errors.badRequest(ctx.msg);
+          case "UNKNOWN_PRODUCT":
+            return errors.notFound(ctx.msg);
+          case "OUT_OF_STOCK":
+            return errors.conflict(ctx.msg);
+          case "PRICE_MISMATCH":
+            return errors.unprocessableEntity(ctx.msg);
+          default:
+            return errors.internal(ctx.msg);
         }
       },
     });
 
-    if (!Array.isArray(line_items))
-      throw errors.invalidData(line_items);
+    if (!Array.isArray(line_items)) throw errors.invalidData(line_items);
 
     if (normalizedShippingCents > 0) {
       line_items.push({
         price_data: {
           currency: "eur",
-          product_data: { name: "Shipping", metadata: { productId: "__shipping__" } },
+          product_data: {
+            name: "Shipping",
+            metadata: { productId: "__shipping__" },
+          },
           unit_amount: normalizedShippingCents,
         },
         quantity: 1,
       });
     }
-    console.log("[stripeServices] Creating Stripe checkout session with line items:", line_items);
+    console.log(
+      "[stripeServices] Creating Stripe checkout session with line items:",
+      line_items
+    );
     const sessionResult = await createUrlCheckoutSession({
       stripe,
       line_items,
@@ -82,6 +97,11 @@ export default function createStripeServices(stockServices) {
       shippingCostCents: normalizedShippingCents,
       clientReferenceId,
       notes,
+      // NEW: forward discount inputs
+      discount,
+      discountCode,
+      discountAmountCents,
+      discountPercent,
     });
 
     if (
@@ -98,6 +118,4 @@ export default function createStripeServices(stockServices) {
       paymentIntentId: sessionResult.paymentIntentId,
     };
   }
-
-
 }

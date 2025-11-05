@@ -141,7 +141,7 @@ app.get("/api/orders/session/:sessionId", ordersApi.getOrderBySessionIdAPI);
 app.get("/api/orders/:id", ordersApi.getOrderByIdAPI);
 app.post("/api/orders", ordersApi.createOrderAPI);
 app.patch("/api/orders/:id", ordersApi.updateOrderAPI);
-app.post("/api/checkout-sessionsv1", stripeAPi.handleCheckoutSession);
+//app.post("/api/checkout-sessionsv1", stripeAPi.handleCheckoutSession);
 app.post("/api/checkout-sessions", ordersApi.handleCheckoutSession);
 
 // -----------------------------------------------------------------------------

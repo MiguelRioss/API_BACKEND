@@ -9,13 +9,19 @@ export default function prepareCheckOut(body = {}) {
     body.clientReferenceId ?? body.client_reference_id ?? undefined;
 
   const shippingAddress =
-    (body.shipping_address && typeof body.shipping_address === "object" && body.shipping_address) ||
+    (body.shipping_address &&
+      typeof body.shipping_address === "object" &&
+      body.shipping_address) ||
     (body.address && typeof body.address === "object" && body.address) ||
     {};
 
   const billingAddress =
-    (body.billing_address && typeof body.billing_address === "object" && body.billing_address) ||
-    (body.billingAddress && typeof body.billingAddress === "object" && body.billingAddress) ||
+    (body.billing_address &&
+      typeof body.billing_address === "object" &&
+      body.billing_address) ||
+    (body.billingAddress &&
+      typeof body.billingAddress === "object" &&
+      body.billingAddress) ||
     {};
 
   const billingSameAsShipping = Boolean(
@@ -34,6 +40,35 @@ export default function prepareCheckOut(body = {}) {
       ? customer.notes
       : undefined;
 
+  // ── NEW: Discount extraction (supports flat and nested shapes) ──────────────
+  const incomingDiscount =
+    (body.discount && typeof body.discount === "object" && body.discount) || {};
+
+  const discountCode = body.discountCode;
+
+  const rawDiscountAmountCents = body.discountAmountCents;
+
+  const discountAmountCents = Number.isFinite(Number(rawDiscountAmountCents))
+    ? Number(rawDiscountAmountCents)
+    : null;
+
+  const rawDiscountPercent = body.discountPercent;
+
+  const discountPercent = Number.isFinite(Number(rawDiscountPercent))
+    ? Number(rawDiscountPercent)
+    : null;
+
+  const discount =
+    discountCode != null &&
+    discountAmountCents != null &&
+    discountPercent != null
+      ? {
+          code: discountCode,
+          amountCents: discountAmountCents,
+          percent: discountPercent,
+        }
+      : null;
+
   return {
     items,
     clientReferenceId,
@@ -43,5 +78,11 @@ export default function prepareCheckOut(body = {}) {
     billingSameAsShipping,
     shippingCostCents,
     notes,
+
+    // ── Added fields ──
+    discount, // { code, amountCents, percent } or null
+    discountCode: discountCode ,
+    discountAmountCents: discountAmountCents,
+    // (percent also available inside `discount` if you want it on the service layer)
   };
 }

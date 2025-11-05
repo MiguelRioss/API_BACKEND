@@ -76,3 +76,12 @@ Deve estar lá no codigo
  Apos autorizar deve mandar o email de autorização com o codigo criado
  Caso seja declined deve ser enviado o email a dizer que foi rejeitado
  - Tem de haver a indicação da razao de ter siod rejeitado
+
+
+
+/////////
+
+Fazer com que o code seja aplicado e depois no chekout tem de fazer a verificação é feita e possa ser aplicado 
+
+Ver tambem que coisas tenho de alterar para puder aplicar os video online no youtube 
+- Visto que mudei de local host para production mode

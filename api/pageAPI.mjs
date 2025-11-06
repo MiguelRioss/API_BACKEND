@@ -7,9 +7,14 @@ export default function createPageApi(pageServices) {
 
   return {
     getPageApi: handlerFactory(internalGetPageAPI),
+    getBlogPostApi: handlerFactory(internalGetBlogPostApi)
   };
 
-  async function internalGetPageAPI() {
+  async function internalGetPageAPI(req,rsp) {
     return pageServices.getPageConfig();
+  }
+  async function internalGetBlogPostApi(req ,rsp) {
+    const slugBlogPost = req.params.slug
+    return pageServices.getBlogPost(slugBlogPost)
   }
 }

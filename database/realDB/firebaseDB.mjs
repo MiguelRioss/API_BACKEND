@@ -574,6 +574,20 @@ export async function getAllVideos() {
   const val = snap.val() || {};
   return Object.entries(val).map(([id, data]) => ({ id, ...data }));
 }
+// -----------------------------------------------------------------------------
+// Retrieve all uploaded videos
+// -----------------------------------------------------------------------------
+export async function getBlogPost(slugBlogPost) {
+  const init = ensureInitDb();
+  if (init) return init;
+  const db = getRealtimeDB();
+  const snap = await db.ref(`/blogs/${slugBlogPost}`).once("value");
+  const val = snap.val();
+  if (val === null) {
+    return Promise.reject(errors.notFound(`Post "${slugBlogPost}" not found`));
+  }
+  return val 
+}
 
 // -----------------------------------------------------------------------------
 // Retrieve one video by ID

@@ -12,6 +12,7 @@ export default function createPageServices(db) {
   return {
     getPageConfig,
     getBlogPost,
+    getAllBlogs
   };
 
   /**
@@ -42,5 +43,17 @@ export default function createPageServices(db) {
       throw errors.notFound(`Post ${slugBlogPost}`);
     }
     return post;
+  }
+   
+  /**
+   * Get All blogs Post
+   * @return {Promise<Object>} Returns a promise of all the blogs
+   */
+  async function getAllBlogs() {
+    const blogs = await db.getAllBlogs()
+    if(!blogs){
+      throw errors.notFound("No blogs were found")
+    }
+    return blogs
   }
 }

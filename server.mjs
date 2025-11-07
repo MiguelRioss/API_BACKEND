@@ -213,6 +213,7 @@ app.post("/api/subscribe", subscribeApi.handleSubscribe); // --- New Subscribe A
 
 app.get("/page/config", pageAPI.getPageApi); // --- New Subscribe API
 app.get("/api/blogs/:slug", pageAPI.getBlogPostApi); // --- New Subscribe API
+app.get("/api/blogs",pageAPI.getAllBlogs)
 
 //---------------------------------------------------------------------------
 //UploadRelated API

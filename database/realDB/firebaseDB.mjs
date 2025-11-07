@@ -600,7 +600,7 @@ export async function getAllBlogs() {
   if (val === null) {
     return Promise.reject(errors.notFound(`Blogs were not found`));
   }
-  return val 
+   return Object.entries(val).map(([id, data]) => ({ id, ...data }));
 }
 
 // -----------------------------------------------------------------------------

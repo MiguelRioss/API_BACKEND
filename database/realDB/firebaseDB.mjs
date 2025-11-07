@@ -575,7 +575,7 @@ export async function getAllVideos() {
   return Object.entries(val).map(([id, data]) => ({ id, ...data }));
 }
 // -----------------------------------------------------------------------------
-// Retrieve all uploaded videos
+// Retrieve a blog by its slug//title
 // -----------------------------------------------------------------------------
 export async function getBlogPost(slugBlogPost) {
   const init = ensureInitDb();
@@ -585,6 +585,20 @@ export async function getBlogPost(slugBlogPost) {
   const val = snap.val();
   if (val === null) {
     return Promise.reject(errors.notFound(`Post "${slugBlogPost}" not found`));
+  }
+  return val 
+}
+// -----------------------------------------------------------------------------
+// Get all the blogPosts
+// -----------------------------------------------------------------------------
+export async function getAllBlogs() {
+  const init = ensureInitDb();
+  if (init) return init;
+  const db = getRealtimeDB();
+  const snap = await db.ref(`/blogs`).once("value");
+  const val = snap.val();
+  if (val === null) {
+    return Promise.reject(errors.notFound(`Blogs were not found`));
   }
   return val 
 }

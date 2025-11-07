@@ -1,3 +1,4 @@
+import { getAllBlogs } from "../database/realDB/firebaseDB.mjs";
 import handlerFactory from "../utils/handleFactory.mjs";
 
 export default function createPageApi(pageServices) {
@@ -7,7 +8,8 @@ export default function createPageApi(pageServices) {
 
   return {
     getPageApi: handlerFactory(internalGetPageAPI),
-    getBlogPostApi: handlerFactory(internalGetBlogPostApi)
+    getBlogPostApi: handlerFactory(internalGetBlogPostApi),
+    getAllBlogs : handlerFactory(internalGetAllBLogPosts)
   };
 
   async function internalGetPageAPI(req,rsp) {
@@ -16,5 +18,9 @@ export default function createPageApi(pageServices) {
   async function internalGetBlogPostApi(req ,rsp) {
     const slugBlogPost = req.params.slug
     return pageServices.getBlogPost(slugBlogPost)
+  }
+
+  async function internalGetAllBLogPosts(req,rsp) {
+    return pageServices.getAllBlogs()
   }
 }

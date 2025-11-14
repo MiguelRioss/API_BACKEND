@@ -67,8 +67,11 @@ export default function createPromoCodeServices(db) {
   // ───────────────────────────────────────────────────────────────────────────
   // NEW: Validate + touch a promo code by (code, discountPercent)
   // ───────────────────────────────────────────────────────────────────────────
+  // ───────────────────────────────────────────────────────────────────────────
+  // NEW: Validate + touch a promo code by (code, discountPercent)
+  // ───────────────────────────────────────────────────────────────────────────
   async function validatePromocode(code, discountPercent) {
-    console.log(code,discountPercent)
+    console.log(code, discountPercent);
     const normCode = String(code || "").trim();
     const normPercent = Number.isFinite(Number(discountPercent))
       ? Math.trunc(Number(discountPercent))
@@ -77,11 +80,11 @@ export default function createPromoCodeServices(db) {
     if (!normCode) throw errors.invalidData("Promo code is required");
 
     // 1) Lookup by code (prefer direct DB method; fallback to in-memory scan)
-    let promo = null;
     const all = await getPromoCodes();
-    promo = Array.isArray(all)
+    const promo = Array.isArray(all)
       ? all.find((p) => String(p.code).trim() === normCode)
       : null;
+
     if (!promo) throw errors.notFound(`Promo code ${normCode} not found`);
 
     // 2) Basic validity gates (only enforced if fields exist on record)
@@ -113,12 +116,14 @@ export default function createPromoCodeServices(db) {
         `Promo code ${normCode} does not match percent ${normPercent}`
       );
     }
-    const changes = {
-      status: false,
-    };
 
-    // 5) Persist and return the updated promo
-    const updated = await updatePromoCode(String(promo.id), changes);
+    // 4) Only mark as used (status:false) if this is a one-time-only code
+    //    🔁 Change `oneTimeOnly` to whatever your flag/field is called.
+    let updated = promo;
+    if (promo.usageType === "singles") {
+      updated = await updatePromoCode(String(promo.id), { status: false });
+    }
+
     return updated;
   }
 }

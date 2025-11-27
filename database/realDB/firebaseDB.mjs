@@ -588,6 +588,69 @@ export async function getBlogPost(slugBlogPost) {
   }
   return val 
 }
+
+// -----------------------------------------------------------------------------
+// Delete a blog by its slug
+// -----------------------------------------------------------------------------
+export async function deleteBlogBySlug(slugBlogPost) {
+  const init = ensureInitDb();
+  if (init) return init;
+
+  if (!useRealtimeDB()) {
+    return Promise.reject(
+      errors.externalService("Firestore delete not implemented yet for blogs")
+    );
+  }
+
+  if (!slugBlogPost || typeof slugBlogPost !== "string") {
+    return Promise.reject(errors.invalidData("Invalid blog slug"));
+  }
+
+  const db = getRealtimeDB();
+  const ref = db.ref(`/blogs/${slugBlogPost}`);
+
+  const snap = await ref.once("value");
+  const val = snap.val();
+
+  if (val === null || typeof val === "undefined") {
+    return Promise.reject(errors.notFound(`Post "${slugBlogPost}" not found`));
+  }
+
+  // remove from RTDB
+  await ref.remove();
+
+  // return the deleted blog (useful for UI / logging)
+  return { id: slugBlogPost, ...val };
+}
+
+
+// -----------------------------------------------------------------------------
+// Add / overwrite a blog by slug
+// -----------------------------------------------------------------------------
+export async function addBlogJsonObject(blog) {
+  const init = ensureInitDb();
+  if (init) return init;
+
+  if (!useRealtimeDB()) {
+    return Promise.reject(
+      errors.externalService("Firestore add blog not implemented yet")
+    );
+  } 
+
+  if (!blog || typeof blog !== "object") {
+    return Promise.reject(errors.invalidData("Blog payload is missing or invalid"));
+  }
+
+  if (!blog.slug || typeof blog.slug !== "string") {
+    return Promise.reject(errors.invalidData("Blog 'slug' is required"));
+  }
+
+  const db = getRealtimeDB();
+  const ref = db.ref(`/blogs/${blog.slug}`);
+
+  await ref.set(blog);
+  return blog;
+}
 // -----------------------------------------------------------------------------
 // Get all the blogPosts
 // -----------------------------------------------------------------------------
@@ -784,3 +847,4 @@ export async function moveOrdersBetweenFolders(ids, fromFolderName, toFolderName
 export function moveOrderBetweenFolders(id, fromFolderName, toFolderName) {
   return moveOrdersBetweenFolders([id], fromFolderName, toFolderName);
 }
+

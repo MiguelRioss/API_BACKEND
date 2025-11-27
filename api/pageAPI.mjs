@@ -9,18 +9,33 @@ export default function createPageApi(pageServices) {
   return {
     getPageApi: handlerFactory(internalGetPageAPI),
     getBlogPostApi: handlerFactory(internalGetBlogPostApi),
-    getAllBlogs : handlerFactory(internalGetAllBLogPosts)
+    getAllBlogs: handlerFactory(internalGetAllBLogPosts),
+    deleteBlogBySlug: handlerFactory(internalDeleteBlogBySlugApi),
+    addBlogJsonObject: handlerFactory(internalAddBlogJsonObjectApi),
   };
 
-  async function internalGetPageAPI(req,rsp) {
+  async function internalGetPageAPI(req, rsp) {
     return pageServices.getPageConfig();
   }
-  async function internalGetBlogPostApi(req ,rsp) {
-    const slugBlogPost = req.params.slug
-    return pageServices.getBlogPost(slugBlogPost)
+  async function internalGetBlogPostApi(req, rsp) {
+    const slugBlogPost = req.params.slug;
+    return pageServices.getBlogPost(slugBlogPost);
+  }
+  async function internalDeleteBlogBySlugApi(req, rsp) {
+    const slugBlogPost = req.params.slug;
+    return pageServices.deleteBlogPostApi(slugBlogPost);
   }
 
-  async function internalGetAllBLogPosts(req,rsp) {
-    return pageServices.getAllBlogs()
+  // POST /api/blogs
+   async function internalAddBlogJsonObjectApi(req, rsp, next) {
+    try {
+      const blog = await pageServices.addBlogJsonObject(req.body);
+      rsp.status(201).json(blog);
+    } catch (err) {
+      next(err);
+    }
+  }
+  async function internalGetAllBLogPosts(req, rsp) {
+    return pageServices.getAllBlogs();
   }
 }

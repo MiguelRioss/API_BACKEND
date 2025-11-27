@@ -12,7 +12,9 @@ export default function createPageServices(db) {
   return {
     getPageConfig,
     getBlogPost,
-    getAllBlogs
+    getAllBlogs,
+    deleteBlogBySlug,
+    addBlogJsonObject,
   };
 
   /**
@@ -44,16 +46,35 @@ export default function createPageServices(db) {
     }
     return post;
   }
-   
+  /**
+   * Delete the blug given the slug.
+   * @returns {Promise<Object>} BlogOject Promise
+   */
+  async function deleteBlogBySlug(slugBlogPost) {
+    const post = await db.deleteBlogBySlug(slugBlogPost);
+    if (!post) {
+      throw errors.notFound(`Post ${slugBlogPost}`);
+    }
+    return post;
+  }
+
   /**
    * Get All blogs Post
    * @return {Promise<Object>} Returns a promise of all the blogs
    */
   async function getAllBlogs() {
-    const blogs = await db.getAllBlogs()
-    if(!blogs){
-      throw errors.notFound("No blogs were found")
+    const blogs = await db.getAllBlogs();
+    if (!blogs) {
+      throw errors.notFound("No blogs were found");
     }
-    return blogs
+    return blogs;
+  }
+  /**
+   * Get All blogs Post
+   * @return {Promise<Object>} Returns a promise of all the blogs
+   */
+  async function addBlogJsonObject(jsonBlogObject) {
+    const blog = await db.addBlogJsonObject(jsonBlogObject);
+    return blog;
   }
 }

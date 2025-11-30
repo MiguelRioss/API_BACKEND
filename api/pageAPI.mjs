@@ -12,6 +12,7 @@ export default function createPageApi(pageServices) {
     getAllBlogs: handlerFactory(internalGetAllBLogPosts),
     deleteBlogBySlug: handlerFactory(internalDeleteBlogBySlugApi),
     addBlogJsonObject: handlerFactory(internalAddBlogJsonObjectApi),
+    importBlogsFromDocxApi: handlerFactory(internalImportBlogsFromDocxApi),
   };
 
   async function internalGetPageAPI(req, rsp) {
@@ -38,4 +39,41 @@ export default function createPageApi(pageServices) {
   async function internalGetAllBLogPosts(req, rsp) {
     return pageServices.getAllBlogs();
   }
+
+ async function internalImportBlogsFromDocxApi(req, res, next) {
+  try {
+    const files = req.files || [];
+    if (!files.length) {
+      throw errors.invalidData("No .docx files uploaded");
+    }
+
+    const results = [];
+
+    for (const file of files) {
+      // 1) write buffer to temp file
+      const tmpPath = path.join(
+        os.tmpdir(),
+        `${Date.now()}_${file.originalname}`
+      );
+      await fs.writeFile(tmpPath, file.buffer);
+
+      // 2) DOCX → JSON
+      const blogJson = await buildFullBlogFromDocx(tmpPath);
+
+      // 3) cleanup temp file
+      await fs.unlink(tmpPath).catch(() => {});
+
+      // 4) save to DB (this calls your db.addBlogJsonObject inside the service)
+      const saved = await pageServices.addBlogJsonObject(blogJson);
+      results.push(saved);
+    }
+
+    res.status(201).json({
+      imported: results.length,
+      blogs: results,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
 }

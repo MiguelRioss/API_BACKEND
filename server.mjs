@@ -217,6 +217,13 @@ app.delete("/api/blogs/:slug", pageAPI.deleteBlogBySlug); // --- New Subscribe A
 app.get("/api/blogs",pageAPI.getAllBlogs)
 app.post("/api/blogs",pageAPI.addBlogJsonObject)
 
+// 🔹 NEW: for DOCX → JSON → DB
+app.post(
+  "/api/blogs/import-docx",
+  upload.array("files"),          // <--- "files" MUST match formData.append("files", ...)
+  pageAPI.importBlogsFromDocxApi
+);
+
 //---------------------------------------------------------------------------
 //UploadRelated API
 // -----------------------------------------------------------------------------

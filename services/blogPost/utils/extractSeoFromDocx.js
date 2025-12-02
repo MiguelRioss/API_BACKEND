@@ -2,8 +2,12 @@ import fs from "node:fs/promises";
 import mammoth from "mammoth";
 
 /**
- * extractSeoFromDocx()
- * Handles edge cases where KEYWORDS merges with next section text.
+ * extractSeoFromDocx() — tolerant version
+ * Handles:
+ * - smart colons “：”
+ * - extra spaces
+ * - non-breaking spaces
+ * - mixed capitalization
  */
 export async function extractSeoFromDocx(docxPath) {
   const buffer = await fs.readFile(docxPath);
@@ -11,10 +15,17 @@ export async function extractSeoFromDocx(docxPath) {
 
   let text = raw.replace(/\r/g, "").trim();
 
-  // Guarantee line breaks before each field
-  text = text.replace(/(SEO TITLE|META DESCRIPTION|SLUG|KEYWORDS)\s*:/gi, "\n$1:");
+  // Normalize strange unicode characters
+  text = text
+    .replace(/\u00A0/g, " ")     // non-breaking spaces
+    .replace(/\uFF1A/g, ":");    // fullwidth colon “：” → normal colon “:”
 
-  // Helper to isolate fields safely
+  // Ensure line breaks before each field label
+  text = text.replace(
+    /(SEO TITLE|META DESCRIPTION|SLUG|KEYWORDS)\s*:\s*/gi,
+    "\n$1: "
+  );
+
   const getField = (label) => {
     const re = new RegExp(
       `${label}\\s*:\\s*([\\s\\S]*?)(?=\\n(?:SEO TITLE|META DESCRIPTION|SLUG|KEYWORDS)\\s*:|\\n\\d+\\.|$)`,
@@ -29,11 +40,11 @@ export async function extractSeoFromDocx(docxPath) {
   const slug = getField("SLUG");
   const keywordsRaw = getField("KEYWORDS");
 
-  // Cut off if the keyword text somehow runs into section 1.
+  // Prevent KEYWORDS bleeding into section 1
   const keywordsClean = keywordsRaw.replace(/\s*\d+\..*$/s, "").trim();
 
   const keywords = keywordsClean
-    .replace(/\.$/, "") // remove trailing period
+    .replace(/\.$/, "")
     .split(/[,;]/)
     .map((k) => k.trim())
     .filter(Boolean);

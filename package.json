@@ -9,7 +9,7 @@
     "test": "echo \"no tests\""
   },
   "engines": {
-    "node": "18.x"
+    "node": ">=18"
   },
   "dependencies": {
     "@sparticuz/chromium": "^141.0.0",

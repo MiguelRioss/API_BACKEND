@@ -2,8 +2,7 @@
 import { writeFile } from "fs/promises";
 import { buildFullBlogFromDocx } from "../buildFullBlogFromDocx.js";
 
-const docxPath =
-  "C:/Projectos/dataBaseUi/dataBaseUi/dataBase/src/components/services/blogPost/input.docx";
+const docxPath = "./input.docx";
 
 
 (async () => {

@@ -28,7 +28,7 @@ export default function createPageApi(pageServices) {
   }
   async function internalDeleteBlogBySlugApi(req, rsp) {
     const slugBlogPost = req.params.slug;
-    return pageServices.deleteBlogPostApi(slugBlogPost);
+    return pageServices.deleteBlogBySlug(slugBlogPost);
   }
 
   // POST /api/blogs

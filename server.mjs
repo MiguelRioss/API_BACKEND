@@ -215,6 +215,8 @@ app.get("/page/config", pageAPI.getPageApi); // --- New Subscribe API
 app.get("/api/blogs/:slug", pageAPI.getBlogPostApi); // --- New Subscribe API
 app.delete("/api/blogs/:slug", pageAPI.deleteBlogBySlug); // --- New Subscribe API
 app.get("/api/blogs",pageAPI.getAllBlogs)
+app.get("/api/individualBlogs",pageAPI.getAllIndvidualBlogs)
+app.get("/api/blogsSeries",pageAPI.getAllBlogSeries)
 app.post("/api/blogs",pageAPI.addBlogJsonObject)
 
 // 🔹 NEW: for DOCX → JSON → DB

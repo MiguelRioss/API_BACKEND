@@ -17,6 +17,8 @@ export default function createPageApi(pageServices) {
     deleteBlogBySlug: handlerFactory(internalDeleteBlogBySlugApi),
     addBlogJsonObject: handlerFactory(internalAddBlogJsonObjectApi),
     importBlogsFromDocxApi: handlerFactory(internalImportBlogsFromDocxApi),
+    getAllBlogSeries: handlerFactory(getAllBlogSeries),
+    getAllIndvidualBlogs: handlerFactory(getAllIndvidualBlogs),
   };
 
   async function internalGetPageAPI(req, rsp) {
@@ -43,7 +45,13 @@ export default function createPageApi(pageServices) {
   async function internalGetAllBLogPosts(req, rsp) {
     return pageServices.getAllBlogs();
   }
+  async function getAllBlogSeries(req, rsp) {
+    return pageServices.getAllBlogSeriesServices();
+  }
 
+    async function getAllIndvidualBlogs(req, rsp) {
+    return pageServices.getAllIndividualBlogsServices();
+  }
  async function internalImportBlogsFromDocxApi(req, res, next) {
   try {
     const files = req.files || [];

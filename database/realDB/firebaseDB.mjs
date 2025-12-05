@@ -1,9 +1,13 @@
 ﻿// database/firebaseDB.mjs
 import "dotenv/config"; // dotenv is idempotent
-import { initFirebase, getRealtimeDB, getFirestore, useRealtimeDB } from "../firebase/firebaseInit.mjs";
+import {
+  initFirebase,
+  getRealtimeDB,
+  getFirestore,
+  useRealtimeDB,
+} from "../firebase/firebaseInit.mjs";
 import errors from "../../errors/errors.mjs"; // <- use your ApplicationError style
 import { getStorage } from "firebase-admin/storage"; // <-- make sure this import is at the top
-
 
 /**
  * Ensure Firebase is initialized before any db operation.
@@ -14,9 +18,12 @@ function ensureInitDb() {
     initFirebase();
   } catch (err) {
     return Promise.reject(
-      errors.externalService(`Firebase initialization failed: ${err?.message ?? err}`, {
-        original: err,
-      })
+      errors.externalService(
+        `Firebase initialization failed: ${err?.message ?? err}`,
+        {
+          original: err,
+        }
+      )
     );
   }
 }
@@ -39,13 +46,16 @@ export async function getAllOrders() {
       .then((snap) => snap.val() || {})
       .then((val) => Object.entries(val).map(([id, data]) => ({ id, ...data })))
       .catch((err) =>
-        Promise.reject(errors.externalService("Failed to read orders from DB", { original: err }))
+        Promise.reject(
+          errors.externalService("Failed to read orders from DB", {
+            original: err,
+          })
+        )
       );
   }
 
   return Promise.reject(errors.internal("No supported DB configured"));
 }
-
 
 /**
  * Get all orders (RTDB or Firestore depending on env).
@@ -65,13 +75,16 @@ export async function getAllOrdersByFolder(folderName) {
       .then((snap) => snap.val() || {})
       .then((val) => Object.entries(val).map(([id, data]) => ({ id, ...data })))
       .catch((err) =>
-        Promise.reject(errors.externalService("Failed to read orders from DB", { original: err }))
+        Promise.reject(
+          errors.externalService("Failed to read orders from DB", {
+            original: err,
+          })
+        )
       );
   }
 
   return Promise.reject(errors.internal("No supported DB configured"));
 }
-
 
 /**
  * Get a single order by id.
@@ -95,13 +108,16 @@ export async function getOrderById(idStr) {
   }
 }
 
-
 export async function getOrderByStripeSessionId(sessionId) {
   const orders = await getAllOrders();
 
-  const order = orders.find((o, i) => { return o.session_id === sessionId });
+  const order = orders.find((o, i) => {
+    return o.session_id === sessionId;
+  });
   if (!order) {
-    return Promise.reject(errors.notFound(`Order with session_id "${sessionId}" not found`))
+    return Promise.reject(
+      errors.notFound(`Order with session_id "${sessionId}" not found`)
+    );
   }
 
   return order;
@@ -118,7 +134,10 @@ export async function getPageConfig() {
   }
 
   const firestore = getFirestore();
-  const doc = await firestore.collection("site_config").doc("mesodoseConfig").get();
+  const doc = await firestore
+    .collection("site_config")
+    .doc("mesodoseConfig")
+    .get();
   if (!doc.exists) {
     return null;
   }
@@ -136,7 +155,7 @@ export async function createOrderDB(orderData = {}) {
   if (init) return init;
 
   const createdAt = new Date().toISOString();
-  const payload = { ...orderData, createdAt };  // <-- define once, in scope
+  const payload = { ...orderData, createdAt }; // <-- define once, in scope
   let applied = []; // for rollback
 
   try {
@@ -173,13 +192,22 @@ export async function createOrderDB(orderData = {}) {
       for (const { stockId, prev, name } of applied.reverse()) {
         try {
           await updateStock(stockId, { name, stockValue: prev });
-          console.log(`[createOrderDB] rollback ok for id=${stockId} → ${prev}`);
+          console.log(
+            `[createOrderDB] rollback ok for id=${stockId} → ${prev}`
+          );
         } catch (rbErr) {
-          console.warn(`[createOrderDB] rollback failed for id=${stockId}:`, rbErr?.message || rbErr);
+          console.warn(
+            `[createOrderDB] rollback failed for id=${stockId}:`,
+            rbErr?.message || rbErr
+          );
         }
       }
     }
-    if (err && typeof err === "object" && Number.isFinite(Number(err.httpStatus))) {
+    if (
+      err &&
+      typeof err === "object" &&
+      Number.isFinite(Number(err.httpStatus))
+    ) {
       return Promise.reject(err);
     }
     return Promise.reject(
@@ -187,8 +215,6 @@ export async function createOrderDB(orderData = {}) {
     );
   }
 }
-
-
 
 /**
  * Update an order by replacing it with the provided object.
@@ -203,7 +229,6 @@ export async function createOrderDB(orderData = {}) {
  */
 export async function updateOrderDB(id, updatedOrder) {
   ensureInitDb(); // throws or rejects if Firebase isn’t ready
-
 
   if (!useRealtimeDB()) {
     return Promise.reject(
@@ -231,7 +256,6 @@ export async function updateOrderDB(id, updatedOrder) {
     );
 }
 
-
 //Stocks
 /**
  * Get all Stocks (RTDB depending on env).
@@ -249,15 +273,25 @@ export async function getStocks() {
       .ref("/stock")
       .once("value")
       .then((snap) => snap.val() || {})
-      .then((val) => Object.entries(val).map(([id, data]) => ({ id: Number(id), name: data.title, stockValue: data.stockValue, price: data.priceInEuros })))
+      .then((val) =>
+        Object.entries(val).map(([id, data]) => ({
+          id: Number(id),
+          name: data.title,
+          stockValue: data.stockValue,
+          price: data.priceInEuros,
+        }))
+      )
       .catch((err) =>
-        Promise.reject(errors.externalService("Failed to read orders from DB", { original: err }))
+        Promise.reject(
+          errors.externalService("Failed to read orders from DB", {
+            original: err,
+          })
+        )
       );
   }
 
   return Promise.resolve([]);
 }
-
 
 /**
  * Get all Products from DB.
@@ -268,7 +302,8 @@ export async function getProducts() {
 
   if (useRealtimeDB()) {
     const db = getRealtimeDB();
-    return db.ref("/stock")
+    return db
+      .ref("/stock")
       .once("value")
       .then((snap) => snap.val() || {})
       .then((val) =>
@@ -293,7 +328,6 @@ export async function getProducts() {
  */
 export async function updateStock(id, updatedStock) {
   ensureInitDb(); // throws or rejects if Firebase isn’t ready
-
 
   if (!useRealtimeDB()) {
     return Promise.reject(
@@ -364,25 +398,29 @@ export async function findStockAndDecrement(stockSnapshot, orderData) {
 
     const qty = Number(item.quantity);
 
-    const found = stockSnapshot.find(s => Number(s.id) === stockId);
+    const found = stockSnapshot.find((s) => Number(s.id) === stockId);
     if (!found)
-      return Promise.reject(errors.invalidData(`STOCK with id :${stockId} notFound`));
+      return Promise.reject(
+        errors.invalidData(`STOCK with id :${stockId} notFound`)
+      );
 
     const newVal = Number(found.stockValue) - qty;
     if (!Number.isFinite(newVal) || newVal < 0)
-      return Promise.reject(errors.badRequest(`INSUFFICIENT_STOCK for id:${stockId}`));
+      return Promise.reject(
+        errors.badRequest(`INSUFFICIENT_STOCK for id:${stockId}`)
+      );
 
-    await updateStockValue(stockId, newVal);          // <-- only field-level update
+    await updateStockValue(stockId, newVal); // <-- only field-level update
     applied.push({ stockId, prev: Number(found.stockValue) });
   }
   return applied;
 }
 
-
 // database/firebaseDB.mjs
 export async function updateStockValue(id, stockValue) {
   ensureInitDb();
-  if (!useRealtimeDB()) throw errors.externalService("Firestore update not implemented yet");
+  if (!useRealtimeDB())
+    throw errors.externalService("Firestore update not implemented yet");
 
   const db = getRealtimeDB();
   // PATCH the field (preserves all other product fields)
@@ -390,10 +428,10 @@ export async function updateStockValue(id, stockValue) {
   return { id, stockValue };
 }
 
-
 export async function createPromoCodeDB(promoCodeObj) {
   ensureInitDb();
-  if (!useRealtimeDB()) throw errors.externalService("FireStore update not implementedyet");
+  if (!useRealtimeDB())
+    throw errors.externalService("FireStore update not implementedyet");
 
   const db = getRealtimeDB();
   const newRef = db.ref("/promoCodes").push();
@@ -407,7 +445,9 @@ export async function getPromoCodes() {
   if (init) return init;
 
   if (!useRealtimeDB()) {
-    return Promise.reject(errors.externalService("FireStore get not implemented yet"));
+    return Promise.reject(
+      errors.externalService("FireStore get not implemented yet")
+    );
   }
 
   const db = getRealtimeDB();
@@ -431,8 +471,8 @@ export async function getPromoCodes() {
 }
 
 /**
-* Get a single promo code by its ID.
-*/
+ * Get a single promo code by its ID.
+ */
 export async function getPromoCodeById(id) {
   const init = ensureInitDb();
   if (init) return init;
@@ -455,13 +495,13 @@ export async function getPromoCodeById(id) {
   return { id, ...val };
 }
 /**
-* Patch (partial update) existing promo code.
-* Only applies provided fields; preserves everything else.
-*
-* @param {string} id - Promo code ID
-* @param {Object} updates - Key/value pairs to patch
-* @returns {Promise<Object>} - Updated promo code
-*/
+ * Patch (partial update) existing promo code.
+ * Only applies provided fields; preserves everything else.
+ *
+ * @param {string} id - Promo code ID
+ * @param {Object} updates - Key/value pairs to patch
+ * @returns {Promise<Object>} - Updated promo code
+ */
 export async function patchPromoCodeDB(id, updates) {
   ensureInitDb();
   if (!useRealtimeDB()) {
@@ -487,8 +527,6 @@ export async function patchPromoCodeDB(id, updates) {
   return { id, ...newData };
 }
 
-
-
 // -----------------------------------------------------------------------------
 // Upload Video to Storage
 // -----------------------------------------------------------------------------
@@ -502,11 +540,14 @@ export async function uploadVideoToStorage(file) {
 
   try {
     const storage = getStorage();
-    const bucketName = 'storageproducts-bbe30.firebasestorage.app';
+    const bucketName = "storageproducts-bbe30.firebasestorage.app";
     const bucket = storage.bucket(bucketName);
 
     const videoId = Date.now().toString();
-    const filename = `videos/${videoId}_${file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+    const filename = `videos/${videoId}_${file.originalname.replace(
+      /[^a-zA-Z0-9._-]/g,
+      "_"
+    )}`;
     const blob = bucket.file(filename);
 
     // Upload the file
@@ -517,14 +558,16 @@ export async function uploadVideoToStorage(file) {
         firebaseStorageDownloadTokens: videoId,
         metadata: {
           originalName: file.originalname,
-          uploadedAt: new Date().toISOString()
-        }
-      }
+          uploadedAt: new Date().toISOString(),
+        },
+      },
     });
 
     // For the new Firebase Storage URL format
     // ✅ FIXED: Use the correct Firebase Storage URL format
-    const url = `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodeURIComponent(filename)}?alt=media&token=${videoId}`;
+    const url = `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodeURIComponent(
+      filename
+    )}?alt=media&token=${videoId}`;
 
     console.log(`Video uploaded successfully: ${filename}`);
     return {
@@ -532,14 +575,15 @@ export async function uploadVideoToStorage(file) {
       url,
       filename,
       bucket: bucket.name,
-      size: file.buffer.length
+      size: file.buffer.length,
     };
-
   } catch (error) {
-    console.error('Storage upload error:', error);
+    console.error("Storage upload error:", error);
 
     if (error.code === 404) {
-      throw errors.externalService(`Storage bucket not found. Please check if bucket 'storageproducts-bbe30.firebasestorage.app' exists.`);
+      throw errors.externalService(
+        `Storage bucket not found. Please check if bucket 'storageproducts-bbe30.firebasestorage.app' exists.`
+      );
     } else {
       throw errors.externalService(`Failed to upload video: ${error.message}`);
     }
@@ -553,7 +597,9 @@ export async function saveVideoMetadata(videoData) {
   if (init) return init;
 
   if (!useRealtimeDB()) {
-    return Promise.reject(errors.externalService("Firestore not yet implemented for videos"));
+    return Promise.reject(
+      errors.externalService("Firestore not yet implemented for videos")
+    );
   }
 
   const db = getRealtimeDB();
@@ -586,7 +632,7 @@ export async function getBlogPost(slugBlogPost) {
   if (val === null) {
     return Promise.reject(errors.notFound(`Post "${slugBlogPost}" not found`));
   }
-  return val 
+  return val;
 }
 
 // -----------------------------------------------------------------------------
@@ -623,7 +669,6 @@ export async function deleteBlogBySlug(slugBlogPost) {
   return { id: slugBlogPost, ...val };
 }
 
-
 // -----------------------------------------------------------------------------
 // Add / overwrite a blog by slug
 // -----------------------------------------------------------------------------
@@ -635,10 +680,12 @@ export async function addBlogJsonObject(blog) {
     return Promise.reject(
       errors.externalService("Firestore add blog not implemented yet")
     );
-  } 
+  }
 
   if (!blog || typeof blog !== "object") {
-    return Promise.reject(errors.invalidData("Blog payload is missing or invalid"));
+    return Promise.reject(
+      errors.invalidData("Blog payload is missing or invalid")
+    );
   }
 
   if (!blog.slug || typeof blog.slug !== "string") {
@@ -663,7 +710,49 @@ export async function getAllBlogs() {
   if (val === null) {
     return Promise.reject(errors.notFound(`Blogs were not found`));
   }
-   return Object.entries(val).map(([id, data]) => ({ id, ...data }));
+  return Object.entries(val).map(([id, data]) => ({ id, ...data }));
+}
+
+export async function getAllIndividualBlogs() {
+  const init = ensureInitDb();
+  if (init) return init;
+  const db = getRealtimeDB();
+  const snap = await db.ref(`/blogs/indvidual`).once("value");
+  const val = snap.val();
+
+  if (val === null) {
+    return Promise.reject(errors.notFound(`Individual blogs were not found`));
+  }
+
+  // val is an object: { slug1: {...}, slug2: {...} }
+  return Object.entries(val).map(([id, data]) => ({ id, ...data }));
+}
+
+export async function getAllBlogSeries() {
+  const init = ensureInitDb();
+  if (init) return init;
+  const db = getRealtimeDB();
+  const snap = await db.ref(`/blogs/blogSeries`).once("value");
+  const val = snap.val();
+
+  if (val === null) {
+    return Promise.reject(errors.notFound(`Blog Series were not found`));
+  }
+
+  // Each series (0, 1, 2...) may have its own title and children
+  return Object.entries(val).map(([seriesId, seriesData]) => {
+    const { title, ...blogs } = seriesData;
+    const blogArray = Object.entries(blogs).map(([id, data]) => ({
+      id,
+      ...data,
+    }));
+
+    return {
+      id: seriesId,
+      title: title || "Untitled Series",
+      blogs: blogArray,
+    };
+  });
 }
 
 // -----------------------------------------------------------------------------
@@ -699,7 +788,7 @@ export async function deleteVideoById(id) {
 
     // 2. Delete from Storage
     const storage = getStorage();
-    const bucketName = 'storageproducts-bbe30.firebasestorage.app';
+    const bucketName = "storageproducts-bbe30.firebasestorage.app";
     const bucket = storage.bucket(bucketName);
     const file = bucket.file(videoMetadata.filename);
 
@@ -708,7 +797,9 @@ export async function deleteVideoById(id) {
       await file.delete();
       console.log(`Video file deleted from storage: ${videoMetadata.filename}`);
     } else {
-      console.warn(`Video file not found in storage: ${videoMetadata.filename}`);
+      console.warn(
+        `Video file not found in storage: ${videoMetadata.filename}`
+      );
     }
 
     // 3. Delete from Realtime DB
@@ -723,11 +814,10 @@ export async function deleteVideoById(id) {
       success: true,
       id: id,
       filename: videoMetadata.filename,
-      message: 'Video and metadata deleted successfully'
+      message: "Video and metadata deleted successfully",
     };
-
   } catch (error) {
-    console.error('Delete video error:', error);
+    console.error("Delete video error:", error);
 
     if (error.code === 404 || error.httpStatus === 404) {
       throw errors.notFound(`Video not found: ${error.message}`);
@@ -774,7 +864,6 @@ export async function patchVideo(id, updates) {
   return { id, ...newData };
 }
 
-
 /**
  * Atomically move one or many orders between top-level RTDB folders.
  * Example: moveOrdersBetweenFolders(["A","B"], "orders", "archive")
@@ -785,7 +874,11 @@ export async function patchVideo(id, updates) {
  * @returns {Promise<{moved:number, skipped:string[]}>}
  * @rejects {externalService|internal} on failure
  */
-export async function moveOrdersBetweenFolders(ids, fromFolderName, toFolderName) {
+export async function moveOrdersBetweenFolders(
+  ids,
+  fromFolderName,
+  toFolderName
+) {
   const init = ensureInitDb();
   if (init) return init; // may return a rejected promise
 
@@ -794,7 +887,9 @@ export async function moveOrdersBetweenFolders(ids, fromFolderName, toFolderName
     return Promise.reject(errors.internal("No ids provided to move"));
   }
   if (!fromFolderName || !toFolderName) {
-    return Promise.reject(errors.internal("Both fromFolderName and toFolderName are required"));
+    return Promise.reject(
+      errors.internal("Both fromFolderName and toFolderName are required")
+    );
   }
   if (fromFolderName === toFolderName) {
     return { moved: 0, skipped: [...idList] };
@@ -820,7 +915,11 @@ export async function moveOrdersBetweenFolders(ids, fromFolderName, toFolderName
         }
         const data = snap.val();
         // copy to destination (add lightweight audit trail), delete from source
-        updates[`/${toFolderName}/${id}`] = { ...data, _movedAt: movedAt, _from: fromFolderName };
+        updates[`/${toFolderName}/${id}`] = {
+          ...data,
+          _movedAt: movedAt,
+          _from: fromFolderName,
+        };
         updates[`/${fromFolderName}/${id}`] = null;
       })
     );
@@ -837,7 +936,9 @@ export async function moveOrdersBetweenFolders(ids, fromFolderName, toFolderName
     const moved = idList.length - skipped.length;
     return { moved, skipped };
   } catch (err) {
-    throw errors.externalService("Failed to move orders between folders", { original: err });
+    throw errors.externalService("Failed to move orders between folders", {
+      original: err,
+    });
   }
 }
 
@@ -847,4 +948,3 @@ export async function moveOrdersBetweenFolders(ids, fromFolderName, toFolderName
 export function moveOrderBetweenFolders(id, fromFolderName, toFolderName) {
   return moveOrdersBetweenFolders([id], fromFolderName, toFolderName);
 }
-

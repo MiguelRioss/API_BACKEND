@@ -1,6 +1,5 @@
 // utils/extractHeroImage.js
 
-import fs from "fs";
 import mammoth from "mammoth";
 
 /**

@@ -43,8 +43,7 @@ export async function sendOtherCountryEmail({
       : undefined;
 
   const discount = (() => {
-    const code =
-      metaDisc?.code ?? order?.metadata?.discount_code ?? undefined;
+    const code = metaDisc?.code ?? order?.metadata?.discount_code ?? undefined;
     const percentSrc =
       metaDisc?.percent ?? order?.metadata?.discount_percent ?? undefined;
     const amountCentsSrc =
@@ -76,16 +75,21 @@ export async function sendOtherCountryEmail({
     discount,
   });
 
-  //  Forward / BCC target (from env)
-  const forwardEmailRaw = normalizedLive
-    ? process.env.ORDER_FORWARD_EMAILS || ""
-    : process.env.TEST_RECIPIENT || "";
+  // Only forward when live
+  const raw = normalizedLive ? process.env.FORWARD_EMAILS || "" : "";
 
-  const forwardEmail = normalizeEmail(forwardEmailRaw);
+  const forwardEmails = Array.from(
+    new Set(
+      raw
+        .split(/[;,]/) // split on comma OR semicolon
+        .map((e) => normalizeEmail(e))
+        .filter(
+          (email) => email && email !== toEmail // no empties, no duplicates of main recipient
+        )
+    )
+  );
 
-  // Avoid duplicating the recipient
-  const bcc =
-    forwardEmail && forwardEmail !== toEmail ? [forwardEmail] : undefined;
+  const bcc = forwardEmails.length ? forwardEmails : undefined;
 
   try {
     await transport.send({
@@ -93,7 +97,7 @@ export async function sendOtherCountryEmail({
       toName,
       subject,
       html,
-      bcc, // ✅ now your env forward address receives a copy
+      bcc, // ✅ env forward(s) receive a copy
     });
 
     console.log(

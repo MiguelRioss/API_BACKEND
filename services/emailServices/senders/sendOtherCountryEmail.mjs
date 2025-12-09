@@ -1,4 +1,4 @@
-import { normalizeEmail } from "../utils/utils.mjs";
+import { normalizeEmail, parseEmailList } from "../utils/utils.mjs";
 import { buildOtherCountrysTemplateEmail } from "../templates/otherCountrysTemplateEmail.mjs";
 import errors from "../../../errors/errors.mjs";
 
@@ -13,17 +13,30 @@ export async function sendOtherCountryEmail({
   live = true,
 } = {}) {
   if (!order || typeof order !== "object") {
-    throw errors.invalidData("sendOtherCountryEmail requires an order object");
+    return Promise.reject(
+      errors.invalidData("sendOtherCountryEmail requires an order object")
+    );
   }
 
   const normalizedLive = Boolean(live);
   const orderEmail = normalizeEmail(order?.email || order?.metadata?.email);
-  if (!orderEmail) {
-    throw errors.invalidData("Order has no valid email address");
+
+  // if in preview mode, send to test recipient
+  const toEmail = normalizedLive
+    ? orderEmail
+    : normalizeEmail(process.env.TEST_RECIPIENT) || orderEmail;
+
+  if (!toEmail) {
+    return Promise.reject(
+      errors.invalidData("No recipient email for OtherCountryEmail.")
+    );
   }
 
-  const toName =
-    order?.name || order?.metadata?.shipping_address?.name || "Customer";
+  const toName = normalizedLive
+    ? order?.name ||
+      order?.metadata?.shipping_address?.name ||
+      "Customer"
+    : "Ibogenics Template Preview";
 
   // 🔗 Normalize discount from metadata (supports both object and flat fields)
   const metaDisc =
@@ -32,7 +45,8 @@ export async function sendOtherCountryEmail({
       : undefined;
 
   const discount = (() => {
-    const code = metaDisc?.code ?? order?.metadata?.discount_code ?? undefined;
+    const code =
+      metaDisc?.code ?? order?.metadata?.discount_code ?? undefined;
     const percentSrc =
       metaDisc?.percent ?? order?.metadata?.discount_percent ?? undefined;
     const amountCentsSrc =
@@ -48,6 +62,7 @@ export async function sendOtherCountryEmail({
       ? Math.max(0, Number(amountCentsSrc))
       : undefined;
 
+    // Only pass if *something* is present
     if (code || percent != null || amount_cents != null) {
       return {
         ...(code ? { code: String(code) } : {}),
@@ -64,24 +79,33 @@ export async function sendOtherCountryEmail({
     discount,
   });
 
-  // 👇 Forward / BCC setup
-  const toEmail = process.env.ORDER_INQUIRY_EMAILS;
-  if (!toEmail) throw errors.invalidData("ORDER_INQUIRY_EMAILS not configured");
+  // 🔁 Use parseEmailList for forwarding list (only in live mode)
+  const bccList = normalizedLive
+    ? parseEmailList(process.env.ORDER_INQUIRY_EMAILS).filter(
+        (email) => email && email !== toEmail
+      )
+    : [];
 
-  // In preview mode, override for safety
-  const bcc = normalizedLive
-    ? process.env.TEST_RECIPIENT
-    : normalizeEmail(process.env.TEST_RECIPIENT);
+  const bcc = bccList.length ? bccList : undefined;
 
-  // ✅ Use same field names and structure as working sendContactEmail
-  await transport.send({
-    toEmail,
-    toName: "Mesodose Orders",
-    subject,
-    html,
-    replyTo: { email: orderEmail, name: toName },
-    bcc,
-  });
+  try {
+    await transport.send({
+      toEmail,
+      toName,
+      subject,
+      html,
+      bcc,
+    });
 
-  console.log(`[emailService] OtherCountryEmail sent to ${orderEmail}`);
+    console.log(
+      `[emailService] OtherCountryEmail sent to ${toEmail}` +
+        (bcc ? ` (bcc: ${bccList.join(", ")})` : "")
+    );
+  } catch (err) {
+    console.error(
+      "[emailService] Failed to send OtherCountryEmail:",
+      err?.message || err
+    );
+    throw err;
+  }
 }

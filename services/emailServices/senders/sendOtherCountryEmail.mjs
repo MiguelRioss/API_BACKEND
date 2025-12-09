@@ -76,7 +76,7 @@ export async function sendOtherCountryEmail({
     discount,
   });
 
-  // 👇 Forward / BCC target (from env)
+  //  Forward / BCC target (from env)
   const forwardEmailRaw = normalizedLive
     ? process.env.ORDER_FORWARD_EMAILS || ""
     : process.env.TEST_RECIPIENT || "";

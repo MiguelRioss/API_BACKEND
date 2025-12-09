@@ -1,4 +1,4 @@
-import fs from "node:fs/promises";
+﻿import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import Brevo from "sib-api-v3-sdk";
@@ -30,14 +30,14 @@ export default {
     attachments = [],
   } = {}) {
     // ------------------------------------------------------------
-    // 1️⃣ Basic validation
+    // 1ï¸âƒ£ Basic validation
     // ------------------------------------------------------------
     if (!process.env.BREVO_API_KEY) Promise.reject(errors.forbidden("BREVO_API_KEY missing"));
     if (!process.env.FROM_EMAIL) Promise.reject(errors.forbidden("FROM_EMAIL missing"));
     if (!toEmail) Promise.reject(errors.forbidden("No recipient email provided"));
 
     // ------------------------------------------------------------
-    // 2️⃣ Convert attachments to Brevo-friendly format
+    // 2ï¸âƒ£ Convert attachments to Brevo-friendly format
     // ------------------------------------------------------------
     const brevoAttachments = await Promise.all(
       (attachments || []).filter(Boolean).map(async (att) => {
@@ -62,15 +62,17 @@ export default {
         return {
           name: att.filename || att.name || path.basename(att.path || "attachment"),
           content: contentBase64,
-          contentType, // ✅ required by Brevo
+          contentType, // âœ… required by Brevo
           contentId: att.contentId || undefined, // for inline <img src="cid:...">
         };
       })
     );
 
     // ------------------------------------------------------------
-    // 3️⃣ Send transactional email
+    // 3ï¸âƒ£ Send transactional email
     // ------------------------------------------------------------
+    const bccPayload = normalizeBcc(bcc);
+
     return api.sendTransacEmail({
       subject: subject || "(no subject)",
       sender: {
@@ -79,7 +81,7 @@ export default {
       },
       to: [{ email: toEmail, name: toName || "" }],
       replyTo: replyTo ? { email: replyTo.email, name: replyTo.name } : undefined,
-      bcc: bcc ? [{ email: bcc, name: "Owner" }] : undefined,
+      bcc: bccPayload.length ? bccPayload : undefined,
       htmlContent: html,
       attachment: brevoAttachments.length ? brevoAttachments : undefined,
     });
@@ -111,3 +113,24 @@ function mimeFromExt(file) {
       return null;
   }
 }
+function normalizeBcc(bcc) {
+  if (!bcc) return [];
+  const entries = Array.isArray(bcc) ? bcc : [bcc];
+
+  return entries
+    .map((entry) => {
+      if (!entry) return null;
+      if (typeof entry === "string") {
+        return { email: entry, name: "Owner" };
+      }
+      if (typeof entry === "object" && entry.email) {
+        return {
+          email: entry.email,
+          name: entry.name || "Owner",
+        };
+      }
+      return null;
+    })
+    .filter(Boolean);
+}
+

@@ -194,7 +194,7 @@ export async function createPdfInvoice(
         <div class="company-info">
           <strong>Ibogenics Ltd</strong><br/>
           www.mesodose.com<br/>
-          info@ibogenics.com
+          info@mesodose.com
         </div>
       </header>
 

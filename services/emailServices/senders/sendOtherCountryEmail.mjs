@@ -76,7 +76,7 @@ export async function sendOtherCountryEmail({
   });
 
   // Only forward when live
-  const raw = normalizedLive ? process.env.FORWARD_EMAILS || "" : "";
+  const raw = normalizedLive ? process.env.ORDER_INQUIRY_EMAILS || "" : "";
 
   const forwardEmails = Array.from(
     new Set(

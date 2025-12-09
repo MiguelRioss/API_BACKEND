@@ -13,28 +13,17 @@ export async function sendOtherCountryEmail({
   live = true,
 } = {}) {
   if (!order || typeof order !== "object") {
-    return Promise.reject(
-      errors.invalidData("sendOtherCountryEmail requires an order object")
-    );
+    throw errors.invalidData("sendOtherCountryEmail requires an order object");
   }
 
   const normalizedLive = Boolean(live);
   const orderEmail = normalizeEmail(order?.email || order?.metadata?.email);
-
-  // if in preview mode, send to test recipient
-  const toEmail = normalizedLive
-    ? orderEmail
-    : normalizeEmail(process.env.TEST_RECIPIENT) || orderEmail;
-
-  if (!toEmail) {
-    return Promise.reject(
-      errors.invalidData("No recipient email for OtherCountryEmail.")
-    );
+  if (!orderEmail) {
+    throw errors.invalidData("Order has no valid email address");
   }
 
-  const toName = normalizedLive
-    ? order?.name || order?.metadata?.shipping_address?.name || "Customer"
-    : "Ibogenics Template Preview";
+  const toName =
+    order?.name || order?.metadata?.shipping_address?.name || "Customer";
 
   // 🔗 Normalize discount from metadata (supports both object and flat fields)
   const metaDisc =
@@ -75,40 +64,24 @@ export async function sendOtherCountryEmail({
     discount,
   });
 
-  // Only forward when live
-  const raw = normalizedLive ? process.env.ORDER_INQUIRY_EMAILS || "" : "";
+  // 👇 Forward / BCC setup
+  const toEmail = process.env.ORDER_INQUIRY_EMAILS;
+  if (!toEmail) throw errors.invalidData("ORDER_INQUIRY_EMAILS not configured");
 
-  const forwardEmails = Array.from(
-    new Set(
-      raw
-        .split(/[;,]/) // split on comma OR semicolon
-        .map((e) => normalizeEmail(e))
-        .filter(
-          (email) => email && email !== toEmail // no empties, no duplicates of main recipient
-        )
-    )
-  );
+  // In preview mode, override for safety
+  const bcc = normalizedLive
+    ? process.env.TEST_RECIPIENT
+    : normalizeEmail(process.env.TEST_RECIPIENT);
 
-  const bcc = forwardEmails.length ? forwardEmails : undefined;
+  // ✅ Use same field names and structure as working sendContactEmail
+  await transport.send({
+    toEmail,
+    toName: "Mesodose Orders",
+    subject,
+    html,
+    replyTo: { email: orderEmail, name: toName },
+    bcc,
+  });
 
-  try {
-    await transport.send({
-      toEmail,
-      toName,
-      subject,
-      html,
-      bcc, // ✅ env forward(s) receive a copy
-    });
-
-    console.log(
-      `[emailService] OtherCountryEmail sent to ${toEmail}` +
-        (bcc ? ` (bcc: ${bcc.join(", ")})` : "")
-    );
-  } catch (err) {
-    console.error(
-      "[emailService] Failed to send OtherCountryEmail:",
-      err?.message || err
-    );
-    throw err;
-  }
+  console.log(`[emailService] OtherCountryEmail sent to ${orderEmail}`);
 }

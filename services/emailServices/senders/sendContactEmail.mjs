@@ -15,6 +15,6 @@ export async function sendContactEmail({ transport, name, email, subject, messag
     subject: subjectLine,
     html,
     replyTo: { email, name },
-    bcc: process.env.TEST_RECIPIENT || undefined,
+    bcc: process.env.TEST_RECIPIENT ,
   });
 }

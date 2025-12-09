@@ -17,14 +17,13 @@ export async function sendAdminNotificationEmail({
   manual = false,
 }) {
   const paymentType = order.payment_type || "unknown";
-  console.log("[emailService] This is their payment_type:", order.paymentType);
   const ownerEmail = normalizeEmail(process.env.ORDER_EMAIL);
   const forwardEmails = parseEmailList(process.env.ORDER_FORWARD_EMAILS || "");
 
   if (!ownerEmail) throw new Error("OWNER_EMAIL missing");
 
   const recipients = [
-    { email: ownerEmail, name: "Ibogenics Admin & Logistics Team" },
+    { email: ownerEmail, name: "Mesodose Admin & Logistics Team" },
     ...forwardEmails.map(email => ({ email, name: "Tech" })),
   ];
 

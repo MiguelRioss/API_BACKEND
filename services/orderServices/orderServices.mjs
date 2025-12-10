@@ -179,11 +179,16 @@ export default function createOrdersService(
   // ──────────────────────────────
   // CREATE + EMAILS
   // ──────────────────────────────
+  // inside createOrderServices
   async function createOrderServices(order, options = {}) {
-    const { isRequestedOrderForOtherCountries = false } = options;
+    const {
+      isRequestedOrderForOtherCountries = false,
+      isSample = false, // 👈 new optional flag
+    } = options;
 
     const prepared = await validateAndPrepareOrder(order, {
       isRequestedOrderForOtherCountries,
+      isSample,
     });
 
     const saved = await db.createOrderDB(prepared);
@@ -197,7 +202,21 @@ export default function createOrdersService(
 
     let flagged = {};
     try {
-      if (isRequestedOrderForOtherCountries) {
+      if (isSample) {
+        // ⚡ SAMPLE ORDERS BRANCH
+        // make sure this matches what you added in createEmailService
+        await emailService.sendSamplesBundleEmails?.({
+          order: saved,
+          orderId: saved.id,
+        });
+
+        flagged = {
+          ...saved,
+          is_sample: true,
+          payment_status: false, // samples: no payment yet
+          email_Sent_ThankYou_Admin: true, // client + admin emails sent
+        };
+      } else if (isRequestedOrderForOtherCountries) {
         await emailService.sendInquiryOrderBundleEmails({
           order: saved,
           orderId: saved.id,
@@ -205,8 +224,8 @@ export default function createOrdersService(
         });
         flagged = {
           ...saved,
-          email_Sent_ThankYou_Admin: false,
           payment_status: false,
+          email_Sent_ThankYou_Admin: false,
         };
       } else {
         await emailService.sendOrderBundleEmails({
@@ -215,8 +234,8 @@ export default function createOrdersService(
         });
         flagged = {
           ...saved,
-          email_Sent_ThankYou_Admin: true,
           payment_status: true,
+          email_Sent_ThankYou_Admin: true,
         };
       }
 
@@ -226,17 +245,14 @@ export default function createOrdersService(
         } catch (updateErr) {
           console.warn(
             "[ordersService] Failed to persist flag updates:",
-            updateErr?.message || updateErr
+            updateErr
           );
         }
       }
 
       return flagged;
     } catch (err) {
-      console.error(
-        "[ordersService] Failed to send order emails:",
-        err?.message || err
-      );
+      console.error("[ordersService] Failed to send order emails:", err);
       return saved;
     }
   }

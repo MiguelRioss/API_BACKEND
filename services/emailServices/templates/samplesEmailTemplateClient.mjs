@@ -12,7 +12,7 @@ import {
  * where Stripe checkout is unavailable. Accepts optional overrides for pricing
  * and links so operations can adjust the message without editing the markup.
  */
-export function buildOtherCountrysTemplateEmail({
+export function samplesEmailTemplate({
   order,
   orderId,
   customerName,
@@ -388,7 +388,7 @@ export function buildOtherCountrysTemplateEmail({
 }
 
 export default {
-  buildOtherCountrysTemplateEmail,
+  samplesEmailTemplate,
 };
 
 function buildItemSummaries({

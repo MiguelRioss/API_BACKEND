@@ -4,7 +4,9 @@ import prepareCheckOut from "./prepareCheckOut.mjs";
 
 const ALLOWED_FOLDERS = new Set(["orders", "archive", "deleted"]);
 function normalizeFolderName(v) {
-  const x = String(v ?? "").trim().toLowerCase();
+  const x = String(v ?? "")
+    .trim()
+    .toLowerCase();
   if (x === "archived") return "archive";
   return ALLOWED_FOLDERS.has(x) ? x : null;
 }
@@ -72,10 +74,17 @@ export default function createOrdersAPI(ordersService) {
     const sessionId = req.params.sessionId ?? req.params.id;
     return ordersService.getOrderByStripeSessionId(sessionId);
   }
-
+  // api/routes/ordersApi.js (or wherever internalCreateOrder lives)
   async function internalCreateOrder(req, rsp) {
     const orderObj = req.body;
-    const saved = await ordersService.createOrderServices(orderObj);
+    const { isRequestedOrderForOtherCountries = false, isSample = false } =
+      req.body;
+
+    const saved = await ordersService.createOrderServices(orderObj, {
+      isRequestedOrderForOtherCountries,
+      isSample, // 👈 pass down to service
+    });
+
     return rsp.status(201).json({
       id: saved.id,
       description: "Order Created",
@@ -86,7 +95,10 @@ export default function createOrdersAPI(ordersService) {
   async function internalUpdateOrder(req, rsp) {
     const orderID = req.params.id;
     const orderChanges = req.body.changes;
-    const updatedOrder = await ordersService.updateOrderServices(orderID, orderChanges);
+    const updatedOrder = await ordersService.updateOrderServices(
+      orderID,
+      orderChanges
+    );
     return rsp.status(200).json({
       message: `Order with id ${updatedOrder.id} updated successfully`,
       ...updatedOrder,
@@ -99,7 +111,9 @@ export default function createOrdersAPI(ordersService) {
   async function internalMoveOrders(req, rsp) {
     const { ids, source, dest } = req.body ?? {};
     if (!Array.isArray(ids) || ids.length === 0) {
-      return rsp.status(400).json({ error: "Body must include non-empty array 'ids'." });
+      return rsp
+        .status(400)
+        .json({ error: "Body must include non-empty array 'ids'." });
     }
 
     const src = normalizeFolderName(source);
@@ -110,7 +124,11 @@ export default function createOrdersAPI(ordersService) {
       });
     }
 
-    const result = await ordersService.moveOrdersService({ ids, source: src, dest: dst });
+    const result = await ordersService.moveOrdersService({
+      ids,
+      source: src,
+      dest: dst,
+    });
     return rsp.json(result);
   }
 }

@@ -731,6 +731,7 @@ export async function getAllIndividualBlogs() {
 export async function getAllBlogSeries() {
   const init = ensureInitDb();
   if (init) return init;
+
   const db = getRealtimeDB();
   const snap = await db.ref(`/blogs/blogSeries`).once("value");
   const val = snap.val();
@@ -739,21 +740,43 @@ export async function getAllBlogSeries() {
     return Promise.reject(errors.notFound(`Blog Series were not found`));
   }
 
-  // Each series (0, 1, 2...) may have its own title and children
-  return Object.entries(val).map(([seriesId, seriesData]) => {
-    const { title, ...blogs } = seriesData;
-    const blogArray = Object.entries(blogs).map(([id, data]) => ({
-      id,
-      ...data,
-    }));
+  // ✅ add "slug" to meta keys so it doesn't become a "blog"
+  const META_KEYS = new Set([
+    "title",
+    "description",
+    "slug",
+    "createdAtISO",
+    "updatedAtISO",
+  ]);
+
+  return Object.entries(val).map(([seriesId, seriesData = {}]) => {
+    const title = seriesData.title || "Untitled Series";
+    const description = seriesData.description || "";
+
+    // ✅ use Firebase slug if present, else fallback to seriesId
+    const slug = seriesData.slug ? String(seriesData.slug) : String(seriesId);
+
+    const blogs = Object.entries(seriesData)
+      .filter(([k]) => !META_KEYS.has(k))
+      .map(([blogSlug, data]) => ({
+        id: blogSlug,
+        slug: blogSlug,
+        ...data,
+      }));
 
     return {
-      id: seriesId,
-      title: title || "Untitled Series",
-      blogs: blogArray,
+      id: String(seriesId),
+      slug, // ✅ real series slug (from Firebase)
+      title,
+      description,
+      blogs,
+      isSeries: true,
+      createdAtISO: seriesData.createdAtISO || null,
+      updatedAtISO: seriesData.updatedAtISO || null,
     };
   });
 }
+
 
 // -----------------------------------------------------------------------------
 // Retrieve one video by ID

@@ -717,7 +717,7 @@ export async function getAllIndividualBlogs() {
   const init = ensureInitDb();
   if (init) return init;
   const db = getRealtimeDB();
-  const snap = await db.ref(`/blogs/indvidual`).once("value");
+  const snap = await db.ref(`/blogs/individual`).once("value");
   const val = snap.val();
 
   if (val === null) {

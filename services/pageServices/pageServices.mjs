@@ -19,16 +19,20 @@ export default function createPageServices(db) {
     getAllBlogSeriesServices,
   };
 
-  /**
-   * Fetches the site/page configuration from Firestore or Realtime DB.
-   * @returns {Promise<Object>} Page configuration object
-   */
+  // ✅ middle function: sort by updatedAtISO (newest first)
+  function orderByUpdatedAtISO(list = []) {
+    const arr = Array.isArray(list) ? [...list] : [];
+    return arr.sort((a, b) => {
+      const da = new Date(a?.updatedAtISO || a?.createdAtISO || 0).getTime();
+      const db = new Date(b?.updatedAtISO || b?.createdAtISO || 0).getTime();
+      return db - da; // newest first
+    });
+  }
+
   async function getPageConfig() {
     try {
       const config = await db.getPageConfig();
-      if (!config) {
-        throw errors.notFound("Page configuration not found");
-      }
+      if (!config) throw errors.notFound("Page configuration not found");
       return config;
     } catch (err) {
       console.error("[pageServices] Failed to fetch page config:", err);
@@ -37,71 +41,46 @@ export default function createPageServices(db) {
       });
     }
   }
-  /**
-   * Get The Blog Post given the slug.
-   * @returns {Promise<Object>} BlogOject Promise
-   */
+
   async function getBlogPost(slugBlogPost) {
     const post = await db.getBlogPost(slugBlogPost);
-    if (!post) {
-      throw errors.notFound(`Post ${slugBlogPost}`);
-    }
+    if (!post) throw errors.notFound(`Post ${slugBlogPost}`);
     return post;
   }
-  /**
-   * Delete the blug given the slug.
-   * @returns {Promise<Object>} BlogOject Promise
-   */
+
   async function deleteBlogBySlug(slugBlogPost) {
     const post = await db.deleteBlogBySlug(slugBlogPost);
-    if (!post) {
-      throw errors.notFound(`Post ${slugBlogPost}`);
-    }
+    if (!post) throw errors.notFound(`Post ${slugBlogPost}`);
     return post;
   }
 
-  /**
-   * Get All blogs Post
-   * @return {Promise<Object>} Returns a promise of all the blogs
-   */
   async function getAllBlogs() {
     const blogs = await db.getAllBlogs();
-    if (!blogs) {
-      throw errors.notFound("No blogs were found");
-    }
-    return blogs;
+    if (!blogs) throw errors.notFound("No blogs were found");
+    return orderByUpdatedAtISO(blogs);
   }
 
-  /**
-   * Get All blogs Post
-   * @return {Promise<Object>} Returns a promise of all the blogs
-   */
   async function getAllIndividualBlogsServices() {
     const individualBlogs = await db.getAllIndividualBlogs();
-    if (!individualBlogs.length) {
-      throw errors.notFound("No blogs were found");
-    }
-    return individualBlogs;
+    if (!individualBlogs?.length) throw errors.notFound("No blogs were found");
+    return orderByUpdatedAtISO(individualBlogs);
   }
 
-  /**
-   * Get All blogs Post
-   * @return {Promise<Object>} Returns a promise of all the blogs
-   */
   async function getAllBlogSeriesServices() {
-    const blogs = await db.getAllBlogSeries();
-    if (!blogs) {
-      throw errors.notFound("No blogs were found");
-    }
-    return blogs;
+    const series = await db.getAllBlogSeries();
+    if (!series) throw errors.notFound("No blogs were found");
+
+    // series list sorted by series.updatedAtISO,
+    // and also sort posts inside each series if present
+    const sortedSeries = orderByUpdatedAtISO(series).map((s) => ({
+      ...s,
+      blogs: orderByUpdatedAtISO(s?.blogs || []),
+    }));
+
+    return sortedSeries;
   }
 
-  /**
-   * Get All blogs Post
-   * @return {Promise<Object>} Returns a promise of all the blogs
-   */
   async function addBlogJsonObject(jsonBlogObject) {
-    const blog = await db.addBlogJsonObject(jsonBlogObject);
-    return blog;
+    return db.addBlogJsonObject(jsonBlogObject);
   }
 }

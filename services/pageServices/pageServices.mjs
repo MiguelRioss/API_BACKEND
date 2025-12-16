@@ -53,12 +53,18 @@ export default function createPageServices(db) {
     if (!post) throw errors.notFound(`Post ${slugBlogPost}`);
     return post;
   }
+async function getAllBlogs() {
+  const blogs = await db.getAllBlogs();
+  if (!blogs) throw errors.notFound("No blogs were found");
 
-  async function getAllBlogs() {
-    const blogs = await db.getAllBlogs();
-    if (!blogs) throw errors.notFound("No blogs were found");
-    return orderByUpdatedAtISO(blogs);
-  }
+  // ✅ Keep only first-level blogs (ignore nested groups)
+  const topLevelBlogs = blogs.filter(
+    (b) => typeof b.id === "string" && !["individual", "blogSeries"].includes(b.id)
+  );
+
+  return orderByUpdatedAtISO(topLevelBlogs);
+}
+
 
   async function getAllIndividualBlogsServices() {
     const individualBlogs = await db.getAllIndividualBlogs();

@@ -218,6 +218,7 @@ app.get("/api/blogs",pageAPI.getAllBlogs)
 app.get("/api/individualBlogs",pageAPI.getAllIndvidualBlogs)
 app.get("/api/blogsSeries",pageAPI.getAllBlogSeries)
 app.post("/api/blogs",pageAPI.addBlogJsonObject)
+app.post("/api/blogsSeries/:slug", pageAPI.updateBlogPropertiesBySlug);
 
 
 // 🔹 NEW: for DOCX → JSON → DB

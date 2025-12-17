@@ -18,6 +18,7 @@ export default function createPageServices(db) {
     getAllIndividualBlogsServices,
     getAllBlogSeriesServices,
     unsubscribeFromBrevo,
+    updateBlogPropertiesBySlug,
   };
 
   // ✅ middle function: sort by updatedAtISO (newest first)
@@ -111,5 +112,52 @@ export default function createPageServices(db) {
 
   async function addBlogJsonObject(jsonBlogObject) {
     return db.addBlogJsonObject(jsonBlogObject);
+  }
+
+  async function updateBlogPropertiesBySlug(slug, changes = {}) {
+    if (!slug) {
+      throw errors.invalidData("Slug is required");
+    }
+
+    if (!changes || typeof changes !== "object") {
+      throw errors.invalidData("Changes must be an object");
+    }
+
+    // 1️⃣ Fetch existing blog
+    const blog = await db.getBlogPost(slug);
+    if (!blog) {
+      throw errors.notFound(`Post ${slug}`);
+    }
+
+    // 2️⃣ Allowed fields (include updatedAtISO)
+    const ALLOWED_FIELDS = [
+      "updatedAtISO", // 👈 ADD THIS
+    ];
+
+    // 3️⃣ Filter allowed changes
+    const sanitizedChanges = Object.fromEntries(
+      Object.entries(changes).filter(([key]) => ALLOWED_FIELDS.includes(key))
+    );
+
+    // 🔑 Special case: only updatedAtISO requested
+    const onlyUpdatingTimestamp =
+      Object.keys(sanitizedChanges).length === 1 &&
+      "updatedAtISO" in sanitizedChanges;
+
+    if (!Object.keys(sanitizedChanges).length) {
+      throw errors.invalidData("No valid fields to update");
+    }
+
+    // 4️⃣ Build update
+    const updatedBlog = {
+      ...blog,
+      ...(onlyUpdatingTimestamp ? {} : sanitizedChanges),
+      updatedAtISO: new Date().toISOString(), // always server time
+    };
+
+    // 5️⃣ Persist
+    await db.updateBlogBySlug(slug, updatedBlog);
+
+    return updatedBlog;
   }
 }

@@ -777,6 +777,45 @@ export async function getAllBlogSeries() {
   });
 }
 
+// -----------------------------------------------------------------------------
+// Patch (partial update) a blog by its slug
+// Only updates provided fields (e.g. updatedAtISO)
+// -----------------------------------------------------------------------------
+export async function updateBlogBySlug(slug, updates = {}) {
+  const init = ensureInitDb();
+  if (init) return init;
+
+  if (!useRealtimeDB()) {
+    return Promise.reject(
+      errors.externalService("Firestore update not implemented yet for blogs")
+    );
+  }
+
+  if (!slug || typeof slug !== "string") {
+    return Promise.reject(errors.invalidData("Invalid blog slug"));
+  }
+
+  if (!updates || typeof updates !== "object") {
+    return Promise.reject(errors.invalidData("Invalid updates payload"));
+  }
+
+  const db = getRealtimeDB();
+  const ref = db.ref(`/blogs/${slug}`);
+
+  // 1️⃣ Ensure blog exists
+  const snap = await ref.once("value");
+  if (!snap.exists()) {
+    return Promise.reject(errors.notFound(`Post "${slug}" not found`));
+  }
+
+  // 2️⃣ Patch only provided fields
+  await ref.update(updates);
+
+  // 3️⃣ Return merged result
+  const newData = { ...(snap.val() || {}), ...updates };
+  return { slug, ...newData };
+}
+
 
 // -----------------------------------------------------------------------------
 // Retrieve one video by ID

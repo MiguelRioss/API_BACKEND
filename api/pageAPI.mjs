@@ -20,6 +20,7 @@ export default function createPageApi(pageServices) {
     getAllBlogSeries: handlerFactory(getAllBlogSeries),
     getAllIndvidualBlogs: handlerFactory(getAllIndvidualBlogs),
     deleteBrevoEmailCampaign: handlerFactory(deleteBrevoEmailCampaignAPI),
+    updateBlogPropertiesBySlug: handlerFactory(internalUpdateBlogPropertiesBySlug),
   };
 
   async function internalGetPageAPI(req, rsp) {
@@ -98,5 +99,19 @@ export default function createPageApi(pageServices) {
     const result = await pageServices.unsubscribeFromBrevo(email);
 
     return res.status(result.status).json(result);
+  }
+
+  async function internalUpdateBlogPropertiesBySlug(req, res, next) {
+    try {
+      const slug = req.params.slug;
+      const updateData = req.body.changes;
+      const updatedBlog = await pageServices.updateBlogPropertiesBySlug(
+        slug,
+        updateData
+      );  
+      res.status(200).json(updatedBlog);
+    } catch (err) {
+      next(err);
+    }
   }
 }

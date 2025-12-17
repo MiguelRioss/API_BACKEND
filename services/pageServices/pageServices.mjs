@@ -115,18 +115,13 @@ export default function createPageServices(db) {
   }
 
   async function updateBlogPropertiesBySlug(slug, changes = {}) {
-    if (!slug) {
-      throw errors.invalidData("Slug is required");
-    }
-
+    if (!slug) throw errors.invalidData("Slug is required");
     if (!changes || typeof changes !== "object") {
       throw errors.invalidData("Changes must be an object");
     }
 
-    // Allowed fields
     const ALLOWED_FIELDS = ["updatedAtISO"];
 
-    // Filter allowed changes
     const sanitizedChanges = Object.fromEntries(
       Object.entries(changes).filter(([key]) => ALLOWED_FIELDS.includes(key))
     );
@@ -135,12 +130,7 @@ export default function createPageServices(db) {
       throw errors.invalidData("No valid fields to update");
     }
 
-    // ✅ Only add timestamp if explicitly requested
-    if ("updatedAtISO" in sanitizedChanges) {
-      sanitizedChanges.updatedAtISO = new Date().toISOString();
-    }
-
-    // ✅ PATCH only
+    // ✅ DO NOT overwrite client value
     await db.updateBlogBySlug(slug, sanitizedChanges);
 
     return {

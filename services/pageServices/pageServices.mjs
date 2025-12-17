@@ -123,41 +123,29 @@ export default function createPageServices(db) {
       throw errors.invalidData("Changes must be an object");
     }
 
-    // 1️⃣ Fetch existing blog
-    const blog = await db.getBlogPost(slug);
-    if (!blog) {
-      throw errors.notFound(`Post ${slug}`);
-    }
+    // Allowed fields
+    const ALLOWED_FIELDS = ["updatedAtISO"];
 
-    // 2️⃣ Allowed fields (include updatedAtISO)
-    const ALLOWED_FIELDS = [
-      "updatedAtISO", // 👈 ADD THIS
-    ];
-
-    // 3️⃣ Filter allowed changes
+    // Filter allowed changes
     const sanitizedChanges = Object.fromEntries(
       Object.entries(changes).filter(([key]) => ALLOWED_FIELDS.includes(key))
     );
-
-    // 🔑 Special case: only updatedAtISO requested
-    const onlyUpdatingTimestamp =
-      Object.keys(sanitizedChanges).length === 1 &&
-      "updatedAtISO" in sanitizedChanges;
 
     if (!Object.keys(sanitizedChanges).length) {
       throw errors.invalidData("No valid fields to update");
     }
 
-    // 4️⃣ Build update
-    const updatedBlog = {
-      ...blog,
-      ...(onlyUpdatingTimestamp ? {} : sanitizedChanges),
-      updatedAtISO: new Date().toISOString(), // always server time
+    // ✅ Only add timestamp if explicitly requested
+    if ("updatedAtISO" in sanitizedChanges) {
+      sanitizedChanges.updatedAtISO = new Date().toISOString();
+    }
+
+    // ✅ PATCH only
+    await db.updateBlogBySlug(slug, sanitizedChanges);
+
+    return {
+      slug,
+      ...sanitizedChanges,
     };
-
-    // 5️⃣ Persist
-    await db.updateBlogBySlug(slug, updatedBlog);
-
-    return updatedBlog;
   }
 }

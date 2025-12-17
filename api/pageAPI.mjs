@@ -19,6 +19,7 @@ export default function createPageApi(pageServices) {
     importBlogsFromDocxApi: handlerFactory(internalImportBlogsFromDocxApi),
     getAllBlogSeries: handlerFactory(getAllBlogSeries),
     getAllIndvidualBlogs: handlerFactory(getAllIndvidualBlogs),
+    deleteBrevoEmailCampaign: handlerFactory(deleteBrevoEmailCampaignAPI),
   };
 
   async function internalGetPageAPI(req, rsp) {
@@ -34,7 +35,7 @@ export default function createPageApi(pageServices) {
   }
 
   // POST /api/blogs
-   async function internalAddBlogJsonObjectApi(req, rsp, next) {
+  async function internalAddBlogJsonObjectApi(req, rsp, next) {
     try {
       const blog = await pageServices.addBlogJsonObject(req.body);
       rsp.status(201).json(blog);
@@ -49,43 +50,53 @@ export default function createPageApi(pageServices) {
     return pageServices.getAllBlogSeriesServices();
   }
 
-    async function getAllIndvidualBlogs(req, rsp) {
+  async function getAllIndvidualBlogs(req, rsp) {
     return pageServices.getAllIndividualBlogsServices();
   }
- async function internalImportBlogsFromDocxApi(req, res, next) {
-  try {
-    const files = req.files || [];
-    if (!files.length) {
-      throw errors.invalidData("No .docx files uploaded");
+  async function internalImportBlogsFromDocxApi(req, res, next) {
+    try {
+      const files = req.files || [];
+      if (!files.length) {
+        throw errors.invalidData("No .docx files uploaded");
+      }
+
+      const results = [];
+
+      for (const file of files) {
+        // 1) write buffer to temp file
+        const tmpPath = path.join(
+          os.tmpdir(),
+          `${Date.now()}_${file.originalname}`
+        );
+        await fs.writeFile(tmpPath, file.buffer);
+
+        // 2) DOCX → JSON
+        const blogJson = await buildFullBlogFromDocx(tmpPath);
+
+        // 3) cleanup temp file
+        await fs.unlink(tmpPath).catch(() => {});
+
+        // 4) save to DB (this calls your db.addBlogJsonObject inside the service)
+        const saved = await pageServices.addBlogJsonObject(blogJson);
+        results.push(saved);
+      }
+
+      res.status(201).json({
+        imported: results.length,
+        blogs: results,
+      });
+    } catch (err) {
+      next(err);
     }
-
-    const results = [];
-
-    for (const file of files) {
-      // 1) write buffer to temp file
-      const tmpPath = path.join(
-        os.tmpdir(),
-        `${Date.now()}_${file.originalname}`
-      );
-      await fs.writeFile(tmpPath, file.buffer);
-
-      // 2) DOCX → JSON
-      const blogJson = await buildFullBlogFromDocx(tmpPath);
-
-      // 3) cleanup temp file
-      await fs.unlink(tmpPath).catch(() => {});
-
-      // 4) save to DB (this calls your db.addBlogJsonObject inside the service)
-      const saved = await pageServices.addBlogJsonObject(blogJson);
-      results.push(saved);
-    }
-
-    res.status(201).json({
-      imported: results.length,
-      blogs: results,
-    });
-  } catch (err) {
-    next(err);
   }
-}
+  async function deleteBrevoEmailCampaignAPI(req, res) {
+    const { email } = req.query;
+    if (!email) {
+      throw errors.invalidData("Email is required");
+    }
+
+    const result = await pageServices.unsubscribeFromBrevo(email);
+
+    return res.status(result.status).json(result);
+  }
 }

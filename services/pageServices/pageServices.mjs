@@ -17,6 +17,7 @@ export default function createPageServices(db) {
     addBlogJsonObject,
     getAllIndividualBlogsServices,
     getAllBlogSeriesServices,
+    unsubscribeFromBrevo,
   };
 
   // ✅ middle function: sort by updatedAtISO (newest first)
@@ -53,18 +54,40 @@ export default function createPageServices(db) {
     if (!post) throw errors.notFound(`Post ${slugBlogPost}`);
     return post;
   }
-async function getAllBlogs() {
-  const blogs = await db.getAllBlogs();
-  if (!blogs) throw errors.notFound("No blogs were found");
+  async function getAllBlogs() {
+    const blogs = await db.getAllBlogs();
+    if (!blogs) throw errors.notFound("No blogs were found");
 
-  // ✅ Keep only first-level blogs (ignore nested groups)
-  const topLevelBlogs = blogs.filter(
-    (b) => typeof b.id === "string" && !["individual", "blogSeries"].includes(b.id)
-  );
+    // ✅ Keep only first-level blogs (ignore nested groups)
+    const topLevelBlogs = blogs.filter(
+      (b) =>
+        typeof b.id === "string" && !["individual", "blogSeries"].includes(b.id)
+    );
 
-  return orderByUpdatedAtISO(topLevelBlogs);
-}
+    return orderByUpdatedAtISO(topLevelBlogs);
+  }
 
+  async function unsubscribeFromBrevo(email) {
+    const res = await fetch(
+      `https://api.brevo.com/v3/contacts/${encodeURIComponent(
+        email
+      )}?identifierType=email_id`,
+      {
+        method: "DELETE",
+        headers: {
+          "api-key": process.env.BREVO_API_KEY,
+        },
+      }
+    );
+
+    const body = await res.text().catch(() => null);
+
+    return {
+      status: res.status,
+      ok: res.ok,
+      message: body || null,
+    };
+  }
 
   async function getAllIndividualBlogsServices() {
     const individualBlogs = await db.getAllIndividualBlogs();

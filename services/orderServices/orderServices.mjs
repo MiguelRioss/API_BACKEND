@@ -136,22 +136,22 @@ export default function createOrdersService(
     }
 
     const stripeAllowed = [
-      "PT",
-      "PORTUGAL",
-      "DE",
-      "GERMANY",
-      "NL",
-      "NETHERLANDS",
-      "MX",
-      "MEXICO",
-      "CA",
-      "CANADA",
-      "AU",
-      "AUSTRALIA",
-      "NZ",
-      "NEW ZEALAND",
-      "ZA",
-      "SOUTH AFRICA",
+      // "PT",
+      // "PORTUGAL",
+      // "DE",
+      // "GERMANY",
+      // "NL",
+      // "NETHERLANDS",
+      // "MX",
+      // "MEXICO",
+      // "CA",
+      // "CANADA",
+      // "AU",
+      // "AUSTRALIA",
+      // "NZ",
+      // "NEW ZEALAND",
+      // "ZA",
+      // "SOUTH AFRICA",
     ];
 
     const normalizedCountry = (country || "").trim().toUpperCase();

@@ -47,11 +47,21 @@ function resolveTokenPath(tokenPath) {
 }
 
 async function loadTokens(tokenPath) {
+  if (process.env.YT_TOKENS_JSON) {
+    try {
+      return JSON.parse(process.env.YT_TOKENS_JSON);
+    } catch (err) {
+      throw new Error("Invalid JSON in YT_TOKENS_JSON env value");
+    }
+  }
+
   let raw;
   try {
     raw = await readFile(tokenPath, "utf8");
   } catch (err) {
-    throw new Error(`Failed to read YouTube tokens at ${tokenPath}`);
+    throw new Error(
+      `Failed to read YouTube tokens at ${tokenPath}. Set YT_TOKENS_PATH or YT_TOKENS_JSON.`
+    );
   }
 
   try {

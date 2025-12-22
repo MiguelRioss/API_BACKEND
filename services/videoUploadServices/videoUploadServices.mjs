@@ -1,5 +1,10 @@
 import errors from "../../errors/errors.mjs";
-import { createPromoCodeForCertainTime, ensureString,ALLOWED_REASONS } from "../videoUploadServices/videoUploadServicesUtils.mjs";
+import {
+  createPromoCodeForCertainTime,
+  ensureString,
+  ALLOWED_REASONS,
+} from "../videoUploadServices/videoUploadServicesUtils.mjs";
+import uploadVideoToYouTubeStep from "./uploadVideoToYouTubeStep.mjs";
 const PROMO_CODE_DAYS = 30;
 
 export default function createVideoUploadServices(
@@ -147,6 +152,34 @@ export default function createVideoUploadServices(
     const validatedAndWithPromoCode = await promoCodeServices.createPromoCode(
       codeInitialProps
     );
+
+    try {
+      const youtubeResult = await uploadVideoToYouTubeStep(video);
+      if (youtubeResult?.youtubeVideoId) {
+        videoChanged.youtubeVideoId = youtubeResult.youtubeVideoId;
+        videoChanged.youtubeUrl = youtubeResult.youtubeUrl || "";
+        videoChanged.youtubeUpload = {
+          status: "uploaded",
+          at: new Date().toISOString(),
+        };
+      } else if (youtubeResult?.skipped) {
+        videoChanged.youtubeUpload = {
+          status: "skipped",
+          reason: youtubeResult.reason || "unknown",
+          at: new Date().toISOString(),
+        };
+      }
+    } catch (youtubeError) {
+      console.warn(
+        "[acceptVideoService] YouTube upload step failed:",
+        youtubeError
+      );
+      videoChanged.youtubeUpload = {
+        status: "failed",
+        reason: youtubeError?.message || "unknown",
+        at: new Date().toISOString(),
+      };
+    }
 
     await emailService.sendSubmissionApproval({
       userEmail: video.userEmail,

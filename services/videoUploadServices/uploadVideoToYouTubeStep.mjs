@@ -1,11 +1,12 @@
-import { readFile, writeFile } from "node:fs/promises";
-import path from "node:path";
 import { randomUUID } from "node:crypto";
 
 const TOKEN_REFRESH_SKEW_MS = 60 * 1000;
 const DEFAULT_PRIVACY_STATUS = "unlisted";
 const DEFAULT_CATEGORY_ID = "22";
 
+/**
+ * MAIN ENTRY
+ */
 export default async function uploadVideoToYouTubeStep(video) {
   if (!video) {
     throw new Error("Video metadata is required for YouTube upload");
@@ -14,14 +15,12 @@ export default async function uploadVideoToYouTubeStep(video) {
     throw new Error("Video URL is required for YouTube upload");
   }
 
-  const tokenPath = resolveTokenPath(
-    process.env.YT_TOKENS_PATH || "yt_tokens.json"
-  );
-  const tokens = await loadTokens(tokenPath);
-  const accessToken = await ensureAccessToken(tokens, tokenPath);
+  const tokens = await loadTokens();
+  const accessToken = await ensureAccessToken(tokens);
 
   const videoBuffer = await downloadVideo(video.url);
   const metadata = buildMetadata(video);
+
   const uploadResponse = await uploadToYouTube({
     accessToken,
     metadata,
@@ -40,67 +39,52 @@ export default async function uploadVideoToYouTubeStep(video) {
   };
 }
 
-function resolveTokenPath(tokenPath) {
-  return path.isAbsolute(tokenPath)
-    ? tokenPath
-    : path.join(process.cwd(), tokenPath);
+/**
+ * TOKEN LOADING (ENV ONLY)
+ */
+async function loadTokens() {
+  const refreshToken = process.env.YT_REFRESH_TOKEN;
+
+  if (!refreshToken) {
+    throw new Error("Missing YT_REFRESH_TOKEN env value");
+  }
+
+  return {
+    refresh_token: refreshToken,
+    token_type: "Bearer",
+    scope: "https://www.googleapis.com/auth/youtube.upload",
+  };
 }
 
-async function loadTokens(tokenPath) {
-  if (process.env.YT_TOKENS_JSON) {
-    try {
-      return JSON.parse(process.env.YT_TOKENS_JSON);
-    } catch (err) {
-      throw new Error("Invalid JSON in YT_TOKENS_JSON env value");
-    }
-  }
-
-  let raw;
-  try {
-    raw = await readFile(tokenPath, "utf8");
-  } catch (err) {
-    throw new Error(
-      `Failed to read YouTube tokens at ${tokenPath}. Set YT_TOKENS_PATH or YT_TOKENS_JSON.`
-    );
-  }
-
-  try {
-    return JSON.parse(raw);
-  } catch (err) {
-    throw new Error(`Invalid JSON in YouTube tokens file: ${tokenPath}`);
-  }
-}
-
+/**
+ * ACCESS TOKEN HANDLING (STATELESS)
+ */
 function isTokenExpired(tokens) {
   const expiryDate = Number(tokens?.expiry_date || 0);
   if (!expiryDate) return true;
   return Date.now() >= expiryDate - TOKEN_REFRESH_SKEW_MS;
 }
 
-async function ensureAccessToken(tokens, tokenPath) {
+async function ensureAccessToken(tokens) {
   if (tokens?.access_token && !isTokenExpired(tokens)) {
     return tokens.access_token;
   }
 
   const refreshed = await refreshAccessToken(tokens);
-  const nextTokens = {
-    ...tokens,
-    ...refreshed,
-  };
-
-  await writeFile(tokenPath, JSON.stringify(nextTokens, null, 2));
-  return nextTokens.access_token;
+  return refreshed.access_token;
 }
 
+/**
+ * OAUTH REFRESH
+ */
 async function refreshAccessToken(tokens = {}) {
-  
   const refreshToken = tokens.refresh_token;
   const clientId = process.env.YT_CLIENT_ID;
   const clientSecret = process.env.YT_CLIENT_SECRET;
 
   console.log("YT_CLIENT_ID exists:", Boolean(clientId));
-console.log("YT_CLIENT_SECRET exists:", Boolean(clientSecret));
-console.log("Has refresh_token:", Boolean(refreshToken));
+  console.log("YT_CLIENT_SECRET exists:", Boolean(clientSecret));
+  console.log("Has refresh_token:", Boolean(refreshToken));
 
   if (!refreshToken) {
     throw new Error("Missing YouTube refresh_token for OAuth refresh");
@@ -123,21 +107,29 @@ console.log("Has refresh_token:", Boolean(refreshToken));
   });
 
   const payload = await response.json().catch(() => ({}));
+
   if (!response.ok) {
-    const message =
-      payload?.error_description || payload?.error || "token refresh failed";
-    throw new Error(`YouTube token refresh failed: ${message}`);
+    console.error("Google token refresh payload:", payload);
+    throw new Error(
+      `YouTube token refresh failed: ${
+        payload?.error_description || payload?.error || "unknown error"
+      }`
+    );
   }
 
   const expiresIn = Number(payload.expires_in || 0);
+
   return {
     access_token: payload.access_token,
-    token_type: payload.token_type || tokens.token_type || "Bearer",
+    token_type: payload.token_type || "Bearer",
     scope: payload.scope || tokens.scope,
     expiry_date: Date.now() + expiresIn * 1000,
   };
 }
 
+/**
+ * VIDEO DOWNLOAD
+ */
 async function downloadVideo(url) {
   const response = await fetch(url);
   if (!response.ok) {
@@ -147,6 +139,9 @@ async function downloadVideo(url) {
   return Buffer.from(arrayBuffer);
 }
 
+/**
+ * METADATA
+ */
 function buildMetadata(video) {
   const title = sanitizeTitle(video.name || video.title || video.filename);
   const description = buildDescription(video);
@@ -178,26 +173,36 @@ function sanitizeTitle(value) {
 
 function buildDescription(video) {
   const parts = [];
+
   if (video.description) {
     parts.push(String(video.description).trim());
   }
+
   const location = [video.city, video.country]
     .map((item) => String(item || "").trim())
     .filter(Boolean)
     .join(", ");
+
   if (location) {
     parts.push(`Location: ${location}`);
   }
+
   if (video.userName) {
     parts.push(`Submitted by: ${String(video.userName).trim()}`);
   }
-  const combined = parts.filter(Boolean).join("\n");
+
+  const combined = parts.join("\n");
+
   if (!combined) {
     return "Mesodose video submission.";
   }
+
   return combined.length > 5000 ? `${combined.slice(0, 4997)}...` : combined;
 }
 
+/**
+ * YOUTUBE UPLOAD
+ */
 async function uploadToYouTube({
   accessToken,
   metadata,
@@ -205,17 +210,21 @@ async function uploadToYouTube({
   videoBuffer,
 }) {
   const boundary = `boundary_${randomUUID()}`;
+
   const jsonPart = Buffer.from(
     `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(
       metadata
     )}\r\n`,
     "utf8"
   );
+
   const videoHeader = Buffer.from(
     `--${boundary}\r\nContent-Type: ${contentType}\r\nContent-Transfer-Encoding: binary\r\n\r\n`,
     "utf8"
   );
+
   const closing = Buffer.from(`\r\n--${boundary}--\r\n`, "utf8");
+
   const body = Buffer.concat([jsonPart, videoHeader, videoBuffer, closing]);
 
   const uploadUrl =
@@ -233,10 +242,13 @@ async function uploadToYouTube({
   });
 
   const payload = await response.json().catch(() => ({}));
+
   if (!response.ok) {
-    const message =
-      payload?.error?.message || payload?.error || "upload failed";
-    throw new Error(`YouTube upload failed: ${message}`);
+    throw new Error(
+      `YouTube upload failed: ${
+        payload?.error?.message || payload?.error || "unknown error"
+      }`
+    );
   }
 
   return payload;

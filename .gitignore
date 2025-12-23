@@ -25,3 +25,5 @@ Thumbs.db
 coverage/
 *.tgz
  
+# OAuth / API secrets
+yt_tokens.json

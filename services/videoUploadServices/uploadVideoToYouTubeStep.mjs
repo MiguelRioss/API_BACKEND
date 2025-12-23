@@ -93,9 +93,14 @@ async function ensureAccessToken(tokens, tokenPath) {
 }
 
 async function refreshAccessToken(tokens = {}) {
+  
   const refreshToken = tokens.refresh_token;
   const clientId = process.env.YT_CLIENT_ID;
   const clientSecret = process.env.YT_CLIENT_SECRET;
+
+  console.log("YT_CLIENT_ID exists:", Boolean(clientId));
+console.log("YT_CLIENT_SECRET exists:", Boolean(clientSecret));
+console.log("Has refresh_token:", Boolean(refreshToken));
 
   if (!refreshToken) {
     throw new Error("Missing YouTube refresh_token for OAuth refresh");

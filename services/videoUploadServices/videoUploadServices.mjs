@@ -153,11 +153,18 @@ export default function createVideoUploadServices(
       codeInitialProps
     );
 
+    let approvalVideoUrl = video.url;
+
     try {
       const youtubeResult = await uploadVideoToYouTubeStep(video);
       if (youtubeResult?.youtubeVideoId) {
+        const youtubeUrl =
+          youtubeResult.youtubeUrl ||
+          `https://youtu.be/${youtubeResult.youtubeVideoId}`;
         videoChanged.youtubeVideoId = youtubeResult.youtubeVideoId;
-        videoChanged.youtubeUrl = youtubeResult.youtubeUrl || "";
+        videoChanged.youtubeUrl = youtubeUrl;
+        videoChanged.url = youtubeUrl;
+        approvalVideoUrl = youtubeUrl;
         videoChanged.youtubeUpload = {
           status: "uploaded",
           at: new Date().toISOString(),
@@ -185,7 +192,7 @@ export default function createVideoUploadServices(
       userEmail: video.userEmail,
       userName: video.userName,
       voucherCode: validatedAndWithPromoCode.code,
-      videoUrl: video.url,
+      videoUrl: approvalVideoUrl,
     });
 
     return await database.patchVideo(videoID, videoChanged);

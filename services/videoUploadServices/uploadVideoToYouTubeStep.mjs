@@ -7,7 +7,10 @@ const DEFAULT_CATEGORY_ID = "22";
 /**
  * MAIN ENTRY
  */
-export default async function uploadVideoToYouTubeStep(video) {
+export default async function uploadVideoToYouTubeStep(
+  video,
+  { emailService } = {}
+) {
   if (!video) {
     throw new Error("Video metadata is required for YouTube upload");
   }
@@ -16,7 +19,7 @@ export default async function uploadVideoToYouTubeStep(video) {
   }
 
   const tokens = await loadTokens();
-  const accessToken = await ensureAccessToken(tokens);
+  const accessToken = await ensureAccessToken(tokens, { emailService });
 
   const videoBuffer = await downloadVideo(video.url);
   const metadata = buildMetadata(video);
@@ -65,19 +68,19 @@ function isTokenExpired(tokens) {
   return Date.now() >= expiryDate - TOKEN_REFRESH_SKEW_MS;
 }
 
-async function ensureAccessToken(tokens) {
+async function ensureAccessToken(tokens, { emailService } = {}) {
   if (tokens?.access_token && !isTokenExpired(tokens)) {
     return tokens.access_token;
   }
 
-  const refreshed = await refreshAccessToken(tokens);
+  const refreshed = await refreshAccessToken(tokens, { emailService });
   return refreshed.access_token;
 }
 
 /**
  * OAUTH REFRESH
  */
-async function refreshAccessToken(tokens = {}) {
+async function refreshAccessToken(tokens = {}, { emailService } = {}) {
   const refreshToken = tokens.refresh_token;
   const clientId = process.env.YT_CLIENT_ID;
   const clientSecret = process.env.YT_CLIENT_SECRET;
@@ -110,6 +113,9 @@ async function refreshAccessToken(tokens = {}) {
 
   if (!response.ok) {
     console.error("Google token refresh payload:", payload);
+    if (payload?.error === "invalid_grant") {
+      await notifyInvalidGrant({ emailService, payload });
+    }
     throw new Error(
       `YouTube token refresh failed: ${
         payload?.error_description || payload?.error || "unknown error"
@@ -125,6 +131,25 @@ async function refreshAccessToken(tokens = {}) {
     scope: payload.scope || tokens.scope,
     expiry_date: Date.now() + expiresIn * 1000,
   };
+}
+
+async function notifyInvalidGrant({ emailService, payload } = {}) {
+  if (!emailService?.sendYouTubeTokenInvalidEmail) return;
+
+  const errorCode = payload?.error || "invalid_grant";
+  const errorDescription =
+    payload?.error_description || "Token refresh rejected by Google.";
+
+  try {
+    await emailService.sendYouTubeTokenInvalidEmail({
+      errorCode,
+      errorDescription,
+      occurredAt: new Date().toISOString(),
+      environment: process.env.NODE_ENV || "unknown",
+    });
+  } catch (err) {
+    console.error("[YouTube] Failed to send token alert email:", err);
+  }
 }
 
 /**

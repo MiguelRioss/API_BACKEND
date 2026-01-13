@@ -156,7 +156,9 @@ export default function createVideoUploadServices(
     let approvalVideoUrl = video.url;
 
     try {
-      const youtubeResult = await uploadVideoToYouTubeStep(video);
+      const youtubeResult = await uploadVideoToYouTubeStep(video, {
+        emailService,
+      });
       if (youtubeResult?.youtubeVideoId) {
         const youtubeUrl =
           youtubeResult.youtubeUrl ||

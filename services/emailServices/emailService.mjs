@@ -10,6 +10,7 @@ import { sendAdminSubmissionNotification } from "./senders/sendAdminSubmissionNo
 import { sendSubmissionApproval } from "./senders/sendSubmissionApproval.mjs";
 import { sendSubmissionRejection } from "./senders/sendSubmissionRejection.mjs";
 import { sendSampleOrderBundleEmails } from "./senders/sendSampleOrderBundleEmails.mjs";
+import { sendYouTubeTokenInvalidEmail } from "./senders/sendYouTubeTokenInvalidEmail.mjs";
 
 export default function createEmailService({ transport } = {}) {
   if (!transport || typeof transport.send !== "function") {
@@ -45,6 +46,8 @@ export default function createEmailService({ transport } = {}) {
       sendSubmissionApproval({ transport, ...args }),
     sendSubmissionRejection: (args) =>
       sendSubmissionRejection({ transport, ...args }),
+    sendYouTubeTokenInvalidEmail: (args) =>
+      sendYouTubeTokenInvalidEmail({ transport, ...args }),
 
     sendSamplesEmailTemplateClient: (args) =>
       sendSamplesEmailTemplateClient({ transport, ...args }),

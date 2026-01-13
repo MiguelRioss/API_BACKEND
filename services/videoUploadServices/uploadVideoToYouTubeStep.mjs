@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 const TOKEN_REFRESH_SKEW_MS = 60 * 1000;
-const DEFAULT_PRIVACY_STATUS = "unlisted";
+const DEFAULT_PRIVACY_STATUS = "public";
 const DEFAULT_CATEGORY_ID = "22";
 
 /**

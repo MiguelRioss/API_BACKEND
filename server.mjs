@@ -30,6 +30,7 @@ import createPromoCodeServices from "./services/promoCodesServices/promoCodeServ
 import createPromotionCodeAPI from "./api/promotionCodeAPI.mjs";
 import createVideoUploadServices from "./services/videoUploadServices/videoUploadServices.mjs";
 import createVideosAPI from "./api/videosAPI.mjs";
+import createYouTubeAPI from "./api/youtubeAPI.mjs";
 
 import multer from "multer";
 
@@ -102,6 +103,7 @@ const subscribeApi = createSubscribeAPI(); // --- New Subscribe API
 const promoCodeApi = createPromotionCodeAPI(promotionCodeServices);
 const pageAPI = createPageApi(pageServices); // --- New Page API
 const videoUploadApi = createVideosAPI(videoUploadServices); // --- New Upload API
+const youtubeApi = createYouTubeAPI();
 
 // -----------------------------------------------------------------------------
 // Stripe Webhook
@@ -242,6 +244,7 @@ app.post("/api/upload/accept/:id", videoUploadApi.acceptVideo);
 app.post("/api/upload/decline/:id", videoUploadApi.declineVideo);
 app.get("/api/videosMetadata", videoUploadApi.getVideosMetadata);
 app.get("/api/video/:id", videoUploadApi.getVideoById);
+app.get("/api/youtube/feed", youtubeApi.getFeed);
 // -----------------------------------------------------------------------------
 // Server Boot
 // -----------------------------------------------------------------------------

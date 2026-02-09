@@ -4,8 +4,10 @@ import handlerFactory from "../utils/handleFactory.mjs";
 
 const DEFAULT_MAX_RESULTS = 12;
 const CACHE_TTL_MS = 10 * 60 * 1000;
+const THUMB_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 const cache = new Map();
+const thumbCache = new Map();
 
 function buildFeedUrl(channelId, playlistId) {
   if (playlistId) {
@@ -80,6 +82,23 @@ function setCache(key, items) {
   cache.set(key, { items, expiresAt: Date.now() + CACHE_TTL_MS });
 }
 
+function getThumbCache(videoId) {
+  const entry = thumbCache.get(videoId);
+  if (!entry) return null;
+  if (entry.expiresAt <= Date.now()) {
+    thumbCache.delete(videoId);
+    return null;
+  }
+  return entry;
+}
+
+function setThumbCache(videoId, payload) {
+  thumbCache.set(videoId, {
+    ...payload,
+    expiresAt: Date.now() + THUMB_CACHE_TTL_MS,
+  });
+}
+
 async function fetchFeedXml(feedUrl) {
   const res = await fetch(feedUrl, {
     headers: {
@@ -96,9 +115,30 @@ async function fetchFeedXml(feedUrl) {
   return res.text();
 }
 
+async function fetchThumbnail(videoId) {
+  const thumbUrl = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+  const res = await fetch(thumbUrl, {
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (compatible; MesodoseBot/1.0; +https://mesodose.com)",
+      Accept: "image/*",
+    },
+  });
+  if (!res.ok) {
+    throw errors.externalService(
+      `Failed to fetch YouTube thumbnail (${res.status} ${res.statusText})`
+    );
+  }
+  const arrayBuffer = await res.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+  const contentType = res.headers.get("content-type") || "image/jpeg";
+  return { buffer, contentType };
+}
+
 export default function createYouTubeAPI() {
   return {
     getFeed: handlerFactory(internalGetFeed),
+    getThumbnail: handlerFactory(internalGetThumbnail),
   };
 
   async function internalGetFeed(req, res) {
@@ -135,5 +175,27 @@ export default function createYouTubeAPI() {
       cached: false,
       sourceUrl: feedUrl,
     };
+  }
+
+  async function internalGetThumbnail(req, res) {
+    const rawId = String(req.query.videoId || req.params.videoId || "").trim();
+    const isValid = /^[A-Za-z0-9_-]{6,}$/.test(rawId);
+    if (!isValid) {
+      return errors.invalidData("Invalid videoId.");
+    }
+
+    const cached = getThumbCache(rawId);
+    if (cached) {
+      res.set("Content-Type", cached.contentType);
+      res.set("Cache-Control", "public, max-age=86400");
+      res.status(200).send(cached.buffer);
+      return;
+    }
+
+    const { buffer, contentType } = await fetchThumbnail(rawId);
+    setThumbCache(rawId, { buffer, contentType });
+    res.set("Content-Type", contentType);
+    res.set("Cache-Control", "public, max-age=86400");
+    res.status(200).send(buffer);
   }
 }

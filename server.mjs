@@ -245,6 +245,7 @@ app.post("/api/upload/decline/:id", videoUploadApi.declineVideo);
 app.get("/api/videosMetadata", videoUploadApi.getVideosMetadata);
 app.get("/api/video/:id", videoUploadApi.getVideoById);
 app.get("/api/youtube/feed", youtubeApi.getFeed);
+app.get("/api/youtube/thumb", youtubeApi.getThumbnail);
 // -----------------------------------------------------------------------------
 // Server Boot
 // -----------------------------------------------------------------------------

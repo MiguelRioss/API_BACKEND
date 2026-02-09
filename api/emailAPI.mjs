@@ -39,6 +39,13 @@ export default function createEmailAPI(emailService) {
   async function internalHandleContactForm(req, res) {
     const { name, email, subject, message, orderId, country } = req.body || {};
 
+    console.log("[contactUs] payload:", {
+      headers: {
+        "content-type": req.headers?.["content-type"],
+      },
+      body: req.body,
+    });
+
     if (!name || !email || !message) {
       return res.status(400).json({ error: "Missing required fields" });
     }

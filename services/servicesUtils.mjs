@@ -309,7 +309,8 @@ export function updateOrderStatus(
  * Includes shipping cost validation and full metadata checks.
  */
 export async function validateAndPrepareOrder(order, options = {}) {
-  const { isRequestedOrderForOtherCountries = false } = options;
+  const { isRequestedOrderForOtherCountries = false, isSample = false } =
+    options;
 
   if (!order || typeof order !== "object" || Array.isArray(order)) {
     return Promise.reject(
@@ -357,10 +358,21 @@ export async function validateAndPrepareOrder(order, options = {}) {
   }
 
   // --- Amount and currency ---
-  if (!Number.isInteger(amount_total) || amount_total < 0) {
-    return Promise.reject(
-      errors.invalidData("amount_total must be a positive integer (in cents).")
-    );
+  const hasAmountTotal = Object.prototype.hasOwnProperty.call(
+    order,
+    "amount_total"
+  );
+  const amountTotalProvided = Number.isInteger(amount_total);
+  let amountTotal = amountTotalProvided ? amount_total : 0;
+
+  if (!amountTotalProvided || amountTotal < 0) {
+    if (!isSample || hasAmountTotal) {
+      return Promise.reject(
+        errors.invalidData(
+          "amount_total must be a positive integer (in cents)."
+        )
+      );
+    }
   }
 
   if (shippingCents < 0) {
@@ -371,7 +383,7 @@ export async function validateAndPrepareOrder(order, options = {}) {
     );
   }
 
-  if (amount_total < shippingCents) {
+  if (!isSample && amountTotal < shippingCents) {
     return Promise.reject(
       errors.invalidData(
         "amount_total must be greater than or equal to shippingCostCents."
@@ -419,7 +431,7 @@ export async function validateAndPrepareOrder(order, options = {}) {
     : PAYMENT_TYPE.MANUAL;
 
   // Paid automatically if Stripe, otherwise unpaid
-  const paymentStatusNormalized = isRequestedOrderForOtherCountries
+  const paymentStatusNormalized = isRequestedOrderForOtherCountries || isSample
     ? false
     : true;
 
@@ -445,7 +457,7 @@ export async function validateAndPrepareOrder(order, options = {}) {
   if (merchandiseTotalCents < 0) {
     return Promise.reject(errors.invalidData("Invalid merchandise total."));
   }
-  if (shippingCents > amount_total) {
+  if (!isSample && shippingCents > amountTotal) {
     return Promise.reject(
       errors.invalidData("amount_total cannot be less than shipping.")
     );
@@ -524,10 +536,17 @@ export async function validateAndPrepareOrder(order, options = {}) {
   );
 
   // Allow ±1 cent tolerance for rounding
-  if (Math.abs(amount_total - expectedTotal) > 1) {
+  if (isSample) {
+    if (amountTotalProvided && Math.abs(amountTotal - expectedTotal) > 1) {
+      console.warn(
+        `[validateAndPrepareOrder] Sample order amount_total (${amountTotal}) does not match expected total (${expectedTotal}). Using expected total.`
+      );
+    }
+    amountTotal = expectedTotal;
+  } else if (Math.abs(amountTotal - expectedTotal) > 1) {
     return Promise.reject(
       errors.invalidData(
-        `Order total mismatch. Expected ${expectedTotal} cents, got ${amount_total} cents.`
+        `Order total mismatch. Expected ${expectedTotal} cents, got ${amountTotal} cents.`
       )
     );
   }
@@ -558,7 +577,7 @@ export async function validateAndPrepareOrder(order, options = {}) {
     phone: phone,
     currency: currencyNorm,
     items: normItems,
-    amount_total,
+    amount_total: amountTotal,
     shipping_cost_cents: shippingCents,
     session_id: normalizedSessionId || "",
     payment_status: paymentStatusNormalized,

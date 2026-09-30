@@ -23,7 +23,6 @@ export function buildOtherCountrysTemplateEmail({
   shippingCents = 1000,
   currency = "EUR",
   wiseUrl = "https://wise.com/pay/me/alvaronigelgiovanniz",
-  revolutUrl = "https://revolut.me/alvaro9dt1",
 
   // (optional) normalized discount from caller: { code?, percent?, amount_cents? }
   discount,
@@ -146,7 +145,6 @@ export function buildOtherCountrysTemplateEmail({
   const formattedTotal = formatMoneyHtml(computedTotalCents, resolvedCurrency);
 
   const safeWiseUrl = escapeHtml(firstNonEmpty(wiseUrl, ""));
-  const safeRevolutUrl = escapeHtml(firstNonEmpty(revolutUrl, ""));
 
   const shippingAddress = resolveAddress(
     order?.metadata?.shipping_address,
@@ -243,10 +241,10 @@ export function buildOtherCountrysTemplateEmail({
   detailItemsText.push(`- Email address: ${emailValue}`);
 
   detailItemsHtml.push(
-    "    <li><strong>Payment receipt:</strong> attach your confirmation (Wise transaction # or Revolut @tag)</li>",
+    "    <li><strong>Payment receipt:</strong> attach your confirmation (Wise transaction #)</li>",
   );
   detailItemsText.push(
-    "- Payment receipt: attach your confirmation (Wise transaction # or Revolut @tag)",
+    "- Payment receipt: attach your confirmation (Wise transaction #)",
   );
 
   const subject = normalizedOrderId
@@ -290,11 +288,8 @@ export function buildOtherCountrysTemplateEmail({
     safeWiseUrl
       ? `    <li>Wise: <a href="${safeWiseUrl}" style="color:#b87333;text-decoration:none;">${safeWiseUrl}</a></li>`
       : "    <li>Wise payment link available upon request.</li>",
-    safeRevolutUrl
-      ? `    <li>Revolut: <a href="${safeRevolutUrl}" style="color:#b87333;text-decoration:none;">${safeRevolutUrl}</a></li>`
-      : "    <li>Revolut payment link available upon request.</li>",
     "  </ul>",
-    '  <p style="margin:16px 0;">Important: Once you have paid, please send us the payment confirmation (Wise transaction # or Revolut @tag) together with the details below:</p>',
+    '  <p style="margin:16px 0;">Important: Once you have paid, please send us the payment confirmation (Wise transaction #) together with the details below:</p>',
     '  <ul style="margin:0 0 16px 20px;padding:0;">',
     ...detailItemsHtml,
     "  </ul>",
@@ -350,9 +345,8 @@ export function buildOtherCountrysTemplateEmail({
     "Payment Options",
     "As Stripe does not allow us to process orders from certain countries, please use one of the alternative methods below if your country is not listed at checkout.",
     safeWiseUrl ? `- Wise: ${wiseUrl}` : "- Wise payment link available upon request.",
-    safeRevolutUrl ? `- Revolut: ${revolutUrl}` : "- Revolut payment link available upon request.",
     "",
-    "Important: Once you have paid, please send the payment confirmation (Wise transaction # or Revolut @tag) together with the information below:",
+    "Important: Once you have paid, please send the payment confirmation (Wise transaction #) together with the information below:",
     ...detailItemsText,
     "",
     `If you need to update any details, use our MesoContact form: ${contactUrl}`,

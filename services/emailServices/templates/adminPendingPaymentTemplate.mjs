@@ -12,7 +12,7 @@ import {
 
 /**
  * Build the admin notification email for manual orders
- * awaiting Wise / Revolut payment.
+ * awaiting Wise payment.
  */
 export function buildAdminPendingPaymentTemplate({
   order = {},
@@ -144,7 +144,7 @@ export function buildAdminPendingPaymentTemplate({
       `  <p style="margin:16px 0;"><strong>Shipping:</strong> ${escapeHtml(shippingCost)}</p>`,
       discountLineHtml,
       `  <p style="margin:0 0 16px 0;"><strong>Order total:</strong> ${escapeHtml(orderTotal)}</p>`,
-      '  <p style="margin:32px 0 0 0; color:#b22222;"><strong>⚠️ Payment pending:</strong> Please verify receipt of Wise / Revolut transfer before preparing shipment.</p>',
+      '  <p style="margin:32px 0 0 0; color:#b22222;"><strong>⚠️ Payment pending:</strong> Please verify receipt of the Wise transfer before preparing shipment.</p>',
       "  <p style=\"margin:32px 0 0 0;\">With gratitude,<br/><strong>The Ibogenics Team</strong><br/>" +
         '<a href="https://mesodose.com" style="color:#b87333;text-decoration:none;">www.mesodose.com</a></p>',
       "</div>",

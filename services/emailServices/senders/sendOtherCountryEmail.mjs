@@ -3,7 +3,7 @@ import { buildOtherCountrysTemplateEmail } from "../templates/otherCountrysTempl
 import errors from "../../../errors/errors.mjs";
 
 /**
- * Sends Wise / Revolut payment instruction emails
+ * Sends Wise payment instruction emails
  * for countries not using Stripe checkout.
  */
 export async function sendOtherCountryEmail({
